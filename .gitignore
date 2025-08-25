@@ -1,0 +1,72 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log
+
+# Build output
+dist/
+build/
+
+# Logs
+logs
+*.log
+*.log.*
+debug.log
+*.pid
+*.seed
+*.pid.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# React Native
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+*.iml
+.gradle/
+local.properties
+
+# iOS
+ios/Pods/
+ios/build/
+ios/DerivedData/
+*.xcworkspace
+*.xcuserstate
+*.xcuserdata/
+*.lock
+
+# React Native specific
+.expo/
+.expo-shared/
+web-build/
+coverage/
+
+# VSCode / IDE
+.vscode/
+.idea/
+*.swp
+
+# Misc
+*.keystore
+*.jks
+*.p12
+*.key
+*.mobileprovision
+
+# Cache
+.cache/
+tmp/
+temp/
