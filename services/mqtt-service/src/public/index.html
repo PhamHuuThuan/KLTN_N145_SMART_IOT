@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart IoT Kitchen Box - MQTT Control</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4757;
+        }
+
+        .status-indicator.connected {
+            background: #2ed573;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .card h2 {
+            color: #2f3542;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .sensor-item {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 15px;
+            color: white;
+        }
+
+        .sensor-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .sensor-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .flame-alert {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .outlet-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-on {
+            background: linear-gradient(135deg, #2ed573 0%, #1e90ff 100%);
+            color: white;
+        }
+
+        .btn-off {
+            background: linear-gradient(135deg, #ff4757 0%, #ff3838 100%);
+            color: white;
+        }
+
+        .btn-toggle {
+            background: linear-gradient(135deg, #ffa502 0%, #ff6348 100%);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .log-section {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .log-container {
+            background: #2f3542;
+            border-radius: 15px;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #f1f2f6;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid #3742fa;
+        }
+
+        .log-time {
+            color: #70a1ff;
+            margin-right: 10px;
+        }
+
+        .log-message {
+            color: #f1f2f6;
+        }
+
+        .log-success { color: #2ed573; }
+        .log-error { color: #ff4757; }
+        .log-info { color: #70a1ff; }
+
+        .timestamp {
+            font-size: 0.8rem;
+            color: #747d8c;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .sensor-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .led-controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Smart IoT Kitchen Box</h1>
+            <p>Real-time sensor monitoring and LED control via MQTT</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="mqttStatus"></div>
+                <span>MQTT Connection</span>
+            </div>
+            <div class="status-item">
+                <div class="status-indicator" id="deviceStatus"></div>
+                <span>Device Status</span>
+            </div>
+            <div class="status-item">
+                <span>Device ID: <strong id="deviceId">KITCHEN-ESP32-LED1</strong></span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <h2>🌡️ Sensor Data</h2>
+                <div class="sensor-grid">
+                    <div class="sensor-item" id="tempSensor">
+                        <div class="sensor-value" id="tempValue">--</div>
+                        <div class="sensor-label">Temperature (°C)</div>
+                    </div>
+                    <div class="sensor-item" id="humidSensor">
+                        <div class="sensor-value" id="humidValue">--</div>
+                        <div class="sensor-label">Humidity (%)</div>
+                    </div>
+                    <div class="sensor-item" id="smokeSensor">
+                        <div class="sensor-value" id="smokeValue">--</div>
+                        <div class="sensor-label">Smoke Detection</div>
+                    </div>
+                    <div class="sensor-item" id="gasSensor">
+                        <div class="sensor-value" id="gasValue">--</div>
+                        <div class="sensor-label">Gas PPM</div>
+                    </div>
+                </div>
+                <div class="timestamp" id="lastUpdate">Last update: Never</div>
+            </div>
+
+            <div class="card">
+                <h2>🔌 Outlet Control (o1 = LED)</h2>
+                <div class="outlet-controls">
+                    <button class="btn btn-on" onclick="turnOnOutlet()">Turn ON</button>
+                    <button class="btn btn-off" onclick="turnOffOutlet()">Turn OFF</button>
+                    <button class="btn btn-toggle" onclick="toggleOutlet()">Toggle</button>
+                </div>
+                <div class="timestamp">Click buttons to control outlet o1 (LED) on your ESP32 device</div>
+            </div>
+        </div>
+
+        <div class="log-section">
+            <h2>📋 Activity Log</h2>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry">
+                    <span class="log-time">[System]</span>
+                    <span class="log-message log-info">Web interface loaded. Waiting for MQTT connection...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Socket.IO connection
+        const socket = io();
+        
+        // DOM elements
+        const mqttStatus = document.getElementById('mqttStatus');
+        const deviceStatus = document.getElementById('deviceStatus');
+        const deviceId = document.getElementById('deviceId');
+        const tempValue = document.getElementById('tempValue');
+        const humidValue = document.getElementById('humidValue');
+        const smokeValue = document.getElementById('smokeValue');
+        const gasValue = document.getElementById('gasValue');
+        const lastUpdate = document.getElementById('lastUpdate');
+        const logContainer = document.getElementById('logContainer');
+
+        // Add log entry
+        function addLog(message, type = 'info') {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `
+                <span class="log-time">[${timeStr}]</span>
+                <span class="log-message log-${type}">${message}</span>
+            `;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Update sensor display
+        function updateSensorDisplay(data) {
+            if (data.temperature !== null) {
+                tempValue.textContent = data.temperature.toFixed(1);
+            }
+            if (data.humidity !== null) {
+                humidValue.textContent = data.humidity.toFixed(1);
+            }
+            
+            smokeValue.textContent = data.smoke ? '🚬' : '✅';
+            gasValue.textContent = data.gasPpm ? data.gasPpm.toFixed(1) : '--';
+            
+            if (data.timestamp) {
+                lastUpdate.textContent = `Last update: ${new Date(data.timestamp).toLocaleString()}`;
+            }
+
+            // Update smoke sensor styling
+            const smokeSensor = document.getElementById('smokeSensor');
+            if (data.smoke) {
+                smokeSensor.classList.add('flame-alert');
+            } else {
+                smokeSensor.classList.remove('flame-alert');
+            }
+        }
+
+        // Outlet control functions
+        async function turnOnOutlet() {
+            try {
+                const response = await fetch('/api/outlet/on', { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    addLog('Outlet o1 turn ON command sent', 'success');
+                } else {
+                    addLog('Failed to send outlet ON command', 'error');
+                }
+            } catch (error) {
+                addLog(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function turnOffOutlet() {
+            try {
+                const response = await fetch('/api/outlet/off', { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    addLog('Outlet o1 turn OFF command sent', 'success');
+                } else {
+                    addLog('Failed to send outlet OFF command', 'error');
+                }
+            } catch (error) {
+                addLog(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function toggleOutlet() {
+            try {
+                const response = await fetch('/api/outlet/toggle', { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    addLog('Outlet o1 toggle command sent', 'success');
+                } else {
+                    addLog('Failed to send outlet toggle command', 'error');
+                }
+            } catch (error) {
+                addLog(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Socket.IO events
+        socket.on('connect', () => {
+            addLog('WebSocket connected', 'success');
+            deviceStatus.classList.add('connected');
+        });
+
+        socket.on('disconnect', () => {
+            addLog('WebSocket disconnected', 'error');
+            deviceStatus.classList.remove('connected');
+        });
+
+        socket.on('sensorData', (data) => {
+            updateSensorDisplay(data);
+            addLog(`Sensor data received: T=${data.temperature}°C, H=${data.humidity}%, Smoke=${data.smoke}, Gas=${data.gasPpm}ppm, o1=${data.outlets.o1}`, 'info');
+        });
+
+        socket.on('ack', (data) => {
+            addLog(`Device acknowledgment: ${data.status}`, 'success');
+        });
+
+        // Check initial status
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                
+                if (status.mqtt) {
+                    mqttStatus.classList.add('connected');
+                    addLog('MQTT connection established', 'success');
+                } else {
+                    addLog('MQTT connection failed', 'error');
+                }
+                
+                if (status.latestData.timestamp) {
+                    updateSensorDisplay(status.latestData);
+                }
+                
+                deviceId.textContent = status.device;
+            } catch (error) {
+                addLog(`Failed to check status: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize
+        checkStatus();
+        
+        // Periodic status check
+        setInterval(checkStatus, 10000);
+    </script>
+</body>
+</html>
