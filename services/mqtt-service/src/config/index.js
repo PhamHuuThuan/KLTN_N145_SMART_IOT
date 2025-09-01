@@ -17,7 +17,7 @@ const config = {
     deviceId: process.env.DEVICE_ID || 'KITCHEN-ESP32-LED1',
   },
   mqtt: {
-    host: process.env.MQTT_HOST || '192.168.110.112',
+    host: process.env.MQTT_HOST || 'localhost',
     port: Number(process.env.MQTT_PORT || 1883),
     username: process.env.MQTT_USERNAME || undefined,
     password: process.env.MQTT_PASSWORD || undefined,
