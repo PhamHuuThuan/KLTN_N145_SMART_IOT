@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ESP32 KitchenBox Telemetry",
+  "type": "object",
+  "required": [
+    "ts",
+    "o",
+    "gas_ppm",
+    "smoke"
+  ],
+  "properties": {
+    "ts": {
+      "type": "integer",
+      "description": "Device uptime in ms when telemetry was produced"
+    },
+    "temp": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Temperature in Celsius (nullable if sensor read fails)"
+    },
+    "humid": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Relative humidity in % (nullable)"
+    },
+    "smoke": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ],
+      "description": "1 = smoke detected, 0 = none (mock if MOCK_SENSORS=1)"
+    },
+    "gas_ppm": {
+      "type": "number",
+      "description": "Gas concentration (ppm) — mocked unless real sensor wired"
+    },
+    "o": {
+      "type": "object",
+      "required": [
+        "o1",
+        "o2",
+        "o3",
+        "o4",
+        "o5"
+      ],
+      "properties": {
+        "o1": {
+          "type": "boolean",
+          "description": "Outlet 1 (LED) state"
+        },
+        "o2": {
+          "type": "boolean",
+          "description": "Outlet 2 state (mock)"
+        },
+        "o3": {
+          "type": "boolean",
+          "description": "Outlet 3 state (mock)"
+        },
+        "o4": {
+          "type": "boolean",
+          "description": "Outlet 4 state (mock)"
+        },
+        "o5": {
+          "type": "boolean",
+          "description": "Outlet 5 state (mock)"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "ts": 382253,
+      "temp": 30.4,
+      "humid": 70,
+      "smoke": 0,
+      "gas_ppm": 373.1002,
+      "o": {
+        "o1": false,
+        "o2": false,
+        "o3": false,
+        "o4": false,
+        "o5": false
+      }
+    }
+  ]
+}
