@@ -1,0 +1,90 @@
+[
+  {
+    "deviceId": "KITCHEN-ESP32-LED1",
+    "name": "Kitchen ESP32 LED Controller",
+    "type": "esp32",
+    "model": "ESP32-WROOM-32",
+    "location": "Kitchen",
+    "description": "ESP32 device for controlling kitchen outlets and monitoring sensors",
+    "status": "online",
+    "lastSeenAt": "2024-01-01T00:00:00.000Z",
+    "ownerId": "admin",
+    "capabilities": {
+      "sensors": ["temperature", "humidity", "smoke", "gas"],
+      "actuators": ["outlet1", "outlet2", "outlet3", "outlet4", "outlet5"],
+      "communication": ["mqtt", "wifi"]
+    },
+    "outlets": [
+      {
+        "id": "o1",
+        "name": "Kitchen Outlet 1",
+        "type": "power",
+        "status": "off",
+        "maxPower": 2200,
+        "description": "Main kitchen power outlet"
+      },
+      {
+        "id": "o2",
+        "name": "Kitchen Outlet 2", 
+        "type": "power",
+        "status": "off",
+        "maxPower": 2200,
+        "description": "Secondary kitchen power outlet"
+      },
+      {
+        "id": "o3",
+        "name": "Kitchen Outlet 3",
+        "type": "power", 
+        "status": "off",
+        "maxPower": 2200,
+        "description": "Tertiary kitchen power outlet"
+      },
+      {
+        "id": "o4",
+        "name": "Kitchen Outlet 4",
+        "type": "power",
+        "status": "off", 
+        "maxPower": 2200,
+        "description": "Quaternary kitchen power outlet"
+      },
+      {
+        "id": "o5",
+        "name": "Kitchen Outlet 5",
+        "type": "power",
+        "status": "off",
+        "maxPower": 2200,
+        "description": "Quinary kitchen power outlet"
+      }
+    ],
+    "thresholds": {
+      "temperature": {
+        "min": 15,
+        "max": 35,
+        "critical": 60
+      },
+      "humidity": {
+        "min": 30,
+        "max": 80
+      },
+      "smoke": {
+        "warning": 50,
+        "critical": 100
+      },
+      "gas": {
+        "warning": 500,
+        "critical": 1000
+      }
+    },
+    "metadata": {
+      "manufacturer": "Espressif",
+      "firmwareVersion": "1.0.0",
+      "hardwareVersion": "1.0",
+      "ipAddress": "192.168.1.100",
+      "macAddress": "AA:BB:CC:DD:EE:FF",
+      "wifiSSID": "Kitchen_WiFi",
+      "mqttBroker": "localhost:1883"
+    },
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+]
