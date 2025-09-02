@@ -14,7 +14,6 @@ try {
 const config = {
   service: {
     port: process.env.PORT || 3000,
-    deviceId: process.env.DEVICE_ID || 'KITCHEN-ESP32-LED1',
   },
   mqtt: {
     host: process.env.MQTT_HOST || 'localhost',
