@@ -87,30 +87,10 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # MongoDB (for storing MQTT message history)
-  mongodb:
-    image: mongo:7.0
-    container_name: mqtt-mongodb
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: mqtt_service
-    volumes:
-      - mongodb-data:/data/db
-      - ./mongodb-init:/docker-entrypoint-initdb.d
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
+
 
 volumes:
   redis-data:
-    driver: local
-  mongodb-data:
     driver: local
 
 networks:
