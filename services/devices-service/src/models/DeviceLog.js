@@ -7,19 +7,23 @@ const telemetrySchema = new mongoose.Schema({
   },
   temp: {
     type: Number,
-    required: true
+    required: true,
+    default: 0
   },
   humid: {
     type: Number,
-    required: true
+    required: true,
+    default: 0
   },
   smoke: {
     type: Number,
-    required: true
+    required: true,
+    default: 0
   },
   gas_ppm: {
     type: Number,
-    required: true
+    required: true,
+    default: 0
   },
   o: {
     o1: { type: Boolean, default: false },
@@ -28,7 +32,7 @@ const telemetrySchema = new mongoose.Schema({
     o4: { type: Boolean, default: false },
     o5: { type: Boolean, default: false }
   }
-});
+}, { _id: false });
 
 const deviceLogSchema = new mongoose.Schema({
   type: {

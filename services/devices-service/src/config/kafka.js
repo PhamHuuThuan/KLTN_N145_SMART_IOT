@@ -5,7 +5,7 @@ dotenv.config();
 
 const kafka = new Kafka({
   clientId: 'devices-service',
-  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+  brokers: (process.env.KAFKA_BROKERS || 'localhost:29092').split(','),
   retry: {
     initialRetryTime: 100,
     retries: 8

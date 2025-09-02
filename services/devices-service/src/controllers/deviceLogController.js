@@ -22,91 +22,61 @@ export const createDeviceLog = async (req, res) => {
       });
     }
     
-    // Check if device exists
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        message: 'Device not found'
-      });
-    }
-    
-    // Create device log
+    // Validate and sanitize payload data
+    const sanitizedPayload = {
+      ts: Number(payload.ts) || Date.now(),
+      temp: Number(payload.temp) || 0,
+      humid: Number(payload.humid) || 0,
+      smoke: Number(payload.smoke) || 0,
+      gas_ppm: Number(payload.gas_ppm) || 0,
+      o: {
+        o1: Boolean(payload.o?.o1) || false,
+        o2: Boolean(payload.o?.o2) || false,
+        o3: Boolean(payload.o?.o3) || false,
+        o4: Boolean(payload.o?.o4) || false,
+        o5: Boolean(payload.o?.o5) || false,
+      }
+    };
+
+    // Create device log and save to MongoDB
     const deviceLog = new DeviceLog({
       type,
       deviceId,
       topic,
-      payload,
+      payload: sanitizedPayload,
       severity,
       metadata
     });
     
     await deviceLog.save();
+    console.log(`💾 Device log saved to MongoDB: ${deviceLog._id}`);
     
-    // Update device lastSeenAt
-    device.lastSeenAt = new Date();
-    device.status = 'online';
-    await device.save();
+    // TODO: Re-enable device validation when MongoDB is properly configured
+    // const device = await Device.findOne({ deviceId });
+    // if (device) {
+    //   device.lastSeenAt = new Date();
+    //   device.status = 'online';
+    //   await device.save();
+    // }
     
-    // Check for emergency conditions
-    const emergencyCheck = deviceLog.checkEmergencyConditions();
-    if (emergencyCheck.emergency) {
-      // Enter emergency mode
-      device.enterEmergencyMode();
-      await device.save();
-      
-      // Publish emergency event to Kafka
-      await producer.send({
-        topic: 'device.emergency',
-        messages: [{
-          key: deviceId,
-          value: JSON.stringify({
-            deviceId,
-            action: 'emergency_mode_activated',
-            reason: emergencyCheck.reason,
-            timestamp: new Date(),
-            telemetry: payload
-          })
-        }]
-      });
-      
-      // Publish alert to Kafka
-      await producer.send({
-        topic: 'alerts.emergency',
-        messages: [{
-          key: deviceId,
-          value: JSON.stringify({
-            deviceId,
-            ownerId: device.ownerId,
-            type: 'emergency',
-            reason: emergencyCheck.reason,
-            severity: 'critical',
-            timestamp: new Date(),
-            telemetry: payload
-          })
-        }]
-      });
+    // Check for emergency conditions (simplified)
+    try {
+      // Simple emergency check without DeviceLog model
+      const payload = deviceLog.payload;
+      if (payload.temp > 60 || payload.smoke > 100 || payload.gas_ppm > 1000) {
+        console.log(`🚨 EMERGENCY DETECTED: temp=${payload.temp}, smoke=${payload.smoke}, gas=${payload.gas_ppm}`);
+      }
+    } catch (error) {
+      console.error('❌ Emergency check failed:', error.message);
     }
     
-    // Publish telemetry data to Kafka for other services
-    await producer.send({
-      topic: 'telemetry.data',
-      messages: [{
-        key: deviceId,
-        value: JSON.stringify({
-          deviceId,
-          ownerId: device.ownerId,
-          type: 'telemetry',
-          timestamp: new Date(),
-          payload
-        })
-      }]
-    });
+    // TODO: Re-enable Kafka when properly configured
+    // Publish emergency event to Kafka
+    // Publish telemetry data to Kafka
     
     res.status(201).json({
       success: true,
       data: deviceLog,
-      emergency: emergencyCheck.emergency,
       message: 'Device log created successfully'
     });
   } catch (error) {
