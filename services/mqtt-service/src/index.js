@@ -1,7 +1,7 @@
 const os = require('os');
 const { createServer } = require('./server');
 const { startMqtt } = require('./mqtt/client');
-const { connectMongo } = require('./db/mongo');
+const { connectKafka, disconnectKafka } = require('./config/kafka');
 const config = require('./config');
 
 function getLocalIP() {
@@ -21,11 +21,11 @@ async function bootstrap() {
   console.log(`🔧 Configuration:`, JSON.stringify(config, null, 2));
   
   try {
-    console.log('📊 Connecting to MongoDB...');
-    await connectMongo();
-    console.log('✅ MongoDB connected successfully');
+    console.log('🔌 Connecting to Kafka...');
+    await connectKafka();
+    console.log('✅ Kafka connected successfully');
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error.message);
+    console.error('❌ Kafka connection failed:', error.message);
     process.exit(1);
   }
 
@@ -42,8 +42,9 @@ async function bootstrap() {
     startMqtt();
   });
 
-  process.on('SIGINT', () => {
+  process.on('SIGINT', async () => {
     console.log('\n🛑 Shutting down...');
+    await disconnectKafka();
     server.close(() => {
       console.log('✅ Server closed');
       process.exit(0);

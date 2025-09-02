@@ -1,6 +1,5 @@
 import DeviceLog from '../models/DeviceLog.js';
 import Device from '../models/Device.js';
-import { producer } from '../config/kafka.js';
 
 // Create new device log (telemetry data)
 export const createDeviceLog = async (req, res) => {

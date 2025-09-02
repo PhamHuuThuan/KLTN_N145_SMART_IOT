@@ -22,13 +22,6 @@ const config = {
     username: process.env.MQTT_USERNAME || undefined,
     password: process.env.MQTT_PASSWORD || undefined,
   },
-  mongo: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/smart_iot',
-    dbName: process.env.MONGODB_DB_NAME || 'smart_iot',
-  },
-  deviceService: {
-    url: process.env.DEVICE_SERVICE_URL || 'http://192.168.110.112:3002',
-  },
 };
 
 module.exports = config;

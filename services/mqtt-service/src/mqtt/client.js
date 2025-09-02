@@ -1,7 +1,7 @@
 const mqtt = require('mqtt');
 const { EventEmitter } = require('events');
-const axios = require('axios');
 const config = require('../config');
+const { publishTelemetryLog, publishEventLog } = require('../config/kafka');
 
 const mqttEvents = new EventEmitter();
 
@@ -75,7 +75,7 @@ function startMqtt() {
         latestData = {
           temperature: data.temp || null,
           humidity: data.humid || null,
-          smoke: data.smoke || 0,  // Keep as number for consistency
+          smoke: data.smoke || 0, 
           gasPpm: data.gas_ppm || null,
           outlets: {
             o1: data.o?.o1 || false,
@@ -92,68 +92,72 @@ function startMqtt() {
         // emit to server/socket layer
         mqttEvents.emit('sensorData', latestData);
 
-                 // forward to device service
-         console.log('🔄 Forwarding to devices-service...');
-                   axios.post(`${config.deviceService.url}/api/logs`, {
-           type: 'telemetry',
-           deviceId: config.service.deviceId,
-           topic,
-           payload: {
-             ts: Date.now(),
-             temp: Number(data.temp) || 0,
-             humid: Number(data.humid) || 0,
-             smoke: Number(data.smoke) || 0,
-             gas_ppm: Number(data.gas_ppm) || 0,
-             o: {
-               o1: Boolean(data.o?.o1) || false,
-               o2: Boolean(data.o?.o2) || false,
-               o3: Boolean(data.o?.o3) || false,
-               o4: Boolean(data.o?.o4) || false,
-               o5: Boolean(data.o?.o5) || false,
-             }
-           },
-           severity: 'low',
-           metadata: {
-             source: 'esp32',
-             version: '1.0'
-           }
-         })
-          .then(response => {
-            console.log('✅ Log saved successfully');
+        // Publish to Kafka 
+        console.log('🔄 Publishing to Kafka...');
+        const telemetryData = {
+          type: 'telemetry',
+          deviceId: config.service.deviceId,
+          topic,
+          payload: {
+            ts: Date.now(),
+            temp: Number(data.temp) || 0,
+            humid: Number(data.humid) || 0,
+            smoke: Number(data.smoke) || 0,
+            gas_ppm: Number(data.gas_ppm) || 0,
+            o: {
+              o1: Boolean(data.o?.o1) || false,
+              o2: Boolean(data.o?.o2) || false,
+              o3: Boolean(data.o?.o3) || false,
+              o4: Boolean(data.o?.o4) || false,
+              o5: Boolean(data.o?.o5) || false,
+            }
+          },
+          severity: 'low',
+          metadata: {
+            source: 'esp32',
+            version: '1.0'
+          }
+        };
+
+        publishTelemetryLog(telemetryData)
+          .then(() => {
+            console.log('✅ Telemetry published to Kafka');
           })
           .catch(error => {
-            console.error(`❌ Failed to save log: ${error.message}`);
+            console.error(`❌ Failed to publish to Kafka: ${error.message}`);
           });
       } else if (topic === topics.ack) {
         console.log('✅ ACK received');
         mqttEvents.emit('ack', data);
         
-                 // forward to device service
-         console.log('🔄 Forwarding ACK to devices-service...');
-         axios.post(`${config.deviceService.url}/api/logs`, {
-           type: 'event',
-           deviceId: config.service.deviceId,
-           topic,
-           payload: {
-             ts: Date.now(),
-             temp: 0,
-             humid: 0,
-             smoke: 0,
-             gas_ppm: 0,
-             o: { o1: false, o2: false, o3: false, o4: false, o5: false }
-           },
-           severity: 'low',
-           metadata: {
-             source: 'esp32',
-             version: '1.0',
-             ackData: data
-           }
-         })
-          .then(response => {
-            console.log('✅ ACK log saved');
+        // Publish ACK event to Kafka
+        console.log('🔄 Publishing ACK to Kafka...');
+        const ackData = {
+          type: 'event',
+          deviceId: config.service.deviceId,
+          topic,
+          payload: {
+            ts: Date.now(),
+            temp: 0,
+            humid: 0,
+            smoke: 0,
+            gas_ppm: 0,
+            o: { o1: false, o2: false, o3: false, o4: false, o5: false }
+          },
+          severity: 'low',
+          metadata: {
+            source: 'esp32',
+            version: '1.0',
+            ackData: data
+          }
+        };
+
+        publishEventLog(ackData)
+          .then(() => {
+            console.log('✅ ACK published to Kafka');
           })
           .catch(error => {
-            console.error(`❌ Failed to save ACK log: ${error.message}`);
+            console.error(`❌ Failed to publish ACK to Kafka: ${error.message}`);
           });
       }
     } catch (err) {
@@ -201,35 +205,6 @@ function sendCommand(action, payload = {}) {
     } else {
       console.log('✅ Command published successfully');
     }
-    
-         // forward to device service
-     console.log('🔄 Forwarding command to devices-service...');
-     axios.post(`${config.deviceService.url}/api/logs`, {
-       type: 'command',
-       deviceId: config.service.deviceId,
-       topic: topics.cmd,
-       payload: {
-         ts: Date.now(),
-         temp: 0,
-         humid: 0,
-         smoke: 0,
-         gas_ppm: 0,
-         o: { o1: false, o2: false, o3: false, o4: false, o5: false }
-       },
-       severity: 'low',
-       metadata: {
-         source: 'mqtt-service',
-         version: '1.0',
-         command: command,
-         error: err ? String(err) : null
-       }
-     })
-      .then(response => {
-        console.log('✅ Command log saved');
-      })
-      .catch(error => {
-        console.error(`❌ Failed to save command log: ${error.message}`);
-      });
   });
 
   return true;

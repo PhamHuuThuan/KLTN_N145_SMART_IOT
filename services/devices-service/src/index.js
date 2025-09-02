@@ -1,17 +1,21 @@
 import app from './app.js';
 import connectDB from './config/database.js';
 import { producer, consumer } from './config/kafka.js';
+import { startLogConsumer, stopLogConsumer } from './consumers/logConsumer.js';
 
 const PORT = process.env.PORT || 3001;
 
 // Connect to MongoDB
 connectDB();
 
-// Start Kafka producer
+// Start Kafka producer and consumers
 const startKafka = async () => {
   try {
     await producer.connect();
-    console.log('Kafka producer connected');
+    console.log('✅ Kafka producer connected');
+    
+    // Start log consumer for telemetry and events
+    await startLogConsumer();
     
     // Connect consumer for emergency events
     await consumer.connect();
@@ -22,20 +26,20 @@ const startKafka = async () => {
       eachMessage: async ({ topic, partition, message }) => {
         try {
           const data = JSON.parse(message.value.toString());
-          console.log('Emergency event received:', data);
+          console.log('🚨 Emergency event received:', data);
           
           // Here you can add additional emergency handling logic
           // For example, sending notifications, activating alarms, etc.
           
         } catch (error) {
-          console.error('Error processing emergency message:', error);
+          console.error('❌ Error processing emergency message:', error);
         }
       }
     });
     
-    console.log('Kafka consumer started');
+    console.log('✅ Kafka consumers started');
   } catch (error) {
-    console.error('Error connecting to Kafka:', error);
+    console.error('❌ Error connecting to Kafka:', error);
   }
 };
 
@@ -62,12 +66,13 @@ process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
   
   try {
+    await stopLogConsumer();
     await producer.disconnect();
     await consumer.disconnect();
-    console.log('Kafka connections closed');
+    console.log('✅ Kafka connections closed');
     process.exit(0);
   } catch (error) {
-    console.error('Error during shutdown:', error);
+    console.error('❌ Error during shutdown:', error);
     process.exit(1);
   }
 });
@@ -76,12 +81,13 @@ process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully');
   
   try {
+    await stopLogConsumer();
     await producer.disconnect();
     await consumer.disconnect();
-    console.log('Kafka connections closed');
+    console.log('✅ Kafka connections closed');
     process.exit(0);
   } catch (error) {
-    console.error('Error during shutdown:', error);
+    console.error('❌ Error during shutdown:', error);
     process.exit(1);
   }
 });
