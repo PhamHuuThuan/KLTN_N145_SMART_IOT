@@ -410,6 +410,65 @@ export const getDeviceStatus = async (req, res) => {
   }
 };
 
+// Update outlet settings
+export const updateOutletSettings = async (req, res) => {
+  try {
+    const { deviceId, outletId } = req.params;
+    const { name, type } = req.body;
+    
+    const device = await Device.findOne({ deviceId });
+    if (!device) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device not found'
+      });
+    }
+    
+    // Find and update outlet
+    const outlet = device.outlets.find(o => o.id === outletId);
+    if (!outlet) {
+      return res.status(404).json({
+        success: false,
+        message: 'Outlet not found'
+      });
+    }
+    
+    // Update outlet settings
+    if (name) outlet.name = name;
+    if (type) outlet.type = type;
+    
+    await device.save();
+    
+    // Publish outlet settings update event to Kafka
+    await producer.send({
+      topic: 'outlet.settings.updated',
+      messages: [{
+        key: deviceId,
+        value: JSON.stringify({
+          deviceId,
+          outletId,
+          name: outlet.name,
+          type: outlet.type,
+          action: 'outlet_settings_updated',
+          timestamp: new Date()
+        })
+      }]
+    });
+    
+    res.json({
+      success: true,
+      data: outlet,
+      message: 'Outlet settings updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating outlet settings',
+      error: error.message
+    });
+  }
+};
+
 // Update device thresholds
 export const updateThresholds = async (req, res) => {
   try {

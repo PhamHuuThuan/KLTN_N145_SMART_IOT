@@ -9,6 +9,8 @@ const mqttEvents = new EventEmitter();
 let mqttClient = null;
 let mqttConnected = false;
 
+// Store data for multiple devices
+let devicesData = new Map();
 let latestData = {
   temperature: null,
   humidity: null,
@@ -16,6 +18,7 @@ let latestData = {
   gasPpm: null,
   outlets: { o1: false, o2: false, o3: false, o4: false, o5: false },
   timestamp: null,
+  deviceId: null,
 };
 
 function startMqtt() {
@@ -79,13 +82,17 @@ function startMqtt() {
       const data = JSON.parse(message.toString());
 
       if (messageType === 'telemetry') {
-        console.log(`🌡️ Telemetry: temp=${data.temp}°C, humid=${data.humid}%, smoke=${data.smoke}, gas=${data.gas_ppm}ppm`);
+        console.log(`🌡️ Telemetry from ${deviceId}: temp=${data.temp}°C, humid=${data.humid}%, smoke=${data.smoke}, gas=${data.gas_ppm}ppm`);
         
-        latestData = {
+        // Store data for this specific device
+        const deviceData = {
+          deviceId: deviceId,
           temperature: data.temp || null,
           humidity: data.humid || null,
           smoke: data.smoke || 0, 
           gasPpm: data.gas_ppm || null,
+          mq2Voltage: data.mq2_v || null,
+          flame: data.flame || 0,
           outlets: {
             o1: data.o?.o1 || false,
             o2: data.o?.o2 || false,
@@ -96,10 +103,17 @@ function startMqtt() {
           timestamp: new Date().toISOString(),
         };
 
-        console.log('💾 Data updated');
+        // Update device-specific data
+        devicesData.set(deviceId, deviceData);
+        
+        // Update latest data (for backward compatibility)
+        latestData = deviceData;
 
-        // emit to server/socket layer
-        mqttEvents.emit('sensorData', latestData);
+        console.log(`💾 Data updated for device ${deviceId}`);
+
+        // emit to server/socket layer with device info
+        mqttEvents.emit('sensorData', deviceData);
+        mqttEvents.emit('deviceData', { deviceId, data: deviceData });
 
         // Publish to Kafka 
         console.log('🔄 Publishing to Kafka...');
@@ -186,9 +200,33 @@ function getLatestData() {
   return latestData;
 }
 
+function getDeviceData(deviceId) {
+  return devicesData.get(deviceId) || null;
+}
+
+function getAllDevicesData() {
+  const result = {};
+  for (const [deviceId, data] of devicesData.entries()) {
+    result[deviceId] = data;
+  }
+  return result;
+}
+
+function getDevicesList() {
+  return Array.from(devicesData.keys());
+}
+
 async function sendCommand(deviceId, action, payload = {}) {
-  if (!mqttClient || !mqttClient.connected) {
+  console.log(`🔍 sendCommand called: deviceId=${deviceId}, action=${action}, payload=`, JSON.stringify(payload));
+  
+  if (!mqttClient) {
+    console.error('❌ Cannot send command: MQTT client not initialized');
+    return false;
+  }
+  
+  if (!mqttClient.connected) {
     console.error('❌ Cannot send command: MQTT client not connected');
+    console.log(`🔍 MQTT client state: connected=${mqttClient.connected}, reconnecting=${mqttClient.reconnecting}`);
     return false;
   }
 
@@ -198,27 +236,25 @@ async function sendCommand(deviceId, action, payload = {}) {
   }
 
   // Validate deviceId from database
+  console.log(`🔍 Validating device: ${deviceId}`);
   const isValidDevice = await deviceService.isValidDevice(deviceId);
   if (!isValidDevice) {
     console.error(`❌ Cannot send command: Invalid or inactive device ${deviceId}`);
     return false;
   }
 
-  const target = payload.target;
   const params = payload.params ?? payload;
 
   const command = {
     action,
-    deviceId,
-    ...(target ? { target } : {}),
     params: params || {},
-    timestamp: new Date().toISOString(),
   };
 
   const cmdTopic = `iot/${deviceId}/cmd`;
 
   console.log(`📤 Sending command: ${command.action} to ${deviceId}`);
   console.log(`📡 Publishing to topic: ${cmdTopic}`);
+  console.log(`📋 Command payload:`, JSON.stringify(command));
 
   mqttClient.publish(cmdTopic, JSON.stringify(command), { qos: 1 }, (err) => {
     if (err) {
@@ -233,23 +269,23 @@ async function sendCommand(deviceId, action, payload = {}) {
 
 async function turnOnOutlet(deviceId) {
   console.log(`🔌 Turning ON outlet o1 for device ${deviceId}`);
-  return await sendCommand(deviceId, 'SET_STATE', {
-    target: { kind: 'outlet', key: 'o1' },
-    params: { state: 'ON' },
+  return await sendCommand(deviceId, 'SET_OUTLET', {
+    params: { key: 'o1', state: 'ON' },
   });
 }
 
 async function turnOffOutlet(deviceId) {
   console.log(`🔌 Turning OFF outlet o1 for device ${deviceId}`);
-  return await sendCommand(deviceId, 'SET_STATE', {
-    target: { kind: 'outlet', key: 'o1' },
-    params: { state: 'OFF' },
+  return await sendCommand(deviceId, 'SET_OUTLET', {
+    params: { key: 'o1', state: 'OFF' },
   });
 }
 
 async function toggleOutlet(deviceId) {
   console.log(`🔌 Toggling outlet o1 for device ${deviceId}`);
-  return await sendCommand(deviceId, 'TOGGLE');
+  return await sendCommand(deviceId, 'TOGGLE_OUTLET', {
+    params: { key: 'o1' },
+  });
 }
 
 module.exports = {
@@ -257,6 +293,9 @@ module.exports = {
   mqttEvents,
   isConnected,
   getLatestData,
+  getDeviceData,
+  getAllDevicesData,
+  getDevicesList,
   sendCommand,
   turnOnOutlet,
   turnOffOutlet,
