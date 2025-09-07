@@ -1,32 +1,30 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 
 const Header = () => {
   return (
     <View style={styles.header}>
-      <Text style={styles.headerTitle}>🏠 Smart IoT Kitchen</Text>
-      <Text style={styles.headerSubtitle}>Device Control & Monitoring</Text>
+      <MaterialCommunityIcons name="home" size={22} color={CONFIG.THEME.surface} />
+      <Text style={styles.headerTitle}>Smart IoT Kitchen</Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: CONFIG.COLORS.primary,
-    padding: 20,
-    paddingTop: 40,
+    backgroundColor: CONFIG.THEME.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: CONFIG.COLORS.white,
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: CONFIG.COLORS.light,
+    fontSize: 18,
+    fontWeight: '700',
+    color: CONFIG.THEME.surface,
   },
 });
 

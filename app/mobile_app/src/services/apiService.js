@@ -74,6 +74,17 @@ class ApiService {
     }
   }
 
+  // Get full device details
+  async getDeviceDetail(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.DEVICE_DETAIL.replace(':deviceId', deviceId);
+      const response = await apiClient.get(url);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch device detail: ${error.message}`);
+    }
+  }
+
   // Toggle outlet
   async toggleOutlet(deviceId, outletId = 'o1') {
     try {

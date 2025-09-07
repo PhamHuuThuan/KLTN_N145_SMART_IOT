@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OutletDetail from './OutletDetail';
 import CONFIG from '../constants/config';
 
@@ -24,18 +24,18 @@ const OutletGrid = ({
       return deviceData.outlets.map(outlet => ({
         id: outlet.id,
         name: outlet.name || `Outlet ${outlet.id}`,
-        icon: outlet.type === 'safety' ? 'security' : 'kitchen',
+        icon: outlet.type === 'safety' ? 'shield' : 'stove',
         type: outlet.type || 'kitchen'
       }));
     }
     
     // Default outlets configuration
     return [
-      { id: 'o1', name: 'Outlet 1', icon: 'kitchen', type: 'kitchen' },
-      { id: 'o2', name: 'Outlet 2', icon: 'kitchen', type: 'kitchen' },
-      { id: 'o3', name: 'Outlet 3', icon: 'kitchen', type: 'kitchen' },
-      { id: 'o4', name: 'Outlet 4', icon: 'security', type: 'safety' },
-      { id: 'o5', name: 'Outlet 5', icon: 'security', type: 'safety' }
+      { id: 'o1', name: 'Outlet 1', icon: 'stove', type: 'kitchen' },
+      { id: 'o2', name: 'Outlet 2', icon: 'stove', type: 'kitchen' },
+      { id: 'o3', name: 'Outlet 3', icon: 'stove', type: 'kitchen' },
+      { id: 'o4', name: 'Outlet 4', icon: 'shield', type: 'safety' },
+      { id: 'o5', name: 'Outlet 5', icon: 'shield', type: 'safety' }
     ];
   };
 
@@ -160,7 +160,7 @@ const OutletGrid = ({
                 {
                   transform: [{ scale: buttonScales[index] }],
                   backgroundColor: isOn ? CONFIG.COLORS.success : CONFIG.COLORS.light,
-                  borderColor: isOn ? CONFIG.COLORS.success : CONFIG.COLORS.gray,
+                  borderColor: isOn ? CONFIG.THEME.success : CONFIG.THEME.border,
                 }
               ]}
             >
@@ -171,7 +171,7 @@ const OutletGrid = ({
               activeOpacity={0.8}
             >
                 <View style={styles.outletHeader}>
-                  <MaterialIcons 
+                  <MaterialCommunityIcons 
                     name={outlet.icon} 
                     size={20} 
                     color={isOn ? CONFIG.COLORS.white : CONFIG.COLORS.gray} 
@@ -185,7 +185,7 @@ const OutletGrid = ({
                 </View>
                 
                 <View style={styles.outletStatus}>
-                  <MaterialIcons 
+                  <MaterialCommunityIcons 
                     name={getOutletIcon(outlet.id)} 
                     size={24} 
                     color={isOn ? CONFIG.COLORS.white : CONFIG.COLORS.gray} 
@@ -209,7 +209,7 @@ const OutletGrid = ({
                 disabled={isDisabled}
                 activeOpacity={0.8}
               >
-                <MaterialIcons 
+                <MaterialCommunityIcons 
                   name={isOn ? 'power-off' : 'power'} 
                   size={18} 
                   color={CONFIG.COLORS.white} 

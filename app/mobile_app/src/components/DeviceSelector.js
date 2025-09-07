@@ -1,11 +1,15 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 
 const DeviceSelector = ({ devices, selectedDevice, onSelectDevice }) => {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>📱 Connected Devices</Text>
+      <View style={styles.headerRow}>
+        <MaterialCommunityIcons name="devices" size={20} color={CONFIG.COLORS.primary} />
+        <Text style={styles.sectionTitle}>Connected Devices</Text>
+      </View>
       {devices.length > 0 ? (
         <View style={styles.deviceList}>
           {devices.map((deviceId) => (
@@ -49,6 +53,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: CONFIG.COLORS.primary,
+    marginBottom: 0,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginBottom: 15,
   },
   deviceList: {

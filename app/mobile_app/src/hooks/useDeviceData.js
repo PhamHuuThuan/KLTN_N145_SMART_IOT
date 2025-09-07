@@ -8,6 +8,7 @@ export const useDeviceData = () => {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [deviceDetail, setDeviceDetail] = useState(null);
 
   // Fetch devices
   const fetchDevices = useCallback(async () => {
@@ -53,6 +54,17 @@ export const useDeviceData = () => {
     }
   }, []);
 
+  // Fetch full device detail for UI (e.g., modal)
+  const fetchDeviceDetail = useCallback(async (deviceId) => {
+    if (!deviceId) return;
+    try {
+      const response = await apiService.getDeviceDetail(deviceId);
+      setDeviceDetail(response.data || response);
+    } catch (err) {
+      console.error('Error fetching device detail:', err);
+    }
+  }, []);
+
   // Select device
   const selectDevice = useCallback(async (deviceId) => {
     setSelectedDevice(deviceId);
@@ -74,6 +86,7 @@ export const useDeviceData = () => {
 
   return {
     deviceData,
+    deviceDetail,
     devicesList,
     selectedDevice,
     loading,
@@ -81,5 +94,6 @@ export const useDeviceData = () => {
     fetchDevices,
     selectDevice,
     fetchDeviceStatus,
+    fetchDeviceDetail,
   };
 };

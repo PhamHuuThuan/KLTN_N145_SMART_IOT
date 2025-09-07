@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 
 const SensorGrid = ({ deviceData }) => {
@@ -26,7 +26,7 @@ const SensorGrid = ({ deviceData }) => {
       id: 'temperature',
       label: 'Temperature',
       value: latestTelemetry.temp !== null && latestTelemetry.temp !== undefined ? `${latestTelemetry.temp}°C` : '--',
-      icon: 'thermostat',
+      icon: 'thermometer',
       color: CONFIG.COLORS.danger,
       unit: '°C'
     },
@@ -34,7 +34,7 @@ const SensorGrid = ({ deviceData }) => {
       id: 'humidity',
       label: 'Humidity',
       value: latestTelemetry.humid !== null && latestTelemetry.humid !== undefined ? `${latestTelemetry.humid}%` : '--',
-      icon: 'water-drop',
+      icon: 'water-percent',
       color: CONFIG.COLORS.info,
       unit: '%'
     },
@@ -42,7 +42,7 @@ const SensorGrid = ({ deviceData }) => {
       id: 'gas',
       label: 'Gas Level',
       value: latestTelemetry.gas_ppm !== null && latestTelemetry.gas_ppm !== undefined ? `${latestTelemetry.gas_ppm} ppm` : '--',
-      icon: 'air',
+      icon: 'molecule-co2',
       color: CONFIG.COLORS.warning,
       unit: 'ppm'
     },
@@ -50,7 +50,7 @@ const SensorGrid = ({ deviceData }) => {
       id: 'smoke',
       label: 'Smoke',
       value: latestTelemetry.smoke !== null && latestTelemetry.smoke !== undefined ? (latestTelemetry.smoke > 0 ? 'Detected' : 'Clear') : '--',
-      icon: 'smoke-free',
+      icon: 'smoke-detector',
       color: latestTelemetry.smoke > 0 ? CONFIG.COLORS.danger : CONFIG.COLORS.success,
       unit: ''
     }
@@ -63,7 +63,7 @@ const SensorGrid = ({ deviceData }) => {
         {sensorData.map((sensor) => (
           <View key={sensor.id} style={styles.sensorCard}>
             <View style={styles.sensorHeader}>
-              <MaterialIcons 
+              <MaterialCommunityIcons 
                 name={sensor.icon} 
                 size={24} 
                 color={sensor.color} 
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: CONFIG.THEME.border,
   },
   sensorHeader: {
     flexDirection: 'row',

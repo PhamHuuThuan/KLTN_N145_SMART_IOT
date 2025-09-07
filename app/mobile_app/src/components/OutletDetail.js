@@ -8,7 +8,7 @@ import {
   TextInput, 
   Alert 
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 
 const OutletDetail = ({ 
@@ -117,9 +117,9 @@ const OutletDetail = ({
   const getGroupIcon = (group) => {
     switch (group) {
       case 'kitchen':
-        return 'kitchen';
+        return 'stove';
       case 'safety':
-        return 'security';
+        return 'shield';
       default:
         return 'power';
     }
@@ -152,13 +152,13 @@ const OutletDetail = ({
           <View style={styles.header}>
             <Text style={styles.title}>Outlet Details</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <MaterialIcons name="close" size={24} color={CONFIG.COLORS.gray} />
+              <MaterialCommunityIcons name="close" size={24} color={CONFIG.COLORS.gray} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.outletInfo}>
             <View style={styles.outletHeader}>
-              <MaterialIcons 
+              <MaterialCommunityIcons 
                 name={getGroupIcon(outletGroup)} 
                 size={32} 
                 color={getGroupColor(outletGroup)} 
@@ -177,7 +177,7 @@ const OutletDetail = ({
                 styles.statusBadge,
                 { backgroundColor: outletStatus ? CONFIG.COLORS.success : CONFIG.COLORS.danger }
               ]}>
-                <MaterialIcons 
+                <MaterialCommunityIcons 
                   name={outletStatus ? 'power' : 'power-off'} 
                   size={18} 
                   color={CONFIG.COLORS.white} 
@@ -220,8 +220,8 @@ const OutletDetail = ({
                       ]}
                       onPress={() => setOutletGroup('kitchen')}
                     >
-                      <MaterialIcons 
-                        name="kitchen" 
+                      <MaterialCommunityIcons 
+                        name="stove" 
                         size={20} 
                         color={outletGroup === 'kitchen' ? CONFIG.COLORS.white : CONFIG.COLORS.warning} 
                       />
@@ -240,8 +240,8 @@ const OutletDetail = ({
                       ]}
                       onPress={() => setOutletGroup('safety')}
                     >
-                      <MaterialIcons 
-                        name="security" 
+                      <MaterialCommunityIcons 
+                        name="shield" 
                         size={20} 
                         color={outletGroup === 'safety' ? CONFIG.COLORS.white : CONFIG.COLORS.danger} 
                       />
@@ -265,7 +265,7 @@ const OutletDetail = ({
                   style={[styles.actionButton, styles.editButton]}
                   onPress={handleEdit}
                 >
-                  <MaterialIcons name="edit" size={20} color={CONFIG.COLORS.white} />
+                  <MaterialCommunityIcons name="pencil" size={20} color={CONFIG.COLORS.white} />
                   <Text style={styles.actionButtonText}>Edit</Text>
                 </TouchableOpacity>
                 
@@ -278,7 +278,7 @@ const OutletDetail = ({
                   onPress={handleToggle}
                   disabled={loading}
                 >
-                  <MaterialIcons 
+                  <MaterialCommunityIcons 
                     name={outletStatus ? 'power-off' : 'power'} 
                     size={22} 
                     color={CONFIG.COLORS.white} 
@@ -294,7 +294,7 @@ const OutletDetail = ({
                   style={[styles.actionButton, styles.cancelButton]}
                   onPress={handleCancel}
                 >
-                  <MaterialIcons name="close" size={20} color={CONFIG.COLORS.white} />
+                  <MaterialCommunityIcons name="close" size={20} color={CONFIG.COLORS.white} />
                   <Text style={styles.actionButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 
@@ -302,7 +302,7 @@ const OutletDetail = ({
                   style={[styles.actionButton, styles.saveButton]}
                   onPress={handleSave}
                 >
-                  <MaterialIcons name="save" size={20} color={CONFIG.COLORS.white} />
+                  <MaterialCommunityIcons name="content-save" size={20} color={CONFIG.COLORS.white} />
                   <Text style={styles.actionButtonText}>Save</Text>
                 </TouchableOpacity>
               </>
