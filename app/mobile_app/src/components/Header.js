@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import CONFIG from '../constants/config';
 
 const Header = () => {
   return (
     <View style={styles.header}>
-      <MaterialCommunityIcons name="home" size={22} color={CONFIG.THEME.surface} />
+      <Image
+        source={require('../../assets/logo_app.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
       <Text style={styles.headerTitle}>Smart IoT Kitchen</Text>
     </View>
   );
@@ -25,6 +28,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: CONFIG.THEME.surface,
+  },
+  logo: {
+    width: 36,
+    height: 36,
   },
 });
 
