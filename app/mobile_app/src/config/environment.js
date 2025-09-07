@@ -10,15 +10,15 @@ const getLocalIP = () => {
 const ENV = {
   // Server URLs
   DEVICES_SERVICE: {
-    HTTP: `http://${getLocalIP()}:3001`,
-    HTTPS: `https://${getLocalIP()}:3001`,
-    LOCAL: 'http://127.0.0.1:3001',
+    HTTP: `http://${getLocalIP()}:3002`,
+    HTTPS: `https://${getLocalIP()}:3002`,
+    LOCAL: 'http://127.0.0.1:3002',
   },
   
   MQTT_SERVICE: {
-    HTTP: `http://${getLocalIP()}:3000`,
-    HTTPS: `https://${getLocalIP()}:3000`,
-    LOCAL: 'http://127.0.0.1:3000',
+    HTTP: `http://${getLocalIP()}:3001`,
+    HTTPS: `https://${getLocalIP()}:3001`,
+    LOCAL: 'http://127.0.0.1:3001',
   },
   
   RULES_SERVICE: {

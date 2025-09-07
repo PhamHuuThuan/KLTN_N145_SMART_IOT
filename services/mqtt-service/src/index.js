@@ -2,6 +2,7 @@ const os = require('os');
 const { createServer } = require('./server');
 const { startMqtt } = require('./mqtt/client');
 const { connectKafka, disconnectKafka } = require('./config/kafka');
+const { startOutletConsumer } = require('./consumers/outletConsumer');
 const config = require('./config');
 
 function getLocalIP() {
@@ -40,6 +41,9 @@ async function bootstrap() {
     
     console.log('🔌 Initializing MQTT client...');
     startMqtt();
+    
+    console.log('🔌 Starting outlet consumer...');
+    startOutletConsumer();
   });
 
   process.on('SIGINT', async () => {

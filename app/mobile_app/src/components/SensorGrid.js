@@ -25,7 +25,7 @@ const SensorGrid = ({ deviceData }) => {
     {
       id: 'temperature',
       label: 'Temperature',
-      value: latestTelemetry.temperature ? `${latestTelemetry.temperature}°C` : '--',
+      value: latestTelemetry.temp !== null && latestTelemetry.temp !== undefined ? `${latestTelemetry.temp}°C` : '--',
       icon: 'thermostat',
       color: CONFIG.COLORS.danger,
       unit: '°C'
@@ -33,7 +33,7 @@ const SensorGrid = ({ deviceData }) => {
     {
       id: 'humidity',
       label: 'Humidity',
-      value: latestTelemetry.humidity ? `${latestTelemetry.humidity}%` : '--',
+      value: latestTelemetry.humid !== null && latestTelemetry.humid !== undefined ? `${latestTelemetry.humid}%` : '--',
       icon: 'water-drop',
       color: CONFIG.COLORS.info,
       unit: '%'
@@ -41,7 +41,7 @@ const SensorGrid = ({ deviceData }) => {
     {
       id: 'gas',
       label: 'Gas Level',
-      value: latestTelemetry.gasPpm ? `${latestTelemetry.gasPpm} ppm` : '--',
+      value: latestTelemetry.gas_ppm !== null && latestTelemetry.gas_ppm !== undefined ? `${latestTelemetry.gas_ppm} ppm` : '--',
       icon: 'air',
       color: CONFIG.COLORS.warning,
       unit: 'ppm'
@@ -49,25 +49,9 @@ const SensorGrid = ({ deviceData }) => {
     {
       id: 'smoke',
       label: 'Smoke',
-      value: latestTelemetry.smoke ? 'Detected' : 'Clear',
+      value: latestTelemetry.smoke !== null && latestTelemetry.smoke !== undefined ? (latestTelemetry.smoke > 0 ? 'Detected' : 'Clear') : '--',
       icon: 'smoke-free',
-      color: latestTelemetry.smoke ? CONFIG.COLORS.danger : CONFIG.COLORS.success,
-      unit: ''
-    },
-    {
-      id: 'mq2',
-      label: 'MQ2 Voltage',
-      value: latestTelemetry.mq2Voltage ? `${latestTelemetry.mq2Voltage}V` : '--',
-      icon: 'electrical-services',
-      color: CONFIG.COLORS.secondary,
-      unit: 'V'
-    },
-    {
-      id: 'flame',
-      label: 'Flame',
-      value: latestTelemetry.flame ? 'Detected' : 'Clear',
-      icon: 'local-fire-department',
-      color: latestTelemetry.flame ? CONFIG.COLORS.danger : CONFIG.COLORS.success,
+      color: latestTelemetry.smoke > 0 ? CONFIG.COLORS.danger : CONFIG.COLORS.success,
       unit: ''
     }
   ];

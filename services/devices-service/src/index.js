@@ -2,6 +2,7 @@ import app from './app.js';
 import connectDB from './config/database.js';
 import { producer, consumer } from './config/kafka.js';
 import { startLogConsumer, stopLogConsumer } from './consumers/logConsumer.js';
+import { startDeviceStatusConsumer } from './consumers/deviceStatusConsumer.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -16,6 +17,9 @@ const startKafka = async () => {
     
     // Start log consumer for telemetry and events
     await startLogConsumer();
+    
+    // Start device status consumer for real-time updates
+    await startDeviceStatusConsumer();
     
     // Connect consumer for emergency events
     await consumer.connect();

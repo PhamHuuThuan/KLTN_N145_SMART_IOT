@@ -385,6 +385,7 @@ export const getDeviceStatus = async (req, res) => {
     const latestLog = await DeviceLog.findOne({ deviceId })
       .sort({ createdAt: -1 });
     
+    console.log('latestLog', latestLog);
     const status = {
       deviceId: device.deviceId,
       name: device.name,

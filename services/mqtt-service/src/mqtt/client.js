@@ -123,10 +123,10 @@ function startMqtt() {
           topic,
           payload: {
             ts: Date.now(),
-            temp: Number(data.temp) || 0,
-            humid: Number(data.humid) || 0,
-            smoke: Number(data.smoke) || 0,
-            gas_ppm: Number(data.gas_ppm) || 0,
+            temp: data.temp !== null && data.temp !== undefined ? Number(data.temp) : 0,
+            humid: data.humid !== null && data.humid !== undefined ? Number(data.humid) : 0,
+            smoke: data.smoke !== null && data.smoke !== undefined ? Number(data.smoke) : 0,
+            gas_ppm: data.gas_ppm !== null && data.gas_ppm !== undefined ? Number(data.gas_ppm) : 0,
             o: {
               o1: Boolean(data.o?.o1) || false,
               o2: Boolean(data.o?.o2) || false,
@@ -288,6 +288,34 @@ async function toggleOutlet(deviceId) {
   });
 }
 
+async function updateDeviceOutletSettings(deviceId, outletId, settings) {
+  try {
+    console.log(`⚙️ Updating outlet settings for ${deviceId}/${outletId}:`, settings);
+    
+    // Update local device data
+    const deviceData = devicesData.get(deviceId);
+    if (deviceData && deviceData.outlets) {
+      deviceData.outlets[outletId] = {
+        ...deviceData.outlets[outletId],
+        ...settings
+      };
+      devicesData.set(deviceId, deviceData);
+    }
+
+    // Emit event for real-time updates
+    mqttEvents.emit('outletSettingsUpdated', {
+      deviceId,
+      outletId,
+      settings
+    });
+
+    return true;
+  } catch (error) {
+    console.error('❌ Error updating outlet settings:', error);
+    return false;
+  }
+}
+
 module.exports = {
   startMqtt,
   mqttEvents,
@@ -300,6 +328,7 @@ module.exports = {
   turnOnOutlet,
   turnOffOutlet,
   toggleOutlet,
+  updateDeviceOutletSettings,
 };
 
 

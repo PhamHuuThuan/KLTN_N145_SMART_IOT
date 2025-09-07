@@ -80,5 +80,6 @@ export const useDeviceData = () => {
     error,
     fetchDevices,
     selectDevice,
+    fetchDeviceStatus,
   };
 };

@@ -16,20 +16,26 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
+// app.use(cors({
+//   origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+//     'http://localhost:3000',
+//     'http://localhost:8081',
+//     'http://127.0.0.1:8081',
+//     'http://192.168.110.112:8081'
+//   ],
+//   credentials: true
+// }));
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-    'http://localhost:3000',
-    'http://localhost:8081',
-    'http://127.0.0.1:8081',
-    'http://192.168.110.112:8081'
-  ],
+  origin: (origin, callback) => {
+    callback(null, true); // accept mọi origin
+  },
   credentials: true
 }));
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 100000000, // limit each IP to 100 requests per windowMs
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.'

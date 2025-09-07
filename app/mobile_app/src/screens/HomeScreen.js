@@ -27,6 +27,7 @@ const HomeScreen = () => {
     error,
     fetchDevices,
     selectDevice,
+    fetchDeviceStatus,
   } = useDeviceData();
 
   const { controlOutlet, loading: controlLoading } = useOutletControl();
@@ -73,10 +74,10 @@ const HomeScreen = () => {
           loading={controlLoading}
         />
 
-        {deviceData?.timestamp && (
+        {deviceData?.lastUpdate && (
           <View style={styles.section}>
             <Text style={styles.lastUpdate}>
-              Last update: {new Date(deviceData.timestamp).toLocaleString()}
+              Last update: {new Date(deviceData.lastUpdate).toLocaleString()}
             </Text>
           </View>
         )}

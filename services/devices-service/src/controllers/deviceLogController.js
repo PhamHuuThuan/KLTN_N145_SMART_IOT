@@ -24,10 +24,10 @@ export const createDeviceLog = async (req, res) => {
     // Validate and sanitize payload data
     const sanitizedPayload = {
       ts: Number(payload.ts) || Date.now(),
-      temp: Number(payload.temp) || 0,
-      humid: Number(payload.humid) || 0,
-      smoke: Number(payload.smoke) || 0,
-      gas_ppm: Number(payload.gas_ppm) || 0,
+      temp: payload.temp !== null && payload.temp !== undefined ? Number(payload.temp) : 0,
+      humid: payload.humid !== null && payload.humid !== undefined ? Number(payload.humid) : 0,
+      smoke: payload.smoke !== null && payload.smoke !== undefined ? Number(payload.smoke) : 0,
+      gas_ppm: payload.gas_ppm !== null && payload.gas_ppm !== undefined ? Number(payload.gas_ppm) : 0,
       o: {
         o1: Boolean(payload.o?.o1) || false,
         o2: Boolean(payload.o?.o2) || false,
