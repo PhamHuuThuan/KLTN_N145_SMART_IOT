@@ -80,9 +80,12 @@ class ApiService {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
+      console.log(`🔌 API toggleOutlet: ${url}`);
       const response = await apiClient.put(url);
+      console.log(`✅ API toggleOutlet response:`, response.data);
       return response.data;
     } catch (error) {
+      console.error(`❌ API toggleOutlet error:`, error);
       throw new Error(`Failed to toggle outlet: ${error.message}`);
     }
   }
@@ -93,9 +96,12 @@ class ApiService {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
+      console.log(`🔌 API turnOnOutlet: ${url}`, { status: true });
       const response = await apiClient.put(url, { status: true });
+      console.log(`✅ API turnOnOutlet response:`, response.data);
       return response.data;
     } catch (error) {
+      console.error(`❌ API turnOnOutlet error:`, error);
       throw new Error(`Failed to turn on outlet: ${error.message}`);
     }
   }
@@ -106,9 +112,12 @@ class ApiService {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
+      console.log(`🔌 API turnOffOutlet: ${url}`, { status: false });
       const response = await apiClient.put(url, { status: false });
+      console.log(`✅ API turnOffOutlet response:`, response.data);
       return response.data;
     } catch (error) {
+      console.error(`❌ API turnOffOutlet error:`, error);
       throw new Error(`Failed to turn off outlet: ${error.message}`);
     }
   }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -19,7 +19,8 @@ const OutletDetail = ({
   onUpdateOutlet,
   onControlOutlet,
   loading,
-  deviceData 
+  deviceData,
+  onRefreshDeviceData
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [outletName, setOutletName] = useState(outlet?.name || '');
@@ -37,6 +38,11 @@ const OutletDetail = ({
   };
   
   const outletStatus = getOutletStatus(outlet?.id);
+
+  // Force re-render when deviceData changes
+  useEffect(() => {
+    console.log(`🔄 OutletDetail: deviceData updated for ${outlet?.id}`);
+  }, [deviceData?.latestTelemetry?.o]);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -70,10 +76,40 @@ const OutletDetail = ({
 
   const handleToggle = async () => {
     const action = outletStatus ? 'off' : 'on';
+    console.log(`🔌 Detail toggle: ${outlet.id} -> ${action}`);
+    console.log(`📋 Detail props: deviceId=${deviceId}, onControlOutlet=${typeof onControlOutlet}`);
+    
+    if (!onControlOutlet) {
+      console.error(`❌ onControlOutlet function not provided`);
+      Alert.alert('Error', 'Control function not available');
+      return;
+    }
+    
     const success = await onControlOutlet(action, deviceId, outlet.id);
+    console.log(`📊 Detail toggle result: ${success}`);
+    
     if (success) {
-      Alert.alert('Success', `Outlet ${action} command sent`);
+      console.log(`✅ Detail toggle success: ${outlet.id} -> ${action}`);
+      
+      // Refresh device data after successful toggle
+      if (onRefreshDeviceData) {
+        setTimeout(() => {
+          onRefreshDeviceData();
+        }, 300);
+      }
+      
+      // Show success message briefly
+      Alert.alert('Success', `Outlet ${action} command sent`, [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Close detail after user acknowledges
+            onClose();
+          }
+        }
+      ]);
     } else {
+      console.error(`❌ Detail toggle failed: ${outlet.id} -> ${action}`);
       Alert.alert('Error', 'Failed to send command');
     }
   };
@@ -136,14 +172,14 @@ const OutletDetail = ({
             </View>
 
             <View style={styles.statusSection}>
-              <Text style={styles.statusLabel}>Status:</Text>
+              <Text style={styles.statusLabel}>Current Status:</Text>
               <View style={[
                 styles.statusBadge,
-                { backgroundColor: outletStatus ? CONFIG.COLORS.success : CONFIG.COLORS.gray }
+                { backgroundColor: outletStatus ? CONFIG.COLORS.success : CONFIG.COLORS.danger }
               ]}>
                 <MaterialIcons 
                   name={outletStatus ? 'power' : 'power-off'} 
-                  size={16} 
+                  size={18} 
                   color={CONFIG.COLORS.white} 
                 />
                 <Text style={styles.statusText}>
@@ -236,18 +272,19 @@ const OutletDetail = ({
                 <TouchableOpacity
                   style={[
                     styles.actionButton, 
-                    outletStatus ? styles.offButton : styles.onButton
+                    outletStatus ? styles.offButton : styles.onButton,
+                    loading && styles.disabledButton
                   ]}
                   onPress={handleToggle}
                   disabled={loading}
                 >
                   <MaterialIcons 
                     name={outletStatus ? 'power-off' : 'power'} 
-                    size={20} 
+                    size={22} 
                     color={CONFIG.COLORS.white} 
                   />
                   <Text style={styles.actionButtonText}>
-                    {loading ? 'Processing...' : (outletStatus ? 'Turn OFF' : 'Turn ON')}
+                    {loading ? 'Processing...' : (outletStatus ? 'TURN OFF' : 'TURN ON')}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -454,6 +491,9 @@ const styles = StyleSheet.create({
     color: CONFIG.COLORS.white,
     fontWeight: 'bold',
     marginLeft: 6,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
 });
 

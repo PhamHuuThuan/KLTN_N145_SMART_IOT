@@ -72,6 +72,7 @@ const HomeScreen = () => {
             }
           }}
           loading={controlLoading}
+          onRefreshDeviceData={() => fetchDeviceStatus(selectedDevice)}
         />
 
         {deviceData?.lastUpdate && (

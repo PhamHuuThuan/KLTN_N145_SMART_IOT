@@ -9,7 +9,8 @@ const OutletGrid = ({
   deviceData, 
   onControlOutlet, 
   onUpdateOutletSettings,
-  loading 
+  loading,
+  onRefreshDeviceData
 }) => {
   const [buttonScales] = useState(() => 
     Array.from({ length: 5 }, () => new Animated.Value(1))
@@ -45,13 +46,21 @@ const OutletGrid = ({
     setDetailVisible(true);
   };
 
-  const handleOutletControl = async (action, outletId) => {
-    if (!selectedDevice) {
-      return;
+  const handleOutletControl = async (action, deviceId, outletId) => {
+    console.log(`🔌 OutletGrid handleOutletControl: ${action}, deviceId: ${deviceId}, outletId: ${outletId}`);
+    console.log(`📋 OutletGrid props: onControlOutlet=${typeof onControlOutlet}, selectedDevice=${selectedDevice}`);
+    
+    const targetDeviceId = deviceId || selectedDevice;
+    if (!targetDeviceId) {
+      console.error(`❌ No device ID provided`);
+      return false;
     }
 
     const outletIndex = outlets.findIndex(outlet => outlet.id === outletId);
-    if (outletIndex === -1) return;
+    if (outletIndex === -1) {
+      console.error(`❌ Outlet not found: ${outletId}`);
+      return false;
+    }
 
     // Button press animation
     Animated.sequence([
@@ -67,8 +76,28 @@ const OutletGrid = ({
       }),
     ]).start();
 
-    const success = await onControlOutlet(action, selectedDevice, outletId);
+    console.log(`📤 Calling onControlOutlet: ${action}, ${targetDeviceId}, ${outletId}`);
+    const success = await onControlOutlet(action, targetDeviceId, outletId);
+    console.log(`📊 OutletGrid result: ${success}`);
     return success;
+  };
+
+  const handleQuickToggle = async (outletId) => {
+    const currentStatus = getOutletStatus(outletId);
+    const action = currentStatus ? 'off' : 'on';
+    const success = await handleOutletControl(action, selectedDevice, outletId);
+    
+    if (success) {
+      console.log(`✅ Quick toggle ${action} for outlet ${outletId}`);
+      // Refresh device data after successful toggle
+      if (onRefreshDeviceData) {
+        setTimeout(() => {
+          onRefreshDeviceData();
+        }, 500);
+      }
+    } else {
+      console.error(`❌ Failed to toggle outlet ${outletId}`);
+    }
   };
 
   const handleUpdateOutletSettings = async (outletId, settings) => {
@@ -169,6 +198,26 @@ const OutletGrid = ({
                   </Text>
                 </View>
               </TouchableOpacity>
+              
+              {/* Toggle Button - Gộp chung với status */}
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  { backgroundColor: isOn ? CONFIG.COLORS.danger : CONFIG.COLORS.success }
+                ]}
+                onPress={() => handleQuickToggle(outlet.id)}
+                disabled={isDisabled}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons 
+                  name={isOn ? 'power-off' : 'power'} 
+                  size={18} 
+                  color={CONFIG.COLORS.white} 
+                />
+                <Text style={styles.toggleText}>
+                  {isOn ? 'TURN OFF' : 'TURN ON'}
+                </Text>
+              </TouchableOpacity>
             </Animated.View>
           );
         })}
@@ -187,6 +236,7 @@ const OutletGrid = ({
         onControlOutlet={handleOutletControl}
         loading={loading}
         deviceData={deviceData}
+        onRefreshDeviceData={onRefreshDeviceData}
       />
     </View>
   );
@@ -232,12 +282,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    position: 'relative',
+    minHeight: 140,
   },
   outletButton: {
     padding: 12,
     alignItems: 'center',
-    minHeight: 80,
+    minHeight: 100,
     justifyContent: 'center',
+    paddingBottom: 60, // Make space for toggle button
   },
   outletHeader: {
     flexDirection: 'row',
@@ -270,6 +323,29 @@ const styles = StyleSheet.create({
     color: CONFIG.COLORS.gray,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  toggleButton: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    right: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  toggleText: {
+    color: CONFIG.COLORS.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 6,
   },
 });
 
