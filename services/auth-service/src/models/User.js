@@ -21,6 +21,17 @@ const userSchema = new mongoose.Schema({
     minlength: 2,
     maxlength: 50
   },
+  phone: {
+    type: String,
+    trim: true,
+    match: [/^[0-9+\-\s()]+$/, 'Please enter a valid phone number'],
+    maxlength: 20
+  },
+  avatar: {
+    type: String,
+    default: null,
+    trim: true
+  },
   role: {
     type: String,
     enum: ['user', 'admin'],
