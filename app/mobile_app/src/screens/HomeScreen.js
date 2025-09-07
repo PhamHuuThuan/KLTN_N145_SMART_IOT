@@ -59,8 +59,8 @@ const HomeScreen = () => {
           onSelectDevice={async (deviceId) => {
             await selectDevice(deviceId);
             await fetchDeviceDetail(deviceId);
-            setShowDeviceInfo(true);
           }}
+          onPressDetails={() => setShowDeviceInfo(true)}
         />
 
         <SensorGrid deviceData={deviceData} />
