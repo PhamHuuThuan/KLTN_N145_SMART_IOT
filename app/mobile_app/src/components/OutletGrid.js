@@ -18,7 +18,7 @@ const OutletGrid = ({
   const [selectedOutlet, setSelectedOutlet] = useState(null);
   const [detailVisible, setDetailVisible] = useState(false);
 
-  // Get outlets from device data or use defaults
+  // Get outlets from device data; if missing, show empty state
   const getOutlets = () => {
     if (deviceData?.outlets && Array.isArray(deviceData.outlets)) {
       return deviceData.outlets.map(outlet => ({
@@ -28,15 +28,7 @@ const OutletGrid = ({
         type: outlet.type || 'kitchen'
       }));
     }
-    
-    // Default outlets configuration
-    return [
-      { id: 'o1', name: 'Outlet 1', icon: 'stove', type: 'kitchen' },
-      { id: 'o2', name: 'Outlet 2', icon: 'stove', type: 'kitchen' },
-      { id: 'o3', name: 'Outlet 3', icon: 'stove', type: 'kitchen' },
-      { id: 'o4', name: 'Outlet 4', icon: 'shield', type: 'safety' },
-      { id: 'o5', name: 'Outlet 5', icon: 'shield', type: 'safety' }
-    ];
+    return [];
   };
 
   const outlets = getOutlets();
@@ -145,12 +137,15 @@ const OutletGrid = ({
   return (
     <View style={styles.container}>
       <Text style={styles.title}>🔌 Outlet Control</Text>
-      <Text style={styles.deviceInfo}>Device: {selectedDevice}</Text>
+      <Text style={styles.deviceInfo}>Device: {selectedDevice || 'Not selected'}</Text>
       
       <View style={styles.grid}>
+        {outlets.length === 0 && (
+          <Text style={styles.noDeviceText}>No outlets configured or data not found</Text>
+        )}
         {outlets.map((outlet, index) => {
           const isOn = getOutletStatus(outlet.id);
-          const isDisabled = loading;
+          const isDisabled = loading || !deviceData?.latestTelemetry;
           
           return (
             <Animated.View
@@ -199,7 +194,7 @@ const OutletGrid = ({
                 </View>
               </TouchableOpacity>
               
-              {/* Toggle Button - Gộp chung với status */}
+              {/* Toggle Button */}
               <TouchableOpacity
                 style={[
                   styles.toggleButton,

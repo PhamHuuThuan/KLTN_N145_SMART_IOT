@@ -7,7 +7,7 @@ const SensorGrid = ({ deviceData }) => {
   if (!deviceData) {
     return (
       <View style={styles.container}>
-        <Text style={styles.noDataText}>No sensor data available</Text>
+        <Text style={styles.noDataText}>Device data not found</Text>
       </View>
     );
   }
@@ -16,7 +16,7 @@ const SensorGrid = ({ deviceData }) => {
   if (!latestTelemetry) {
     return (
       <View style={styles.container}>
-        <Text style={styles.noDataText}>No telemetry data available</Text>
+        <Text style={styles.noDataText}>No telemetry data</Text>
       </View>
     );
   }

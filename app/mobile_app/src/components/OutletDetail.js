@@ -85,6 +85,10 @@ const OutletDetail = ({
       return;
     }
     
+    if (!deviceId || !outlet?.id) {
+      Alert.alert('Info', 'Device or outlet not found');
+      return;
+    }
     const success = await onControlOutlet(action, deviceId, outlet.id);
     console.log(`📊 Detail toggle result: ${success}`);
     
