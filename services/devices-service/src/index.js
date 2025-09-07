@@ -30,10 +30,7 @@ const startKafka = async () => {
       eachMessage: async ({ topic, partition, message }) => {
         try {
           const data = JSON.parse(message.value.toString());
-          console.log('🚨 Emergency event received:', data);
-          
-          // Here you can add additional emergency handling logic
-          // For example, sending notifications, activating alarms, etc.
+          // Emergency event handling - add notifications/alarms here
           
         } catch (error) {
           console.error('❌ Error processing emergency message:', error);
@@ -41,7 +38,7 @@ const startKafka = async () => {
       }
     });
     
-    console.log('✅ Kafka consumers started');
+    // Kafka consumers started
   } catch (error) {
     console.error('❌ Error connecting to Kafka:', error);
   }
@@ -56,8 +53,6 @@ const startServer = async () => {
     // Start HTTP server
     app.listen(PORT, () => {
       console.log(`🚀 Devices Service running on port ${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}/health`);
-      console.log(`🔌 API endpoints: http://localhost:${PORT}/api/`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
@@ -67,13 +62,13 @@ const startServer = async () => {
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
+  // SIGTERM received, shutting down gracefully
   
   try {
     await stopLogConsumer();
     await producer.disconnect();
     await consumer.disconnect();
-    console.log('✅ Kafka connections closed');
+    // Kafka connections closed
     process.exit(0);
   } catch (error) {
     console.error('❌ Error during shutdown:', error);
@@ -82,13 +77,13 @@ process.on('SIGTERM', async () => {
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
+  // SIGINT received, shutting down gracefully
   
   try {
     await stopLogConsumer();
     await producer.disconnect();
     await consumer.disconnect();
-    console.log('✅ Kafka connections closed');
+    // Kafka connections closed
     process.exit(0);
   } catch (error) {
     console.error('❌ Error during shutdown:', error);

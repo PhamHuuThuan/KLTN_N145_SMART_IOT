@@ -48,7 +48,6 @@ export const createDeviceLog = async (req, res) => {
     });
     
     await deviceLog.save();
-    console.log(`💾 Device log saved to MongoDB: ${deviceLog._id}`);
     
     // TODO: Re-enable device validation when MongoDB is properly configured
     // const device = await Device.findOne({ deviceId });

@@ -4,7 +4,11 @@ import config from '../config/database.js';
 
 const kafka = new Kafka({
   clientId: 'devices-status-consumer',
-  brokers: process.env.KAFKA_BROKERS?.split(',') || ['127.0.0.1:9092'],
+  brokers: (process.env.KAFKA_BROKERS || 'localhost:29092').split(','),
+  retry: {
+    initialRetryTime: 100,
+    retries: 8
+  }
 });
 
 const consumer = kafka.consumer({ groupId: 'devices-status-group' });
@@ -12,7 +16,7 @@ const consumer = kafka.consumer({ groupId: 'devices-status-group' });
 async function startDeviceStatusConsumer() {
   try {
     await consumer.connect();
-    console.log('🔌 Device status consumer connected to Kafka');
+    // Device status consumer connected to Kafka
 
     // Subscribe to device status update topics
     await consumer.subscribe({ 
@@ -26,14 +30,17 @@ async function startDeviceStatusConsumer() {
     await consumer.run({
       eachMessage: async ({ topic, partition, message }) => {
         try {
+          console.log(`📨 DeviceStatusConsumer received message from topic: ${topic}`);
           const messageData = JSON.parse(message.value.toString());
-          console.log(`📨 Received device status message from ${topic}:`, messageData);
+          console.log(`📋 Message data:`, JSON.stringify(messageData, null, 2));
 
           switch (topic) {
             case 'device.status.updated':
+              console.log(`🔄 Handling device status update`);
               await handleDeviceStatusUpdate(messageData);
               break;
             case 'outlet.toggled':
+              console.log(`🔌 Handling outlet toggle`);
               await handleOutletToggle(messageData);
               break;
             default:
@@ -41,22 +48,30 @@ async function startDeviceStatusConsumer() {
           }
         } catch (error) {
           console.error('❌ Error processing device status message:', error);
+          console.error('📋 Error details:', {
+            message: error.message,
+            stack: error.stack,
+            topic,
+            partition,
+            messageValue: message.value.toString()
+          });
+          // Don't throw error to prevent consumer from stopping
         }
       },
     });
 
-    console.log('✅ Device status consumer started successfully');
+    // Device status consumer started successfully
   } catch (error) {
     console.error('❌ Error starting device status consumer:', error);
   }
 }
 
 async function handleDeviceStatusUpdate(data) {
-  const { deviceId, outletId, status, action } = data;
-  
-  console.log(`📊 Processing device status update: ${deviceId}/${outletId} -> ${status ? 'ON' : 'OFF'}`);
-
   try {
+    const { deviceId, outletId, status, action } = data;
+    
+    console.log(`🔄 Processing device status update: ${deviceId}/${outletId} -> ${status}`);
+
     const device = await Device.findOne({ deviceId });
     if (!device) {
       console.error(`❌ Device not found: ${deviceId}`);
@@ -66,24 +81,29 @@ async function handleDeviceStatusUpdate(data) {
     // Update outlet status
     const outlet = device.outlets.find(o => o.id === outletId);
     if (outlet) {
+      const oldStatus = outlet.status;
       outlet.status = status;
       outlet.lastToggleAt = new Date();
       await device.save();
-      console.log(`✅ Updated outlet ${outletId} status to ${status ? 'ON' : 'OFF'}`);
     } else {
       console.error(`❌ Outlet not found: ${outletId}`);
     }
   } catch (error) {
     console.error('❌ Error handling device status update:', error);
+    console.error('📋 Error details:', {
+      message: error.message,
+      stack: error.stack,
+      data
+    });
   }
 }
 
 async function handleOutletToggle(data) {
-  const { deviceId, outletId, status } = data;
-  
-  console.log(`🔌 Processing outlet toggle: ${deviceId}/${outletId} -> ${status ? 'ON' : 'OFF'}`);
-
   try {
+    const { deviceId, outletId, status } = data;
+    
+    console.log(`🔌 Processing outlet toggle: ${deviceId}/${outletId} -> ${status}`);
+
     const device = await Device.findOne({ deviceId });
     if (!device) {
       console.error(`❌ Device not found: ${deviceId}`);
@@ -93,21 +113,27 @@ async function handleOutletToggle(data) {
     // Update outlet status
     const outlet = device.outlets.find(o => o.id === outletId);
     if (outlet) {
+      const oldStatus = outlet.status;
       outlet.status = status;
       outlet.lastToggleAt = new Date();
       await device.save();
-      console.log(`✅ Updated outlet ${outletId} status to ${status ? 'ON' : 'OFF'}`);
+      console.log(`✅ Outlet toggle processed: ${outletId} ${oldStatus} -> ${status}`);
     } else {
       console.error(`❌ Outlet not found: ${outletId}`);
     }
   } catch (error) {
     console.error('❌ Error handling outlet toggle:', error);
+    console.error('📋 Error details:', {
+      message: error.message,
+      stack: error.stack,
+      data
+    });
   }
 }
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('🛑 Shutting down device status consumer...');
+  // Shutting down device status consumer
   await consumer.disconnect();
   process.exit(0);
 });

@@ -221,7 +221,14 @@ export const deleteDevice = async (req, res) => {
 export const toggleOutlet = async (req, res) => {
   try {
     const { deviceId, outletId } = req.params;
-    const { status } = req.body;
+    let { status } = req.body;
+    
+    // Convert string status to boolean
+    if (typeof status === 'string') {
+      status = status.toLowerCase() === 'true' || status.toLowerCase() === 'on' || status === '1';
+    }
+    
+    console.log(`🔌 Toggle outlet request: ${deviceId}/${outletId} -> ${status ? 'ON' : 'OFF'}`);
     
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -251,6 +258,7 @@ export const toggleOutlet = async (req, res) => {
     await device.save();
     
     // Publish outlet toggle event to Kafka
+    console.log(`📤 Publishing outlet toggle to Kafka: ${deviceId}/${outletId}`);
     await producer.send({
       topic: 'outlet.toggled',
       messages: [{
@@ -384,8 +392,6 @@ export const getDeviceStatus = async (req, res) => {
     // Get latest telemetry data
     const latestLog = await DeviceLog.findOne({ deviceId })
       .sort({ createdAt: -1 });
-    
-    console.log('latestLog', latestLog);
     const status = {
       deviceId: device.deviceId,
       name: device.name,
@@ -436,7 +442,17 @@ export const updateOutletSettings = async (req, res) => {
     
     // Update outlet settings
     if (name) outlet.name = name;
-    if (type) outlet.type = type;
+    if (type) {
+      // Validate type enum
+      const validTypes = ['kitchen', 'safety'];
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid outlet type. Must be one of: ${validTypes.join(', ')}`
+        });
+      }
+      outlet.type = type;
+    }
     
     await device.save();
     

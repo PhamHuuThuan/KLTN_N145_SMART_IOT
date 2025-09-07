@@ -5,7 +5,7 @@ class DeviceService {
     this.deviceServiceUrl = process.env.DEVICE_SERVICE_URL || 'http://localhost:3002';
     this.deviceCache = new Map();
     this.cacheExpiry = 5 * 60 * 1000; // 5 minutes
-    this.validationEnabled = process.env.DEVICE_VALIDATION_ENABLED !== 'false';
+    this.validationEnabled = process.env.DEVICE_VALIDATION_ENABLED === 'true';
   }
 
   async getDevice(deviceId) {
@@ -76,18 +76,13 @@ class DeviceService {
   async isValidDevice(deviceId) {
     // Skip validation if disabled
     if (!this.validationEnabled) {
-      console.log(`⚠️ Device validation disabled - allowing ${deviceId}`);
       return true;
     }
 
     const device = await this.getDevice(deviceId);
-    console.log(`🔍 Device validation for ${deviceId}:`, device ? 'Found' : 'Not found');
     if (device) {
-      console.log(`🔍 Device status: ${device.status || 'undefined'}`);
       // Device is valid if it exists and is not in error or maintenance mode
-      const isValid = device.status !== 'error' && device.status !== 'maintenance';
-      console.log(`🔍 Device valid: ${isValid}`);
-      return isValid;
+      return device.status !== 'error' && device.status !== 'maintenance';
     }
     return false;
   }

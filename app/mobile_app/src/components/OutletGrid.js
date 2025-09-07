@@ -78,8 +78,15 @@ const OutletGrid = ({
   };
 
   const getOutletStatus = (outletId) => {
-    if (!deviceData?.outlets) return false;
-    return deviceData.outlets[outletId] || false;
+    const outlets = deviceData?.outlets;
+    if (!outlets) return false;
+  
+    if (Array.isArray(outlets)) {
+      const outlet = outlets.find(o => o.id === outletId || o._id === outletId);
+      return outlet?.status ?? false;
+    }
+  
+    return outlets[outletId]?.status ?? false;
   };
 
   const getOutletColor = (outletId) => {
