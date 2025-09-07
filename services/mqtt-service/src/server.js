@@ -4,7 +4,7 @@ const socketIo = require('socket.io');
 const path = require('path');
 const cors = require('cors');
 
-const { mqttEvents, getLatestData, turnOnOutlet, turnOffOutlet, toggleOutlet, isConnected } = require('./mqtt/client');
+const { mqttEvents, getLatestData, getDeviceData, getAllDevicesData, getDevicesList, turnOnOutlet, turnOffOutlet, toggleOutlet, isConnected } = require('./mqtt/client');
 const deviceService = require('./services/deviceService');
 const config = require('./config');
 
@@ -22,22 +22,35 @@ function createServer() {
     const status = {
       mqtt: isConnected(),
       latestData: getLatestData(),
+      allDevices: getAllDevicesData(),
+      devicesList: getDevicesList(),
       mqttConfig: config.mqtt,
     };
     console.log('📊 Status response:', JSON.stringify(status, null, 2));
     res.json(status);
   });
 
+  // Get data for specific device
+  app.get('/api/devices/:deviceId/data', (req, res) => {
+    const { deviceId } = req.params;
+    console.log(`📊 API: Get data for device ${deviceId}`);
+    
+    const deviceData = getDeviceData(deviceId);
+    if (deviceData) {
+      res.json({ success: true, data: deviceData });
+    } else {
+      res.status(404).json({ success: false, error: 'Device data not found' });
+    }
+  });
+
   app.post('/api/outlet/on', async (req, res) => {
     const { deviceId } = req.body;
-    if (!deviceId) {
-      return res.status(400).json({ error: 'deviceId is required' });
-    }
+    const targetDeviceId = deviceId || 'KITCHEN-ESP32-LED1'; // Default device ID
     
-    console.log(`🔌 API: Turn ON outlet request for device ${deviceId}`);
+    console.log(`🔌 API: Turn ON outlet request for device ${targetDeviceId}`);
     try {
-      const success = await turnOnOutlet(deviceId);
-      const response = { success, action: 'turnOn', outlet: 'o1', deviceId };
+      const success = await turnOnOutlet(targetDeviceId);
+      const response = { success, action: 'turnOn', outlet: 'o1', deviceId: targetDeviceId };
       console.log('🔌 API: Turn ON response:', JSON.stringify(response, null, 2));
       res.json(response);
     } catch (error) {
@@ -48,14 +61,12 @@ function createServer() {
 
   app.post('/api/outlet/off', async (req, res) => {
     const { deviceId } = req.body;
-    if (!deviceId) {
-      return res.status(400).json({ error: 'deviceId is required' });
-    }
+    const targetDeviceId = deviceId || 'KITCHEN-ESP32-LED1'; // Default device ID
     
-    console.log(`🔌 API: Turn OFF outlet request for device ${deviceId}`);
+    console.log(`🔌 API: Turn OFF outlet request for device ${targetDeviceId}`);
     try {
-      const success = await turnOffOutlet(deviceId);
-      const response = { success, action: 'turnOff', outlet: 'o1', deviceId };
+      const success = await turnOffOutlet(targetDeviceId);
+      const response = { success, action: 'turnOff', outlet: 'o1', deviceId: targetDeviceId };
       console.log('🔌 API: Turn OFF response:', JSON.stringify(response, null, 2));
       res.json(response);
     } catch (error) {
@@ -66,14 +77,12 @@ function createServer() {
 
   app.post('/api/outlet/toggle', async (req, res) => {
     const { deviceId } = req.body;
-    if (!deviceId) {
-      return res.status(400).json({ error: 'deviceId is required' });
-    }
+    const targetDeviceId = deviceId || 'KITCHEN-ESP32-LED1'; // Default device ID
     
-    console.log(`🔌 API: Toggle outlet request for device ${deviceId}`);
+    console.log(`🔌 API: Toggle outlet request for device ${targetDeviceId}`);
     try {
-      const success = await toggleOutlet(deviceId);
-      const response = { success, action: 'toggle', outlet: 'o1', deviceId };
+      const success = await toggleOutlet(targetDeviceId);
+      const response = { success, action: 'toggle', outlet: 'o1', deviceId: targetDeviceId };
       console.log('🔌 API: Toggle response:', JSON.stringify(response, null, 2));
       res.json(response);
     } catch (error) {

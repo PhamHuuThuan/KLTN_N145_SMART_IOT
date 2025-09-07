@@ -17,7 +17,12 @@ app.use(helmet());
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+    'http://localhost:8081',
+    'http://127.0.0.1:8081',
+    'http://192.168.110.112:8081'
+  ],
   credentials: true
 }));
 
