@@ -14,12 +14,20 @@ const kafka = new Kafka({
   }
 });
 
-const consumer = kafka.consumer({ groupId: 'devices-service-group' });
+const consumer = kafka.consumer({ 
+  groupId: 'devices-service-group',
+  allowAutoTopicCreation: true,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000
+});
 
-// Update device status from telemetry data
-async function updateDeviceStatus(telemetryData) {
+// Update device status from telemetry or event data
+async function updateDeviceStatus(data) {
   try {
-    const { deviceId, payload } = telemetryData;
+    const { deviceId, payload, type } = data;
+    
+    console.log(`🔍 Processing ${type} data for device: ${deviceId}`);
+    console.log(`📋 Payload:`, JSON.stringify(payload, null, 2));
     
     if (!deviceId || !payload) {
       console.log(`⚠️ Missing deviceId or payload:`, { deviceId, payload });
@@ -42,7 +50,7 @@ async function updateDeviceStatus(telemetryData) {
     
     // Update outlet statuses if provided
     if (payload.o && typeof payload.o === 'object') {
-      console.log(`🔌 Updating outlet statuses:`, payload.o);
+      console.log(`🔌 Updating outlet statuses from payload.o:`, payload.o);
       Object.keys(payload.o).forEach(outletId => {
         const outlet = device.outlets.find(o => o.id === outletId);
         if (outlet) {
@@ -56,7 +64,7 @@ async function updateDeviceStatus(telemetryData) {
       });
     } else if (payload.outlets && typeof payload.outlets === 'object') {
       // Fallback for outlets object
-      console.log(`🔌 Updating outlet statuses (fallback):`, payload.outlets);
+      console.log(`🔌 Updating outlet statuses from payload.outlets:`, payload.outlets);
       Object.keys(payload.outlets).forEach(outletId => {
         const outlet = device.outlets.find(o => o.id === outletId);
         if (outlet) {
@@ -68,17 +76,39 @@ async function updateDeviceStatus(telemetryData) {
           console.log(`⚠️ Outlet not found: ${outletId}`);
         }
       });
+    } else {
+      console.log(`⚠️ No outlet data found in payload for ${type} log`);
     }
     
-    // Update latest telemetry
-    device.latestTelemetry = {
-      ts: payload.ts || Date.now(),
-      temp: payload.temp || 0,
-      humid: payload.humid || 0,
-      smoke: payload.smoke || 0,
-      gas_ppm: payload.gas_ppm || 0,
-      o: payload.o || payload.outlets || {}
-    };
+    // Update latest telemetry (only if we have valid sensor data)
+    if (payload.temp !== undefined || payload.humid !== undefined || payload.smoke !== undefined || payload.gas_ppm !== undefined) {
+      device.latestTelemetry = {
+        ts: payload.ts || Date.now(),
+        temp: payload.temp !== undefined ? payload.temp : device.latestTelemetry?.temp || 0,
+        humid: payload.humid !== undefined ? payload.humid : device.latestTelemetry?.humid || 0,
+        smoke: payload.smoke !== undefined ? payload.smoke : device.latestTelemetry?.smoke || 0,
+        gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : device.latestTelemetry?.gas_ppm || 0,
+        o: payload.o || payload.outlets || device.latestTelemetry?.o || {}
+      };
+      console.log(`🌡️ Updated latest telemetry:`, device.latestTelemetry);
+    } else if (type === 'event' && (payload.o || payload.outlets)) {
+      // For event logs, only update outlet status in latestTelemetry
+      if (!device.latestTelemetry) {
+        device.latestTelemetry = {
+          ts: Date.now(),
+          temp: 0,
+          humid: 0,
+          smoke: 0,
+          gas_ppm: 0,
+          o: {}
+        };
+      }
+      device.latestTelemetry.o = payload.o || payload.outlets || device.latestTelemetry.o;
+      device.latestTelemetry.ts = payload.ts || Date.now();
+      console.log(`🔌 Updated outlet status in latestTelemetry:`, device.latestTelemetry.o);
+    } else {
+      console.log(`⚠️ No sensor data found in ${type} log, keeping existing telemetry`);
+    }
     
     console.log(`💾 Saving device to database...`);
     await device.save();
@@ -115,6 +145,8 @@ async function startLogConsumer() {
     // Subscribed to topics: iot.telemetry.logs, iot.events.logs
 
     await consumer.run({
+      autoCommit: true,
+      autoCommitInterval: 5000,
       eachMessage: async ({ topic, partition, message }) => {
         try {
           console.log(`📨 Received message from topic: ${topic}, partition: ${partition}`);
@@ -127,9 +159,9 @@ async function startLogConsumer() {
           await deviceLog.save();
           console.log(`✅ Device log saved successfully`);
           
-          // Update device status if it's telemetry data
-          if (logData.type === 'telemetry' && logData.deviceId) {
-            console.log(`🔄 Updating device status for: ${logData.deviceId}`);
+          // Update device status if it's telemetry or event data
+          if ((logData.type === 'telemetry' || logData.type === 'event') && logData.deviceId) {
+            console.log(`🔄 Updating device status for: ${logData.deviceId} (${logData.type})`);
             await updateDeviceStatus(logData);
           }
           
@@ -141,6 +173,11 @@ async function startLogConsumer() {
               // TODO: Send emergency notification
             }
           }
+          
+          // Mark log as processed
+          deviceLog.markAsProcessed();
+          await deviceLog.save();
+          console.log(`✅ Device log marked as processed`);
 
         } catch (error) {
           console.error(`❌ Error processing message from ${topic}:`, error);
@@ -154,6 +191,17 @@ async function startLogConsumer() {
           
           // Don't throw error to prevent consumer from stopping
           console.log(`⚠️ Continuing to process next message...`);
+          
+          // Mark message as processed even if failed to prevent infinite retry
+          try {
+            await consumer.commitOffsets([{
+              topic,
+              partition,
+              offset: message.offset
+            }]);
+          } catch (commitError) {
+            console.error('❌ Error committing offset:', commitError);
+          }
         }
       },
     });

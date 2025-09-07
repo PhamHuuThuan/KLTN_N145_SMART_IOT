@@ -18,11 +18,25 @@ const OutletDetail = ({
   onClose, 
   onUpdateOutlet,
   onControlOutlet,
-  loading 
+  loading,
+  deviceData 
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [outletName, setOutletName] = useState(outlet?.name || '');
   const [outletGroup, setOutletGroup] = useState(outlet?.type || 'kitchen');
+  
+  // Get real-time outlet status
+  const getOutletStatus = (outletId) => {
+    // First try to get from latestTelemetry.o (real-time data)
+    if (deviceData?.latestTelemetry?.o && deviceData.latestTelemetry.o[outletId] !== undefined) {
+      return deviceData.latestTelemetry.o[outletId];
+    }
+    
+    // Fallback to outlet.status
+    return outlet?.status ?? false;
+  };
+  
+  const outletStatus = getOutletStatus(outlet?.id);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -55,7 +69,7 @@ const OutletDetail = ({
   };
 
   const handleToggle = async () => {
-    const action = outlet.status ? 'off' : 'on';
+    const action = outletStatus ? 'off' : 'on';
     const success = await onControlOutlet(action, deviceId, outlet.id);
     if (success) {
       Alert.alert('Success', `Outlet ${action} command sent`);
@@ -125,15 +139,15 @@ const OutletDetail = ({
               <Text style={styles.statusLabel}>Status:</Text>
               <View style={[
                 styles.statusBadge,
-                { backgroundColor: outlet.status ? CONFIG.COLORS.success : CONFIG.COLORS.gray }
+                { backgroundColor: outletStatus ? CONFIG.COLORS.success : CONFIG.COLORS.gray }
               ]}>
                 <MaterialIcons 
-                  name={outlet.status ? 'power' : 'power-off'} 
+                  name={outletStatus ? 'power' : 'power-off'} 
                   size={16} 
                   color={CONFIG.COLORS.white} 
                 />
                 <Text style={styles.statusText}>
-                  {outlet.status ? 'ON' : 'OFF'}
+                  {outletStatus ? 'ON' : 'OFF'}
                 </Text>
               </View>
             </View>
@@ -222,18 +236,18 @@ const OutletDetail = ({
                 <TouchableOpacity
                   style={[
                     styles.actionButton, 
-                    outlet.status ? styles.offButton : styles.onButton
+                    outletStatus ? styles.offButton : styles.onButton
                   ]}
                   onPress={handleToggle}
                   disabled={loading}
                 >
                   <MaterialIcons 
-                    name={outlet.status ? 'power-off' : 'power'} 
+                    name={outletStatus ? 'power-off' : 'power'} 
                     size={20} 
                     color={CONFIG.COLORS.white} 
                   />
                   <Text style={styles.actionButtonText}>
-                    {loading ? 'Processing...' : (outlet.status ? 'Turn OFF' : 'Turn ON')}
+                    {loading ? 'Processing...' : (outletStatus ? 'Turn OFF' : 'Turn ON')}
                   </Text>
                 </TouchableOpacity>
               </>

@@ -78,6 +78,12 @@ const OutletGrid = ({
   };
 
   const getOutletStatus = (outletId) => {
+    // First try to get from latestTelemetry.o (real-time data)
+    if (deviceData?.latestTelemetry?.o && deviceData.latestTelemetry.o[outletId] !== undefined) {
+      return deviceData.latestTelemetry.o[outletId];
+    }
+    
+    // Fallback to outlets array
     const outlets = deviceData?.outlets;
     if (!outlets) return false;
   
@@ -180,6 +186,7 @@ const OutletGrid = ({
         onUpdateOutlet={handleUpdateOutletSettings}
         onControlOutlet={handleOutletControl}
         loading={loading}
+        deviceData={deviceData}
       />
     </View>
   );

@@ -11,7 +11,12 @@ const kafka = new Kafka({
   }
 });
 
-const consumer = kafka.consumer({ groupId: 'devices-status-group' });
+const consumer = kafka.consumer({ 
+  groupId: 'devices-status-group',
+  allowAutoTopicCreation: true,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000
+});
 
 async function startDeviceStatusConsumer() {
   try {
@@ -28,6 +33,8 @@ async function startDeviceStatusConsumer() {
     });
 
     await consumer.run({
+      autoCommit: true,
+      autoCommitInterval: 5000,
       eachMessage: async ({ topic, partition, message }) => {
         try {
           console.log(`📨 DeviceStatusConsumer received message from topic: ${topic}`);
@@ -55,7 +62,20 @@ async function startDeviceStatusConsumer() {
             partition,
             messageValue: message.value.toString()
           });
+          
           // Don't throw error to prevent consumer from stopping
+          console.log(`⚠️ Continuing to process next message...`);
+          
+          // Mark message as processed even if failed to prevent infinite retry
+          try {
+            await consumer.commitOffsets([{
+              topic,
+              partition,
+              offset: message.offset
+            }]);
+          } catch (commitError) {
+            console.error('❌ Error committing offset:', commitError);
+          }
         }
       },
     });
