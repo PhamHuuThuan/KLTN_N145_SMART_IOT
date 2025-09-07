@@ -98,7 +98,7 @@
 
         .sensor-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 20px;
         }
 
@@ -222,15 +222,21 @@
             }
             
             .sensor-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
             }
             
-            .led-controls {
+            .outlet-controls {
                 grid-template-columns: 1fr;
             }
             
             .header h1 {
                 font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sensor-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -252,7 +258,12 @@
                 <span>Device Status</span>
             </div>
             <div class="status-item">
-                <span>Device ID: <strong id="deviceId">KITCHEN-ESP32-LED1</strong></span>
+                <span>Active Devices: <strong id="deviceCount">0</strong></span>
+            </div>
+            <div class="status-item">
+                <select id="deviceSelector" onchange="switchDevice()">
+                    <option value="">Select Device</option>
+                </select>
             </div>
         </div>
 
@@ -276,6 +287,14 @@
                         <div class="sensor-value" id="gasValue">--</div>
                         <div class="sensor-label">Gas PPM</div>
                     </div>
+                    <div class="sensor-item" id="mq2Sensor">
+                        <div class="sensor-value" id="mq2Value">--</div>
+                        <div class="sensor-label">MQ2 Voltage (V)</div>
+                    </div>
+                    <div class="sensor-item" id="flameSensor">
+                        <div class="sensor-value" id="flameValue">--</div>
+                        <div class="sensor-label">Flame Detection</div>
+                    </div>
                 </div>
                 <div class="timestamp" id="lastUpdate">Last update: Never</div>
             </div>
@@ -287,7 +306,7 @@
                     <button class="btn btn-off" onclick="turnOffOutlet()">Turn OFF</button>
                     <button class="btn btn-toggle" onclick="toggleOutlet()">Toggle</button>
                 </div>
-                <div class="timestamp">Click buttons to control outlet o1 (LED) on your ESP32 device</div>
+                <div class="timestamp">Click buttons to control outlet o1 (LED) on selected device: <strong id="currentDevice">None</strong></div>
             </div>
         </div>
 
@@ -309,13 +328,21 @@
         // DOM elements
         const mqttStatus = document.getElementById('mqttStatus');
         const deviceStatus = document.getElementById('deviceStatus');
-        const deviceId = document.getElementById('deviceId');
+        const deviceCount = document.getElementById('deviceCount');
+        const deviceSelector = document.getElementById('deviceSelector');
+        const currentDevice = document.getElementById('currentDevice');
         const tempValue = document.getElementById('tempValue');
         const humidValue = document.getElementById('humidValue');
         const smokeValue = document.getElementById('smokeValue');
         const gasValue = document.getElementById('gasValue');
+        const mq2Value = document.getElementById('mq2Value');
+        const flameValue = document.getElementById('flameValue');
         const lastUpdate = document.getElementById('lastUpdate');
         const logContainer = document.getElementById('logContainer');
+
+        // Current selected device
+        let selectedDeviceId = null;
+        let allDevicesData = {};
 
         // Add log entry
         function addLog(message, type = 'info') {
@@ -333,6 +360,8 @@
 
         // Update sensor display
         function updateSensorDisplay(data) {
+            if (!data) return;
+            
             if (data.temperature !== null) {
                 tempValue.textContent = data.temperature.toFixed(1);
             }
@@ -342,6 +371,8 @@
             
             smokeValue.textContent = data.smoke ? '🚬' : '✅';
             gasValue.textContent = data.gasPpm ? data.gasPpm.toFixed(1) : '--';
+            mq2Value.textContent = data.mq2Voltage ? data.mq2Voltage.toFixed(3) : '--';
+            flameValue.textContent = data.flame ? '🔥' : '✅';
             
             if (data.timestamp) {
                 lastUpdate.textContent = `Last update: ${new Date(data.timestamp).toLocaleString()}`;
@@ -354,15 +385,65 @@
             } else {
                 smokeSensor.classList.remove('flame-alert');
             }
+
+            // Update flame sensor styling
+            const flameSensor = document.getElementById('flameSensor');
+            if (data.flame) {
+                flameSensor.classList.add('flame-alert');
+            } else {
+                flameSensor.classList.remove('flame-alert');
+            }
+        }
+
+        // Update device selector
+        function updateDeviceSelector(devices) {
+            deviceSelector.innerHTML = '<option value="">Select Device</option>';
+            devices.forEach(deviceId => {
+                const option = document.createElement('option');
+                option.value = deviceId;
+                option.textContent = deviceId;
+                deviceSelector.appendChild(option);
+            });
+            
+            deviceCount.textContent = devices.length;
+        }
+
+        // Switch to selected device
+        function switchDevice() {
+            selectedDeviceId = deviceSelector.value;
+            currentDevice.textContent = selectedDeviceId || 'None';
+            
+            if (selectedDeviceId && allDevicesData[selectedDeviceId]) {
+                updateSensorDisplay(allDevicesData[selectedDeviceId]);
+                addLog(`Switched to device: ${selectedDeviceId}`, 'info');
+            } else {
+                // Clear display if no device selected
+                tempValue.textContent = '--';
+                humidValue.textContent = '--';
+                smokeValue.textContent = '--';
+                gasValue.textContent = '--';
+                mq2Value.textContent = '--';
+                flameValue.textContent = '--';
+                lastUpdate.textContent = 'Last update: Never';
+            }
         }
 
         // Outlet control functions
         async function turnOnOutlet() {
+            if (!selectedDeviceId) {
+                addLog('Please select a device first', 'error');
+                return;
+            }
+            
             try {
-                const response = await fetch('/api/outlet/on', { method: 'POST' });
+                const response = await fetch('/api/outlet/on', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deviceId: selectedDeviceId })
+                });
                 const result = await response.json();
                 if (result.success) {
-                    addLog('Outlet o1 turn ON command sent', 'success');
+                    addLog(`Outlet o1 turn ON command sent to ${selectedDeviceId}`, 'success');
                 } else {
                     addLog('Failed to send outlet ON command', 'error');
                 }
@@ -372,11 +453,20 @@
         }
 
         async function turnOffOutlet() {
+            if (!selectedDeviceId) {
+                addLog('Please select a device first', 'error');
+                return;
+            }
+            
             try {
-                const response = await fetch('/api/outlet/off', { method: 'POST' });
+                const response = await fetch('/api/outlet/off', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deviceId: selectedDeviceId })
+                });
                 const result = await response.json();
                 if (result.success) {
-                    addLog('Outlet o1 turn OFF command sent', 'success');
+                    addLog(`Outlet o1 turn OFF command sent to ${selectedDeviceId}`, 'success');
                 } else {
                     addLog('Failed to send outlet OFF command', 'error');
                 }
@@ -386,11 +476,20 @@
         }
 
         async function toggleOutlet() {
+            if (!selectedDeviceId) {
+                addLog('Please select a device first', 'error');
+                return;
+            }
+            
             try {
-                const response = await fetch('/api/outlet/toggle', { method: 'POST' });
+                const response = await fetch('/api/outlet/toggle', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deviceId: selectedDeviceId })
+                });
                 const result = await response.json();
                 if (result.success) {
-                    addLog('Outlet o1 toggle command sent', 'success');
+                    addLog(`Outlet o1 toggle command sent to ${selectedDeviceId}`, 'success');
                 } else {
                     addLog('Failed to send outlet toggle command', 'error');
                 }
@@ -411,8 +510,28 @@
         });
 
         socket.on('sensorData', (data) => {
-            updateSensorDisplay(data);
-            addLog(`Sensor data received: T=${data.temperature}°C, H=${data.humidity}%, Smoke=${data.smoke}, Gas=${data.gasPpm}ppm, o1=${data.outlets.o1}`, 'info');
+            // Store data for the device
+            if (data.deviceId) {
+                allDevicesData[data.deviceId] = data;
+                
+                // Update device selector if new device
+                const currentDevices = Object.keys(allDevicesData);
+                updateDeviceSelector(currentDevices);
+                
+                // Auto-select first device if none selected
+                if (!selectedDeviceId && currentDevices.length > 0) {
+                    selectedDeviceId = currentDevices[0];
+                    deviceSelector.value = selectedDeviceId;
+                    currentDevice.textContent = selectedDeviceId;
+                }
+                
+                // Update display if this is the selected device
+                if (selectedDeviceId === data.deviceId) {
+                    updateSensorDisplay(data);
+                }
+            }
+            
+            addLog(`Sensor data from ${data.deviceId}: T=${data.temperature}°C, H=${data.humidity}%, Smoke=${data.smoke}, Gas=${data.gasPpm}ppm, MQ2=${data.mq2Voltage}V, Flame=${data.flame}, o1=${data.outlets.o1}`, 'info');
         });
 
         socket.on('ack', (data) => {
@@ -432,11 +551,23 @@
                     addLog('MQTT connection failed', 'error');
                 }
                 
-                if (status.latestData.timestamp) {
-                    updateSensorDisplay(status.latestData);
+                // Update devices data
+                if (status.allDevices) {
+                    allDevicesData = status.allDevices;
+                    updateDeviceSelector(status.devicesList || []);
+                    
+                    // Auto-select first device
+                    if (status.devicesList && status.devicesList.length > 0) {
+                        selectedDeviceId = status.devicesList[0];
+                        deviceSelector.value = selectedDeviceId;
+                        currentDevice.textContent = selectedDeviceId;
+                        updateSensorDisplay(allDevicesData[selectedDeviceId]);
+                    }
                 }
                 
-                deviceId.textContent = status.device;
+                if (status.latestData && status.latestData.timestamp) {
+                    updateSensorDisplay(status.latestData);
+                }
             } catch (error) {
                 addLog(`Failed to check status: ${error.message}`, 'error');
             }
