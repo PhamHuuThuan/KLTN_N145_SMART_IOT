@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -8,7 +8,7 @@ import {
   TextInput, 
   Alert 
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 
 const OutletDetail = ({ 
@@ -18,11 +18,31 @@ const OutletDetail = ({
   onClose, 
   onUpdateOutlet,
   onControlOutlet,
-  loading 
+  loading,
+  deviceData,
+  onRefreshDeviceData
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [outletName, setOutletName] = useState(outlet?.name || '');
   const [outletGroup, setOutletGroup] = useState(outlet?.type || 'kitchen');
+  
+  // Get real-time outlet status
+  const getOutletStatus = (outletId) => {
+    // First try to get from latestTelemetry.o (real-time data)
+    if (deviceData?.latestTelemetry?.o && deviceData.latestTelemetry.o[outletId] !== undefined) {
+      return deviceData.latestTelemetry.o[outletId];
+    }
+    
+    // Fallback to outlet.status
+    return outlet?.status ?? false;
+  };
+  
+  const outletStatus = getOutletStatus(outlet?.id);
+
+  // Force re-render when deviceData changes
+  useEffect(() => {
+    console.log(`🔄 OutletDetail: deviceData updated for ${outlet?.id}`);
+  }, [deviceData?.latestTelemetry?.o]);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -55,11 +75,45 @@ const OutletDetail = ({
   };
 
   const handleToggle = async () => {
-    const action = outlet.status ? 'off' : 'on';
+    const action = outletStatus ? 'off' : 'on';
+    console.log(`🔌 Detail toggle: ${outlet.id} -> ${action}`);
+    console.log(`📋 Detail props: deviceId=${deviceId}, onControlOutlet=${typeof onControlOutlet}`);
+    
+    if (!onControlOutlet) {
+      console.error(`❌ onControlOutlet function not provided`);
+      Alert.alert('Error', 'Control function not available');
+      return;
+    }
+    
+    if (!deviceId || !outlet?.id) {
+      Alert.alert('Info', 'Device or outlet not found');
+      return;
+    }
     const success = await onControlOutlet(action, deviceId, outlet.id);
+    console.log(`📊 Detail toggle result: ${success}`);
+    
     if (success) {
-      Alert.alert('Success', `Outlet ${action} command sent`);
+      console.log(`✅ Detail toggle success: ${outlet.id} -> ${action}`);
+      
+      // Refresh device data after successful toggle
+      if (onRefreshDeviceData) {
+        setTimeout(() => {
+          onRefreshDeviceData();
+        }, 300);
+      }
+      
+      // Show success message briefly
+      Alert.alert('Success', `Outlet ${action} command sent`, [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Close detail after user acknowledges
+            onClose();
+          }
+        }
+      ]);
     } else {
+      console.error(`❌ Detail toggle failed: ${outlet.id} -> ${action}`);
       Alert.alert('Error', 'Failed to send command');
     }
   };
@@ -67,9 +121,9 @@ const OutletDetail = ({
   const getGroupIcon = (group) => {
     switch (group) {
       case 'kitchen':
-        return 'kitchen';
+        return 'stove';
       case 'safety':
-        return 'security';
+        return 'shield';
       default:
         return 'power';
     }
@@ -102,13 +156,13 @@ const OutletDetail = ({
           <View style={styles.header}>
             <Text style={styles.title}>Outlet Details</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <MaterialIcons name="close" size={24} color={CONFIG.COLORS.gray} />
+              <MaterialCommunityIcons name="close" size={24} color={CONFIG.COLORS.gray} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.outletInfo}>
             <View style={styles.outletHeader}>
-              <MaterialIcons 
+              <MaterialCommunityIcons 
                 name={getGroupIcon(outletGroup)} 
                 size={32} 
                 color={getGroupColor(outletGroup)} 
@@ -122,18 +176,18 @@ const OutletDetail = ({
             </View>
 
             <View style={styles.statusSection}>
-              <Text style={styles.statusLabel}>Status:</Text>
+              <Text style={styles.statusLabel}>Current Status:</Text>
               <View style={[
                 styles.statusBadge,
-                { backgroundColor: outlet.status ? CONFIG.COLORS.success : CONFIG.COLORS.gray }
+                { backgroundColor: outletStatus ? CONFIG.COLORS.success : CONFIG.COLORS.danger }
               ]}>
-                <MaterialIcons 
-                  name={outlet.status ? 'power' : 'power-off'} 
-                  size={16} 
+                <MaterialCommunityIcons 
+                  name={outletStatus ? 'power' : 'power-off'} 
+                  size={18} 
                   color={CONFIG.COLORS.white} 
                 />
                 <Text style={styles.statusText}>
-                  {outlet.status ? 'ON' : 'OFF'}
+                  {outletStatus ? 'ON' : 'OFF'}
                 </Text>
               </View>
             </View>
@@ -170,8 +224,8 @@ const OutletDetail = ({
                       ]}
                       onPress={() => setOutletGroup('kitchen')}
                     >
-                      <MaterialIcons 
-                        name="kitchen" 
+                      <MaterialCommunityIcons 
+                        name="stove" 
                         size={20} 
                         color={outletGroup === 'kitchen' ? CONFIG.COLORS.white : CONFIG.COLORS.warning} 
                       />
@@ -190,8 +244,8 @@ const OutletDetail = ({
                       ]}
                       onPress={() => setOutletGroup('safety')}
                     >
-                      <MaterialIcons 
-                        name="security" 
+                      <MaterialCommunityIcons 
+                        name="shield" 
                         size={20} 
                         color={outletGroup === 'safety' ? CONFIG.COLORS.white : CONFIG.COLORS.danger} 
                       />
@@ -215,25 +269,26 @@ const OutletDetail = ({
                   style={[styles.actionButton, styles.editButton]}
                   onPress={handleEdit}
                 >
-                  <MaterialIcons name="edit" size={20} color={CONFIG.COLORS.white} />
+                  <MaterialCommunityIcons name="pencil" size={20} color={CONFIG.COLORS.white} />
                   <Text style={styles.actionButtonText}>Edit</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
                   style={[
                     styles.actionButton, 
-                    outlet.status ? styles.offButton : styles.onButton
+                    outletStatus ? styles.offButton : styles.onButton,
+                    loading && styles.disabledButton
                   ]}
                   onPress={handleToggle}
                   disabled={loading}
                 >
-                  <MaterialIcons 
-                    name={outlet.status ? 'power-off' : 'power'} 
-                    size={20} 
+                  <MaterialCommunityIcons 
+                    name={outletStatus ? 'power-off' : 'power'} 
+                    size={22} 
                     color={CONFIG.COLORS.white} 
                   />
                   <Text style={styles.actionButtonText}>
-                    {loading ? 'Processing...' : (outlet.status ? 'Turn OFF' : 'Turn ON')}
+                    {loading ? 'Processing...' : (outletStatus ? 'TURN OFF' : 'TURN ON')}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -243,7 +298,7 @@ const OutletDetail = ({
                   style={[styles.actionButton, styles.cancelButton]}
                   onPress={handleCancel}
                 >
-                  <MaterialIcons name="close" size={20} color={CONFIG.COLORS.white} />
+                  <MaterialCommunityIcons name="close" size={20} color={CONFIG.COLORS.white} />
                   <Text style={styles.actionButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 
@@ -251,7 +306,7 @@ const OutletDetail = ({
                   style={[styles.actionButton, styles.saveButton]}
                   onPress={handleSave}
                 >
-                  <MaterialIcons name="save" size={20} color={CONFIG.COLORS.white} />
+                  <MaterialCommunityIcons name="content-save" size={20} color={CONFIG.COLORS.white} />
                   <Text style={styles.actionButtonText}>Save</Text>
                 </TouchableOpacity>
               </>
@@ -440,6 +495,9 @@ const styles = StyleSheet.create({
     color: CONFIG.COLORS.white,
     fontWeight: 'bold',
     marginLeft: 6,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
 });
 

@@ -1,32 +1,37 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import CONFIG from '../constants/config';
 
 const Header = () => {
   return (
     <View style={styles.header}>
-      <Text style={styles.headerTitle}>🏠 Smart IoT Kitchen</Text>
-      <Text style={styles.headerSubtitle}>Device Control & Monitoring</Text>
+      <Image
+        source={require('../../assets/logo_app.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+      <Text style={styles.headerTitle}>Smart IoT Kitchen</Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: CONFIG.COLORS.primary,
-    padding: 20,
-    paddingTop: 40,
+    backgroundColor: CONFIG.THEME.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: CONFIG.COLORS.white,
-    marginBottom: 5,
+    fontSize: 18,
+    fontWeight: '700',
+    color: CONFIG.THEME.surface,
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: CONFIG.COLORS.light,
+  logo: {
+    width: 36,
+    height: 36,
   },
 });
 

@@ -18,16 +18,16 @@
       {
         "id": "o1",
         "name": "Kitchen Outlet 1",
-        "type": "power",
-        "status": "off",
+        "type": "kitchen",
+        "status": false,
         "maxPower": 2200,
         "description": "Main kitchen power outlet"
       },
       {
         "id": "o2",
         "name": "Kitchen Outlet 2", 
-        "type": "power",
-        "status": "off",
+        "type": "kitchen",
+        "status": false,
         "maxPower": 2200,
         "description": "Secondary kitchen power outlet"
       },
@@ -42,16 +42,16 @@
       {
         "id": "o4",
         "name": "Kitchen Outlet 4",
-        "type": "power",
-        "status": "off", 
+        "type": "kitchen",
+        "status": false, 
         "maxPower": 2200,
         "description": "Quaternary kitchen power outlet"
       },
       {
         "id": "o5",
         "name": "Kitchen Outlet 5",
-        "type": "power",
-        "status": "off",
+        "type": "kitchen",
+        "status": false,
         "maxPower": 2200,
         "description": "Quinary kitchen power outlet"
       }

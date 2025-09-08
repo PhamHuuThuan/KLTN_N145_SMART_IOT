@@ -4,7 +4,7 @@ import environment from '../config/environment';
 
 // Create axios instance with base configuration
 const apiClient = axios.create({
-  baseURL: CONFIG.API_BASE_URL,
+  baseURL: environment.API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -74,15 +74,29 @@ class ApiService {
     }
   }
 
+  // Get full device details
+  async getDeviceDetail(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.DEVICE_DETAIL.replace(':deviceId', deviceId);
+      const response = await apiClient.get(url);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch device detail: ${error.message}`);
+    }
+  }
+
   // Toggle outlet
   async toggleOutlet(deviceId, outletId = 'o1') {
     try {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
+      console.log(`🔌 API toggleOutlet: ${url}`);
       const response = await apiClient.put(url);
+      console.log(`✅ API toggleOutlet response:`, response.data);
       return response.data;
     } catch (error) {
+      console.error(`❌ API toggleOutlet error:`, error);
       throw new Error(`Failed to toggle outlet: ${error.message}`);
     }
   }
@@ -93,9 +107,12 @@ class ApiService {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
+      console.log(`🔌 API turnOnOutlet: ${url}`, { status: true });
       const response = await apiClient.put(url, { status: true });
+      console.log(`✅ API turnOnOutlet response:`, response.data);
       return response.data;
     } catch (error) {
+      console.error(`❌ API turnOnOutlet error:`, error);
       throw new Error(`Failed to turn on outlet: ${error.message}`);
     }
   }
@@ -106,9 +123,12 @@ class ApiService {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
+      console.log(`🔌 API turnOffOutlet: ${url}`, { status: false });
       const response = await apiClient.put(url, { status: false });
+      console.log(`✅ API turnOffOutlet response:`, response.data);
       return response.data;
     } catch (error) {
+      console.error(`❌ API turnOffOutlet error:`, error);
       throw new Error(`Failed to turn off outlet: ${error.message}`);
     }
   }

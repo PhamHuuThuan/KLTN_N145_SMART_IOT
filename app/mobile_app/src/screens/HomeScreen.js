@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ScrollView,
   RefreshControl,
@@ -15,19 +15,25 @@ import Header from '../components/Header';
 import DeviceSelector from '../components/DeviceSelector';
 import SensorGrid from '../components/SensorGrid';
 import OutletGrid from '../components/OutletGrid';
+import DeviceInfoModal from '../components/DeviceInfoModal';
 import apiService from '../services/apiService';
 import CONFIG from '../constants/config';
 
 const HomeScreen = () => {
   const {
     deviceData,
+    deviceDetail,
     devicesList,
     selectedDevice,
     loading,
     error,
     fetchDevices,
     selectDevice,
+    fetchDeviceStatus,
+    fetchDeviceDetail,
   } = useDeviceData();
+
+  const [showDeviceInfo, setShowDeviceInfo] = useState(false);
 
   const { controlOutlet, loading: controlLoading } = useOutletControl();
 
@@ -50,7 +56,11 @@ const HomeScreen = () => {
         <DeviceSelector
           devices={devicesList}
           selectedDevice={selectedDevice}
-          onSelectDevice={selectDevice}
+          onSelectDevice={async (deviceId) => {
+            await selectDevice(deviceId);
+            await fetchDeviceDetail(deviceId);
+          }}
+          onPressDetails={() => setShowDeviceInfo(true)}
         />
 
         <SensorGrid deviceData={deviceData} />
@@ -71,12 +81,19 @@ const HomeScreen = () => {
             }
           }}
           loading={controlLoading}
+          onRefreshDeviceData={() => fetchDeviceStatus(selectedDevice)}
         />
 
-        {deviceData?.timestamp && (
+        <DeviceInfoModal
+          visible={showDeviceInfo}
+          onClose={() => setShowDeviceInfo(false)}
+          deviceData={deviceDetail || deviceData}
+        />
+
+        {deviceData?.lastUpdate && (
           <View style={styles.section}>
             <Text style={styles.lastUpdate}>
-              Last update: {new Date(deviceData.timestamp).toLocaleString()}
+              Last update: {new Date(deviceData.lastUpdate).toLocaleString()}
             </Text>
           </View>
         )}

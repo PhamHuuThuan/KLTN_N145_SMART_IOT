@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OutletDetail from './OutletDetail';
 import CONFIG from '../constants/config';
 
@@ -9,7 +9,8 @@ const OutletGrid = ({
   deviceData, 
   onControlOutlet, 
   onUpdateOutletSettings,
-  loading 
+  loading,
+  onRefreshDeviceData
 }) => {
   const [buttonScales] = useState(() => 
     Array.from({ length: 5 }, () => new Animated.Value(1))
@@ -17,25 +18,17 @@ const OutletGrid = ({
   const [selectedOutlet, setSelectedOutlet] = useState(null);
   const [detailVisible, setDetailVisible] = useState(false);
 
-  // Get outlets from device data or use defaults
+  // Get outlets from device data; if missing, show empty state
   const getOutlets = () => {
     if (deviceData?.outlets && Array.isArray(deviceData.outlets)) {
       return deviceData.outlets.map(outlet => ({
         id: outlet.id,
         name: outlet.name || `Outlet ${outlet.id}`,
-        icon: outlet.type === 'safety' ? 'security' : 'kitchen',
+        icon: outlet.type === 'safety' ? 'shield' : 'stove',
         type: outlet.type || 'kitchen'
       }));
     }
-    
-    // Default outlets configuration
-    return [
-      { id: 'o1', name: 'Outlet 1', icon: 'kitchen', type: 'kitchen' },
-      { id: 'o2', name: 'Outlet 2', icon: 'kitchen', type: 'kitchen' },
-      { id: 'o3', name: 'Outlet 3', icon: 'kitchen', type: 'kitchen' },
-      { id: 'o4', name: 'Outlet 4', icon: 'security', type: 'safety' },
-      { id: 'o5', name: 'Outlet 5', icon: 'security', type: 'safety' }
-    ];
+    return [];
   };
 
   const outlets = getOutlets();
@@ -45,13 +38,21 @@ const OutletGrid = ({
     setDetailVisible(true);
   };
 
-  const handleOutletControl = async (action, outletId) => {
-    if (!selectedDevice) {
-      return;
+  const handleOutletControl = async (action, deviceId, outletId) => {
+    console.log(`🔌 OutletGrid handleOutletControl: ${action}, deviceId: ${deviceId}, outletId: ${outletId}`);
+    console.log(`📋 OutletGrid props: onControlOutlet=${typeof onControlOutlet}, selectedDevice=${selectedDevice}`);
+    
+    const targetDeviceId = deviceId || selectedDevice;
+    if (!targetDeviceId) {
+      console.error(`❌ No device ID provided`);
+      return false;
     }
 
     const outletIndex = outlets.findIndex(outlet => outlet.id === outletId);
-    if (outletIndex === -1) return;
+    if (outletIndex === -1) {
+      console.error(`❌ Outlet not found: ${outletId}`);
+      return false;
+    }
 
     // Button press animation
     Animated.sequence([
@@ -67,8 +68,28 @@ const OutletGrid = ({
       }),
     ]).start();
 
-    const success = await onControlOutlet(action, selectedDevice, outletId);
+    console.log(`📤 Calling onControlOutlet: ${action}, ${targetDeviceId}, ${outletId}`);
+    const success = await onControlOutlet(action, targetDeviceId, outletId);
+    console.log(`📊 OutletGrid result: ${success}`);
     return success;
+  };
+
+  const handleQuickToggle = async (outletId) => {
+    const currentStatus = getOutletStatus(outletId);
+    const action = currentStatus ? 'off' : 'on';
+    const success = await handleOutletControl(action, selectedDevice, outletId);
+    
+    if (success) {
+      console.log(`✅ Quick toggle ${action} for outlet ${outletId}`);
+      // Refresh device data after successful toggle
+      if (onRefreshDeviceData) {
+        setTimeout(() => {
+          onRefreshDeviceData();
+        }, 500);
+      }
+    } else {
+      console.error(`❌ Failed to toggle outlet ${outletId}`);
+    }
   };
 
   const handleUpdateOutletSettings = async (outletId, settings) => {
@@ -78,8 +99,21 @@ const OutletGrid = ({
   };
 
   const getOutletStatus = (outletId) => {
-    if (!deviceData?.outlets) return false;
-    return deviceData.outlets[outletId] || false;
+    // First try to get from latestTelemetry.o (real-time data)
+    if (deviceData?.latestTelemetry?.o && deviceData.latestTelemetry.o[outletId] !== undefined) {
+      return deviceData.latestTelemetry.o[outletId];
+    }
+    
+    // Fallback to outlets array
+    const outlets = deviceData?.outlets;
+    if (!outlets) return false;
+  
+    if (Array.isArray(outlets)) {
+      const outlet = outlets.find(o => o.id === outletId || o._id === outletId);
+      return outlet?.status ?? false;
+    }
+  
+    return outlets[outletId]?.status ?? false;
   };
 
   const getOutletColor = (outletId) => {
@@ -103,12 +137,15 @@ const OutletGrid = ({
   return (
     <View style={styles.container}>
       <Text style={styles.title}>🔌 Outlet Control</Text>
-      <Text style={styles.deviceInfo}>Device: {selectedDevice}</Text>
+      <Text style={styles.deviceInfo}>Device: {selectedDevice || 'Not selected'}</Text>
       
       <View style={styles.grid}>
+        {outlets.length === 0 && (
+          <Text style={styles.noDeviceText}>No outlets configured or data not found</Text>
+        )}
         {outlets.map((outlet, index) => {
           const isOn = getOutletStatus(outlet.id);
-          const isDisabled = loading;
+          const isDisabled = loading || !deviceData?.latestTelemetry;
           
           return (
             <Animated.View
@@ -118,7 +155,7 @@ const OutletGrid = ({
                 {
                   transform: [{ scale: buttonScales[index] }],
                   backgroundColor: isOn ? CONFIG.COLORS.success : CONFIG.COLORS.light,
-                  borderColor: isOn ? CONFIG.COLORS.success : CONFIG.COLORS.gray,
+                  borderColor: isOn ? CONFIG.THEME.success : CONFIG.THEME.border,
                 }
               ]}
             >
@@ -129,7 +166,7 @@ const OutletGrid = ({
               activeOpacity={0.8}
             >
                 <View style={styles.outletHeader}>
-                  <MaterialIcons 
+                  <MaterialCommunityIcons 
                     name={outlet.icon} 
                     size={20} 
                     color={isOn ? CONFIG.COLORS.white : CONFIG.COLORS.gray} 
@@ -143,7 +180,7 @@ const OutletGrid = ({
                 </View>
                 
                 <View style={styles.outletStatus}>
-                  <MaterialIcons 
+                  <MaterialCommunityIcons 
                     name={getOutletIcon(outlet.id)} 
                     size={24} 
                     color={isOn ? CONFIG.COLORS.white : CONFIG.COLORS.gray} 
@@ -155,6 +192,26 @@ const OutletGrid = ({
                     {isOn ? 'ON' : 'OFF'}
                   </Text>
                 </View>
+              </TouchableOpacity>
+              
+              {/* Toggle Button */}
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  { backgroundColor: isOn ? CONFIG.COLORS.danger : CONFIG.COLORS.success }
+                ]}
+                onPress={() => handleQuickToggle(outlet.id)}
+                disabled={isDisabled}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons 
+                  name={isOn ? 'power-off' : 'power'} 
+                  size={18} 
+                  color={CONFIG.COLORS.white} 
+                />
+                <Text style={styles.toggleText}>
+                  {isOn ? 'TURN OFF' : 'TURN ON'}
+                </Text>
               </TouchableOpacity>
             </Animated.View>
           );
@@ -173,6 +230,8 @@ const OutletGrid = ({
         onUpdateOutlet={handleUpdateOutletSettings}
         onControlOutlet={handleOutletControl}
         loading={loading}
+        deviceData={deviceData}
+        onRefreshDeviceData={onRefreshDeviceData}
       />
     </View>
   );
@@ -218,12 +277,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    position: 'relative',
+    minHeight: 140,
   },
   outletButton: {
     padding: 12,
     alignItems: 'center',
-    minHeight: 80,
+    minHeight: 100,
     justifyContent: 'center',
+    paddingBottom: 60, // Make space for toggle button
   },
   outletHeader: {
     flexDirection: 'row',
@@ -256,6 +318,29 @@ const styles = StyleSheet.create({
     color: CONFIG.COLORS.gray,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  toggleButton: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    right: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  toggleText: {
+    color: CONFIG.COLORS.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 6,
   },
 });
 

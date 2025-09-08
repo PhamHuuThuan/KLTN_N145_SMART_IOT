@@ -8,6 +8,29 @@ export const useDeviceData = () => {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [deviceDetail, setDeviceDetail] = useState(null);
+
+  // Fetch device status
+  const fetchDeviceStatus = useCallback(async (deviceId) => {
+    if (!deviceId) return;
+    
+    try {
+      console.log('📱 Fetching status for device:', deviceId);
+      const response = await apiService.getDeviceStatus(deviceId);
+      console.log('📱 Device status received:', response);
+      // apiService returns already-unwrapped data; ensure safe defaults
+      const data = response?.data || response || {};
+      setDeviceData({
+        deviceId,
+        latestTelemetry: null,
+        outlets: [],
+        ...data,
+      });
+    } catch (err) {
+      console.error('Error fetching device status:', err);
+      setError(err.message);
+    }
+  }, []);
 
   // Fetch devices
   const fetchDevices = useCallback(async () => {
@@ -20,13 +43,14 @@ export const useDeviceData = () => {
       
       console.log('📱 Devices received:', devices);
       
-      // Map devices to get deviceId
-      const deviceIds = devices.map(device => device.deviceId);
+      // Map devices to get deviceId, guard against bad entries
+      const deviceIds = devices.map(device => device?.deviceId).filter(Boolean);
       setDevicesList(deviceIds);
       
-      if (deviceIds.length > 0) {
+      // Only auto-select first device if nothing selected yet
+      if (!selectedDevice && deviceIds.length > 0) {
         const firstDevice = deviceIds[0];
-        console.log('📱 Selected device:', firstDevice);
+        console.log('📱 Auto-selected device:', firstDevice);
         setSelectedDevice(firstDevice);
         await fetchDeviceStatus(firstDevice);
       }
@@ -36,20 +60,16 @@ export const useDeviceData = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDevice, fetchDeviceStatus]);
 
-  // Fetch device status
-  const fetchDeviceStatus = useCallback(async (deviceId) => {
+  // Fetch full device detail for UI (e.g., modal)
+  const fetchDeviceDetail = useCallback(async (deviceId) => {
     if (!deviceId) return;
-    
     try {
-      console.log('📱 Fetching status for device:', deviceId);
-      const response = await apiService.getDeviceStatus(deviceId);
-      console.log('📱 Device status received:', response);
-      setDeviceData(response.data);
+      const response = await apiService.getDeviceDetail(deviceId);
+      setDeviceDetail(response.data || response);
     } catch (err) {
-      console.error('Error fetching device status:', err);
-      setError(err.message);
+      console.error('Error fetching device detail:', err);
     }
   }, []);
 
@@ -74,11 +94,14 @@ export const useDeviceData = () => {
 
   return {
     deviceData,
+    deviceDetail,
     devicesList,
     selectedDevice,
     loading,
     error,
     fetchDevices,
     selectDevice,
+    fetchDeviceStatus,
+    fetchDeviceDetail,
   };
 };

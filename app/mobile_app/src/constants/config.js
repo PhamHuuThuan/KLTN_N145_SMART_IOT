@@ -13,6 +13,7 @@ export const CONFIG = {
     DEVICES: '/api/devices',                    // GET all devices
     STATUS: '/api/devices/status',              // GET general status
     DEVICE_STATUS: '/api/devices/:deviceId/status', // GET device status
+    DEVICE_DETAIL: '/api/devices/:deviceId',    // GET device by id (full info)
     OUTLET_TOGGLE: '/api/devices/:deviceId/outlets/:outletId/toggle', // PUT toggle outlet
     OUTLET_UPDATE: '/api/devices/:deviceId/outlets/:outletId', // PUT update outlet settings
   },
@@ -29,6 +30,20 @@ export const CONFIG = {
     dark: '#2C3E50',
     white: '#FFFFFF',
     gray: '#6C757D',
+  },
+
+  // Simple, easy-on-the-eyes theme palette for consistent UI accents
+  THEME: {
+    primary: '#2563EB',      // blue-600
+    secondary: '#14B8A6',    // teal-500
+    success: '#22C55E',      // green-500
+    danger: '#EF4444',       // red-500
+    info: '#8B5CF6',         // violet-500
+    gray: '#94A3B8',         // slate-400
+    grayLight: '#CBD5E1',    // slate-300
+    surface: '#FFFFFF',      // white
+    background: '#F1F5F9',   // slate-100
+    border: '#E2E8F0',       // slate-200
   },
   
   // Sensor thresholds

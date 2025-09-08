@@ -99,6 +99,14 @@ const deviceSchema = new mongoose.Schema({
     autoShutdown: { type: Boolean, default: true },
     notificationEnabled: { type: Boolean, default: true },
     emergencyResponseDelay: { type: Number, default: 5000 } // milliseconds
+  },
+  latestTelemetry: {
+    ts: { type: Number, default: Date.now },
+    temp: { type: Number, default: 0 },
+    humid: { type: Number, default: 0 },
+    smoke: { type: Number, default: 0 },
+    gas_ppm: { type: Number, default: 0 },
+    o: { type: Object, default: {} }
   }
 }, {
   timestamps: true
