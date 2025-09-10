@@ -54,8 +54,12 @@ async function updateDeviceStatus(data) {
       Object.keys(payload.o).forEach(outletId => {
         const outlet = device.outlets.find(o => o.id === outletId);
         if (outlet) {
+          const newVal = payload.o[outletId];
+          if (newVal === undefined || newVal === null) {
+            return; // skip unknowns
+          }
           const oldStatus = outlet.status;
-          outlet.status = payload.o[outletId];
+          outlet.status = newVal;
           outlet.lastToggleAt = new Date();
           console.log(`🔌 Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
         } else {
@@ -68,8 +72,12 @@ async function updateDeviceStatus(data) {
       Object.keys(payload.outlets).forEach(outletId => {
         const outlet = device.outlets.find(o => o.id === outletId);
         if (outlet) {
+          const newVal = payload.outlets[outletId];
+          if (newVal === undefined || newVal === null) {
+            return;
+          }
           const oldStatus = outlet.status;
-          outlet.status = payload.outlets[outletId];
+          outlet.status = newVal;
           outlet.lastToggleAt = new Date();
           console.log(`🔌 Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
         } else {
@@ -80,28 +88,22 @@ async function updateDeviceStatus(data) {
       console.log(`⚠️ No outlet data found in payload for ${type} log`);
     }
     
-    // Update latest telemetry (only if we have valid sensor data)
-    if (payload.temp !== undefined || payload.humid !== undefined || payload.smoke !== undefined || payload.gas_ppm !== undefined) {
+    // Update latest telemetry (only set provided fields; do not default to 0)
+    if (payload.temp !== undefined || payload.humid !== undefined || payload.smoke !== undefined || payload.gas_ppm !== undefined || payload.o || payload.outlets) {
+      const prev = device.latestTelemetry || { ts: Date.now(), temp: null, humid: null, smoke: null, gas_ppm: null, o: {} };
       device.latestTelemetry = {
-        ts: payload.ts || Date.now(),
-        temp: payload.temp !== undefined ? payload.temp : device.latestTelemetry?.temp || 0,
-        humid: payload.humid !== undefined ? payload.humid : device.latestTelemetry?.humid || 0,
-        smoke: payload.smoke !== undefined ? payload.smoke : device.latestTelemetry?.smoke || 0,
-        gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : device.latestTelemetry?.gas_ppm || 0,
-        o: payload.o || payload.outlets || device.latestTelemetry?.o || {}
+        ts: payload.ts || prev.ts || Date.now(),
+        temp: payload.temp !== undefined ? payload.temp : prev.temp ?? null,
+        humid: payload.humid !== undefined ? payload.humid : prev.humid ?? null,
+        smoke: payload.smoke !== undefined ? payload.smoke : prev.smoke ?? null,
+        gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : prev.gas_ppm ?? null,
+        o: (payload.o || payload.outlets || prev.o || {})
       };
       console.log(`🌡️ Updated latest telemetry:`, device.latestTelemetry);
     } else if (type === 'event' && (payload.o || payload.outlets)) {
       // For event logs, only update outlet status in latestTelemetry
       if (!device.latestTelemetry) {
-        device.latestTelemetry = {
-          ts: Date.now(),
-          temp: 0,
-          humid: 0,
-          smoke: 0,
-          gas_ppm: 0,
-          o: {}
-        };
+        device.latestTelemetry = { ts: Date.now(), temp: null, humid: null, smoke: null, gas_ppm: null, o: {} };
       }
       device.latestTelemetry.o = payload.o || payload.outlets || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();

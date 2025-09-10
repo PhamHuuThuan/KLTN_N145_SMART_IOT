@@ -94,18 +94,18 @@ function startMqtt() {
         // Store data for this specific device
         const deviceData = {
           deviceId: deviceId,
-          temperature: data.temp || null,
-          humidity: data.humid || null,
-          smoke: data.smoke || 0, 
-          gasPpm: data.gas_ppm || null,
-          mq2Voltage: data.mq2_v || null,
-          flame: data.flame || 0,
+          temperature: (data.temp ?? null),
+          humidity: (data.humid ?? null),
+          smoke: (data.smoke ?? null),
+          gasPpm: (data.gas_ppm ?? null),
+          mq2Voltage: (data.mq2_v ?? null),
+          flame: (data.flame ?? null),
           outlets: {
-            o1: data.o?.o1 || false,
-            o2: data.o?.o2 || false,
-            o3: data.o?.o3 || false,
-            o4: data.o?.o4 || false,
-            o5: data.o?.o5 || false,
+            o1: (data.o?.o1 ?? null),
+            o2: (data.o?.o2 ?? null),
+            o3: (data.o?.o3 ?? null),
+            o4: (data.o?.o4 ?? null),
+            o5: (data.o?.o5 ?? null),
           },
           timestamp: new Date().toISOString(),
         };
@@ -127,16 +127,16 @@ function startMqtt() {
           topic,
           payload: {
             ts: Date.now(),
-            temp: data.temp !== null && data.temp !== undefined ? Number(data.temp) : 0,
-            humid: data.humid !== null && data.humid !== undefined ? Number(data.humid) : 0,
-            smoke: data.smoke !== null && data.smoke !== undefined ? Number(data.smoke) : 0,
-            gas_ppm: data.gas_ppm !== null && data.gas_ppm !== undefined ? Number(data.gas_ppm) : 0,
+            temp: (data.temp ?? null) !== null ? Number(data.temp) : null,
+            humid: (data.humid ?? null) !== null ? Number(data.humid) : null,
+            smoke: (data.smoke ?? null) !== null ? Number(data.smoke) : null,
+            gas_ppm: (data.gas_ppm ?? null) !== null ? Number(data.gas_ppm) : null,
             o: {
-              o1: Boolean(data.o?.o1) || false,
-              o2: Boolean(data.o?.o2) || false,
-              o3: Boolean(data.o?.o3) || false,
-              o4: Boolean(data.o?.o4) || false,
-              o5: Boolean(data.o?.o5) || false,
+              o1: (data.o?.o1 ?? null),
+              o2: (data.o?.o2 ?? null),
+              o3: (data.o?.o3 ?? null),
+              o4: (data.o?.o4 ?? null),
+              o5: (data.o?.o5 ?? null),
             }
           },
           severity: 'low',
@@ -161,11 +161,7 @@ function startMqtt() {
           topic,
           payload: {
             ts: Date.now(),
-            temp: 0,
-            humid: 0,
-            smoke: 0,
-            gas_ppm: 0,
-            o: { o1: false, o2: false, o3: false, o4: false, o5: false }
+            ack: true
           },
           severity: 'low',
           metadata: {
