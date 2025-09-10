@@ -205,10 +205,10 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={CONFIG.COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={CONFIG.THEME.primary} />
       
       <LinearGradient
-        colors={[CONFIG.COLORS.primary, CONFIG.COLORS.secondary]}
+        colors={[CONFIG.THEME.primary, CONFIG.THEME.secondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradientHeader}
@@ -273,7 +273,7 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
   },
   gradientHeader: {
     paddingTop: 32,
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: CONFIG.COLORS.primary,
+    backgroundColor: CONFIG.THEME.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   section: {
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     padding: CONFIG.DIMENSIONS.cardPadding,
     marginBottom: 16,
@@ -405,12 +405,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: CONFIG.COLORS.border,
+    borderColor: CONFIG.THEME.border,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
   },
   inputRowDisabled: {
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
   },
   inputIcon: {
     paddingLeft: 12,
@@ -425,9 +425,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: CONFIG.COLORS.border,
+    borderColor: CONFIG.THEME.border,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
   },
   passwordInput: {
     flex: 1,
@@ -450,18 +450,18 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   editButton: {
-    backgroundColor: CONFIG.COLORS.primary,
+    backgroundColor: CONFIG.THEME.primary,
   },
   saveButton: {
-    backgroundColor: CONFIG.COLORS.success,
+    backgroundColor: CONFIG.THEME.success,
   },
   cancelButton: {
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
     borderWidth: 1,
-    borderColor: CONFIG.COLORS.border,
+    borderColor: CONFIG.THEME.border,
   },
   logoutButton: {
-    backgroundColor: CONFIG.COLORS.danger,
+    backgroundColor: CONFIG.THEME.danger,
   },
   ctaText: {
     color: CONFIG.COLORS.white,
