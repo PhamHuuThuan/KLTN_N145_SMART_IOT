@@ -32,6 +32,12 @@ const ENV = {
     HTTPS: `https://${getLocalIP()}:3004`,
     LOCAL: 'http://127.0.0.1:3004',
   },
+
+  AUTH_SERVICE: {
+    HTTP: `http://${getLocalIP()}:3005`,
+    HTTPS: `https://${getLocalIP()}:3005`,
+    LOCAL: 'http://127.0.0.1:3005',
+  },
   
   // Current API Configuration (devices-service)
   API_BASE_URL: Constants.expoConfig?.extra?.apiUrl || `http://${getLocalIP()}:3002`,
