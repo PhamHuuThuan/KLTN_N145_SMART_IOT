@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import CONFIG from '../constants/config';
+import Header from '../components/Header';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -57,17 +58,9 @@ const LoginScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={CONFIG.COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={CONFIG.THEME.primary} />
       
-      {/* Header giống trang device */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.titleContainer}>
-            <Text style={styles.headerTitle}>🔐 Smart IoT Kitchen</Text>
-            <Text style={styles.headerSubtitle}>Đăng nhập để tiếp tục</Text>
-          </View>
-        </View>
-      </View>
+      <Header />
 
       <KeyboardAvoidingView 
         style={styles.content}
@@ -147,7 +140,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
   },
   header: {
     backgroundColor: CONFIG.COLORS.primary,
@@ -181,7 +174,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   form: {
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
     borderRadius: 16,
     padding: 24,
     shadowColor: '#000',
@@ -202,11 +195,11 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: CONFIG.COLORS.grayLight,
+    borderColor: CONFIG.THEME.border,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -221,12 +214,12 @@ const styles = StyleSheet.create({
   passwordInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: CONFIG.COLORS.grayLight,
+    borderColor: CONFIG.THEME.border,
     borderRadius: 12,
     padding: 16,
     paddingRight: 50,
     fontSize: 16,
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -239,19 +232,19 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   loginButton: {
-    backgroundColor: CONFIG.COLORS.primary,
+    backgroundColor: CONFIG.THEME.primary,
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',
     marginTop: 20,
-    shadowColor: CONFIG.COLORS.primary,
+    shadowColor: CONFIG.THEME.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   disabledButton: {
-    backgroundColor: CONFIG.COLORS.gray,
+    backgroundColor: CONFIG.THEME.gray,
   },
   loginButtonText: {
     color: CONFIG.COLORS.white,
@@ -265,15 +258,15 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: CONFIG.COLORS.grayLight,
+    borderTopColor: CONFIG.THEME.border,
   },
   footerText: {
     fontSize: 16,
-    color: CONFIG.COLORS.gray,
+    color: CONFIG.THEME.gray,
   },
   linkText: {
     fontSize: 16,
-    color: CONFIG.COLORS.primary,
+    color: CONFIG.THEME.primary,
     fontWeight: '600',
   },
 });

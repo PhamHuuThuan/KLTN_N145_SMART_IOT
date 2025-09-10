@@ -37,7 +37,7 @@ const SettingsScreen = ({ navigation }) => {
     <TouchableOpacity style={styles.settingItem} onPress={onPress}>
       <View style={styles.settingLeft}>
         <View style={styles.iconContainer}>
-          <Ionicons name={icon} size={24} color={CONFIG.COLORS.primary} />
+          <Ionicons name={icon} size={24} color={CONFIG.THEME.primary} />
         </View>
         <View style={styles.settingText}>
           <Text style={styles.settingTitle}>{title}</Text>
@@ -45,14 +45,14 @@ const SettingsScreen = ({ navigation }) => {
         </View>
       </View>
       {showArrow && (
-        <Ionicons name="chevron-forward" size={20} color={CONFIG.COLORS.gray} />
+        <Ionicons name="chevron-forward" size={20} color={CONFIG.THEME.gray} />
       )}
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={CONFIG.COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={CONFIG.THEME.primary} />
       
       {/* Header */}
       <View style={styles.headerContainer}>
@@ -133,10 +133,10 @@ const SettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
   },
   headerContainer: {
-    backgroundColor: CONFIG.COLORS.primary,
+    backgroundColor: CONFIG.THEME.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   section: {
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     marginBottom: 15,
     shadowColor: '#000',
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     padding: 15,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.COLORS.light,
+    borderBottomColor: CONFIG.THEME.border,
   },
   settingItem: {
     flexDirection: 'row',
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.COLORS.light,
+    borderBottomColor: CONFIG.THEME.border,
   },
   settingLeft: {
     flexDirection: 'row',
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   },
   settingSubtitle: {
     fontSize: 14,
-    color: CONFIG.COLORS.gray,
+    color: CONFIG.THEME.gray,
   },
 });
 

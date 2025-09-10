@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import environment from '../config/environment';
 
 const authClient = axios.create({
-  baseURL: environment.getServiceUrl('AUTH_SERVICE') || 'http://127.0.0.1:3002',
+  baseURL: environment.getServiceUrl('AUTH_SERVICE') || 'http://127.0.0.1:3005',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

@@ -100,19 +100,19 @@ const RulesScreen = () => {
   const getCategoryColor = (category) => {
     switch (category) {
       case 'safety':
-        return CONFIG.COLORS.danger;
+        return CONFIG.THEME.danger;
       case 'energy_saving':
-        return CONFIG.COLORS.success;
+        return CONFIG.THEME.success;
       default:
-        return CONFIG.COLORS.gray;
+        return CONFIG.THEME.gray;
     }
   };
 
   const getPriorityColor = (priority) => {
-    if (priority >= 8) return CONFIG.COLORS.danger;
-    if (priority >= 6) return CONFIG.COLORS.warning;
-    if (priority >= 4) return CONFIG.COLORS.info;
-    return CONFIG.COLORS.success;
+    if (priority >= 8) return CONFIG.THEME.danger;
+    if (priority >= 6) return CONFIG.THEME.warning;
+    if (priority >= 4) return CONFIG.THEME.info;
+    return CONFIG.THEME.success;
   };
 
   const filteredRules = selectedCategory === 'all' 
@@ -219,7 +219,7 @@ const RulesScreen = () => {
           style={styles.actionButton}
           onPress={() => setShowTemplatesModal(true)}
         >
-          <MaterialIcons name="library-books" size={20} color={CONFIG.COLORS.primary} />
+          <MaterialIcons name="library-books" size={20} color={CONFIG.THEME.primary} />
         </TouchableOpacity>
       </View>
 
@@ -246,7 +246,7 @@ const RulesScreen = () => {
         contentContainerStyle={styles.rulesList}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MaterialIcons name="rule" size={48} color={CONFIG.COLORS.gray} />
+            <MaterialIcons name="rule" size={48} color={CONFIG.THEME.gray} />
             <Text style={styles.emptyText}>No rules yet</Text>
             <Text style={styles.emptySubtext}>
               Create your first rule from available templates
@@ -268,7 +268,7 @@ const RulesScreen = () => {
               style={styles.closeButton}
               onPress={() => setShowTemplatesModal(false)}
             >
-              <MaterialIcons name="close" size={24} color={CONFIG.COLORS.gray} />
+              <MaterialIcons name="close" size={24} color={CONFIG.THEME.gray} />
             </TouchableOpacity>
           </View>
           
@@ -347,7 +347,7 @@ const RulesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
   },
   loadingContainer: {
     flex: 1,
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: CONFIG.COLORS.gray,
+    color: CONFIG.THEME.gray,
   },
   header: {
     flexDirection: 'row',
@@ -364,19 +364,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 56,
     paddingHorizontal: 16,
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.COLORS.light,
+    borderBottomColor: CONFIG.THEME.border,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: CONFIG.COLORS.primary,
+    color: CONFIG.THEME.primary,
   },
   actionButton: {
     padding: 8,
     borderRadius: 8,
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
   },
   rulesList: {
     paddingTop: 8,
@@ -392,33 +392,33 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: CONFIG.COLORS.gray,
+    color: CONFIG.THEME.gray,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: CONFIG.COLORS.gray,
+    color: CONFIG.THEME.gray,
     textAlign: 'center',
     marginTop: 8,
     paddingHorizontal: 32,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.COLORS.light,
+    borderBottomColor: CONFIG.THEME.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: CONFIG.COLORS.primary,
+    color: CONFIG.THEME.primary,
   },
   closeButton: {
     padding: 4,
