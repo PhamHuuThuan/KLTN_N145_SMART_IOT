@@ -1,0 +1,378 @@
+import mongoose from 'mongoose';
+import Notification from '../models/Notification.js';
+import UserNotificationPreferences from '../models/UserNotificationPreferences.js';
+import EmailService from './EmailService.js';
+import SMSService from './SMSService.js';
+import FCMService from './FCMService.js';
+import InAppService from './InAppService.js';
+import logger from '../utils/logger.js';
+
+class NotificationService {
+  constructor() {
+    this.emailService = new EmailService();
+    this.smsService = new SMSService();
+    this.fcmService = new FCMService();
+    this.inAppService = new InAppService();
+  }
+
+  /**
+   * Send notification to user through all enabled channels
+   * @param {Object} notificationData - Notification data
+   * @param {string} notificationData.userId - User ID
+   * @param {string} notificationData.title - Notification title
+   * @param {string} notificationData.message - Notification message
+   * @param {string} notificationData.type - Notification type
+   * @param {string} notificationData.category - Notification category
+   * @param {string} notificationData.priority - Notification priority
+   * @param {Object} notificationData.metadata - Additional metadata
+   * @param {Date} notificationData.scheduledFor - When to send (optional)
+   * @param {Date} notificationData.expiresAt - When notification expires (optional)
+   */
+  async sendNotification(notificationData) {
+    try {
+      const {
+        userId,
+        title,
+        message,
+        type,
+        category,
+        priority = 'medium',
+        metadata = {},
+        scheduledFor = null,
+        expiresAt = null
+      } = notificationData;
+
+      // Create notification record
+      const notification = new Notification({
+        userId,
+        title,
+        message,
+        type,
+        category,
+        priority,
+        metadata,
+        scheduledFor,
+        expiresAt
+      });
+
+      await notification.save();
+
+      // Get user preferences
+      const preferences = await UserNotificationPreferences.getUserPreferences(userId);
+      if (!preferences) {
+        logger.warn(`No notification preferences found for user ${userId}`);
+        return notification;
+      }
+
+      // Check if notification should be sent immediately or scheduled
+      if (scheduledFor && scheduledFor > new Date()) {
+        logger.info(`Notification scheduled for ${scheduledFor}`, { notificationId: notification._id });
+        return notification;
+      }
+
+      // Send through enabled channels
+      await this._sendThroughChannels(notification, preferences);
+
+      return notification;
+    } catch (error) {
+      logger.error('Error sending notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send notification through all enabled channels
+   * @private
+   */
+  async _sendThroughChannels(notification, preferences) {
+    const { category, priority } = notification;
+    const channels = ['inApp', 'email', 'sms', 'fcm'];
+
+    for (const channel of channels) {
+      try {
+        if (preferences.shouldSendNotification(category, channel, priority)) {
+          await this._sendThroughChannel(notification, preferences, channel);
+        }
+      } catch (error) {
+        logger.error(`Error sending notification through ${channel}:`, error);
+        // Update delivery status with error
+        notification.deliveryStatus[channel].error = error.message;
+        await notification.save();
+      }
+    }
+  }
+
+  /**
+   * Send notification through specific channel
+   * @private
+   */
+  async _sendThroughChannel(notification, preferences, channel) {
+    const { userId, title, message, metadata } = notification;
+    const deliveryStatus = notification.deliveryStatus[channel];
+
+    let result;
+    switch (channel) {
+      case 'inApp':
+        result = await this.inAppService.send(userId, title, message, metadata);
+        break;
+      case 'email':
+        result = await this.emailService.send(
+          preferences.email.address,
+          title,
+          message,
+          metadata
+        );
+        break;
+      case 'sms':
+        if (preferences.sms.phoneNumber) {
+          result = await this.smsService.send(
+            preferences.sms.phoneNumber,
+            message,
+            metadata
+          );
+        }
+        break;
+      case 'fcm':
+        if (preferences.fcm.tokens.length > 0) {
+          result = await this.fcmService.send(
+            preferences.fcm.tokens,
+            title,
+            message,
+            metadata
+          );
+        }
+        break;
+    }
+
+    if (result) {
+      deliveryStatus.sent = true;
+      deliveryStatus.sentAt = new Date();
+      deliveryStatus.error = null;
+    }
+
+    await notification.save();
+  }
+
+  /**
+   * Send bulk notifications to multiple users
+   * @param {Array} notifications - Array of notification data
+   */
+  async sendBulkNotifications(notifications) {
+    const results = [];
+    
+    for (const notificationData of notifications) {
+      try {
+        const result = await this.sendNotification(notificationData);
+        results.push({ success: true, notification: result });
+      } catch (error) {
+        logger.error('Error in bulk notification:', error);
+        results.push({ success: false, error: error.message, data: notificationData });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Get user notifications with pagination and filters
+   * @param {string} userId - User ID
+   * @param {Object} options - Query options
+   */
+  async getUserNotifications(userId, options = {}) {
+    try {
+      const notifications = await Notification.getUserNotifications(userId, options);
+      const total = await Notification.countDocuments({ userId });
+      
+      return {
+        notifications,
+        total,
+        page: options.page || 1,
+        limit: options.limit || 20,
+        pages: Math.ceil(total / (options.limit || 20))
+      };
+    } catch (error) {
+      logger.error('Error getting user notifications:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark notification as read
+   * @param {string} notificationId - Notification ID
+   * @param {string} userId - User ID
+   */
+  async markAsRead(notificationId, userId) {
+    try {
+      const notification = await Notification.findOne({
+        _id: notificationId,
+        userId
+      });
+
+      if (!notification) {
+        throw new Error('Notification not found');
+      }
+
+      await notification.markAsRead();
+      return notification;
+    } catch (error) {
+      logger.error('Error marking notification as read:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark all notifications as read for user
+   * @param {string} userId - User ID
+   */
+  async markAllAsRead(userId) {
+    try {
+      const result = await Notification.updateMany(
+        { userId, isRead: false },
+        { isRead: true, readAt: new Date() }
+      );
+      
+      return result;
+    } catch (error) {
+      logger.error('Error marking all notifications as read:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete notification
+   * @param {string} notificationId - Notification ID
+   * @param {string} userId - User ID
+   */
+  async deleteNotification(notificationId, userId) {
+    try {
+      const notification = await Notification.findOneAndDelete({
+        _id: notificationId,
+        userId
+      });
+
+      if (!notification) {
+        throw new Error('Notification not found');
+      }
+
+      return notification;
+    } catch (error) {
+      logger.error('Error deleting notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get notification statistics for user
+   * @param {string} userId - User ID
+   */
+  async getNotificationStats(userId) {
+    try {
+      const stats = await Notification.aggregate([
+        { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            unread: { $sum: { $cond: ['$isRead', 0, 1] } },
+            byType: {
+              $push: {
+                type: '$type',
+                isRead: '$isRead'
+              }
+            },
+            byCategory: {
+              $push: {
+                category: '$category',
+                isRead: '$isRead'
+              }
+            }
+          }
+        }
+      ]);
+
+      if (stats.length === 0) {
+        return {
+          total: 0,
+          unread: 0,
+          byType: {},
+          byCategory: {}
+        };
+      }
+
+      const result = stats[0];
+      
+      // Process by type
+      const byType = {};
+      result.byType.forEach(item => {
+        if (!byType[item.type]) {
+          byType[item.type] = { total: 0, unread: 0 };
+        }
+        byType[item.type].total++;
+        if (!item.isRead) byType[item.type].unread++;
+      });
+
+      // Process by category
+      const byCategory = {};
+      result.byCategory.forEach(item => {
+        if (!byCategory[item.category]) {
+          byCategory[item.category] = { total: 0, unread: 0 };
+        }
+        byCategory[item.category].total++;
+        if (!item.isRead) byCategory[item.category].unread++;
+      });
+
+      return {
+        total: result.total,
+        unread: result.unread,
+        byType,
+        byCategory
+      };
+    } catch (error) {
+      logger.error('Error getting notification stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process scheduled notifications
+   */
+  async processScheduledNotifications() {
+    try {
+      const now = new Date();
+      const scheduledNotifications = await Notification.find({
+        scheduledFor: { $lte: now },
+        'deliveryStatus.inApp.sent': false
+      });
+
+      for (const notification of scheduledNotifications) {
+        const preferences = await UserNotificationPreferences.getUserPreferences(notification.userId);
+        if (preferences) {
+          await this._sendThroughChannels(notification, preferences);
+        }
+      }
+
+      logger.info(`Processed ${scheduledNotifications.length} scheduled notifications`);
+    } catch (error) {
+      logger.error('Error processing scheduled notifications:', error);
+    }
+  }
+
+  /**
+   * Clean up expired notifications
+   */
+  async cleanupExpiredNotifications() {
+    try {
+      const now = new Date();
+      const result = await Notification.deleteMany({
+        expiresAt: { $lte: now }
+      });
+
+      logger.info(`Cleaned up ${result.deletedCount} expired notifications`);
+      return result;
+    } catch (error) {
+      logger.error('Error cleaning up expired notifications:', error);
+    }
+  }
+}
+
+export default NotificationService;
