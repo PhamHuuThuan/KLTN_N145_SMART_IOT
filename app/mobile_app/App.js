@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { NotificationProvider } from './src/contexts/NotificationContext';
 import HomeScreen from './src/screens/HomeScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -10,6 +12,7 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import RulesScreen from './src/screens/RulesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
+import NotificationScreen from './src/screens/NotificationScreen';
 import CONFIG from './src/constants/config';
 
 function AppContent() {
@@ -33,7 +36,7 @@ function AppContent() {
       case 'Main':
         switch (activeTab) {
           case 'Home':
-            return <HomeScreen />;
+            return <HomeScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
           case 'Chat':
             return <ChatScreen />;
           case 'Rules':
@@ -41,8 +44,10 @@ function AppContent() {
           case 'Settings':
             return <SettingsScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
           default:
-            return <HomeScreen />;
+            return <HomeScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
         }
+      case 'Notifications':
+        return <NotificationScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
       case 'Profile':
         return <ProfileScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
       case 'ChangePassword':
@@ -113,9 +118,13 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <AppContent />
+        </NotificationProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

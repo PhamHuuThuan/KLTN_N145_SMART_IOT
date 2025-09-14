@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/logo_app.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/logo_app.png",
       "resizeMode": "contain",
@@ -27,7 +27,7 @@
       "bundler": "metro"
     },
     "extra": {
-      "apiUrl": "http://192.168.110.112:3002"
+      "apiUrl": "http://127.0.0.1:3002"
     },
     "plugins": [
       "expo-font"

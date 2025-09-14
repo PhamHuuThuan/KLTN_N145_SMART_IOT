@@ -19,7 +19,7 @@ import DeviceInfoModal from '../components/DeviceInfoModal';
 import apiService from '../services/apiService';
 import CONFIG from '../constants/config';
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }) => {
   const {
     deviceData,
     deviceDetail,
@@ -45,7 +45,7 @@ const HomeScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={CONFIG.COLORS.primary} />
       
-      <Header />
+      <Header onNotificationPress={() => navigation?.navigate('Notifications')} />
       
       <ScrollView
         style={styles.content}
