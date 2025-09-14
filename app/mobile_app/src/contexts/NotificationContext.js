@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { notificationService } from '../services/notificationService';
+import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext();
 
@@ -35,10 +36,15 @@ const notificationReducer = (state, action) => {
       return { ...state, error: action.payload, loading: false };
     
     case NOTIFICATION_ACTIONS.SET_NOTIFICATIONS:
+      // Handle both array and object with notifications property
+      const notifications = Array.isArray(action.payload) 
+        ? action.payload 
+        : action.payload.data?.notifications || [];
+      
       return {
         ...state,
-        notifications: action.payload,
-        unreadCount: action.payload.filter(n => !n.isRead).length,
+        notifications: notifications,
+        unreadCount: notifications.filter(n => !n.isRead).length,
         loading: false,
         error: null,
       };
@@ -99,33 +105,67 @@ const notificationReducer = (state, action) => {
 // Provider component
 export const NotificationProvider = ({ children }) => {
   const [state, dispatch] = useReducer(notificationReducer, initialState);
+  const { user, isAuthenticated } = useAuth();
 
   // Load notifications on mount
   useEffect(() => {
-    // Load demo notifications for testing
-    const demoNotifications = notificationService.createDemoNotifications();
-    dispatch({
-      type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
-      payload: demoNotifications,
-    });
-  }, []);
+    if (isAuthenticated && user?.id) {
+      loadNotifications();
+    } else {
+      // Load demo notifications for testing when not authenticated
+      const demoNotifications = notificationService.createDemoNotifications();
+      dispatch({
+        type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
+        payload: demoNotifications,
+      });
+    }
+  }, [isAuthenticated, user?.id]);
 
   // Load notifications
   const loadNotifications = async (page = 1, limit = 20) => {
+    if (!isAuthenticated || !user?.id) {
+      console.warn('User not authenticated, using demo notifications');
+      const demoNotifications = notificationService.createDemoNotifications();
+      dispatch({
+        type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
+        payload: demoNotifications,
+      });
+      return;
+    }
+
+    // Prevent multiple simultaneous calls
+    if (state.loading) {
+      console.log('Already loading notifications, skipping...');
+      return;
+    }
+
     try {
       dispatch({ type: NOTIFICATION_ACTIONS.SET_LOADING, payload: true });
-      const response = await notificationService.getNotifications(page, limit);
+      const response = await notificationService.getNotifications(user.id, page, limit);
       
       if (response.success) {
+        // Pass the entire response.data object to the reducer
         dispatch({
           type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
-          payload: response.data.notifications,
+          payload: response.data,
         });
       } else {
-        dispatch({ type: NOTIFICATION_ACTIONS.SET_ERROR, payload: response.message });
+        // If API fails, fall back to demo notifications
+        console.warn('API failed, using demo notifications:', response.message);
+        const demoNotifications = notificationService.createDemoNotifications();
+        dispatch({
+          type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
+          payload: demoNotifications,
+        });
       }
     } catch (error) {
-      dispatch({ type: NOTIFICATION_ACTIONS.SET_ERROR, payload: error.message });
+      console.warn('API error, using demo notifications:', error.message);
+      // If API fails, fall back to demo notifications
+      const demoNotifications = notificationService.createDemoNotifications();
+      dispatch({
+        type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
+        payload: demoNotifications,
+      });
     }
   };
 
@@ -141,8 +181,17 @@ export const NotificationProvider = ({ children }) => {
 
   // Mark notification as read
   const markAsRead = async (notificationId) => {
+    if (!isAuthenticated || !user?.id) {
+      // If not authenticated, just update local state
+      dispatch({
+        type: NOTIFICATION_ACTIONS.MARK_AS_READ,
+        payload: notificationId,
+      });
+      return;
+    }
+
     try {
-      const response = await notificationService.markAsRead(notificationId);
+      const response = await notificationService.markAsRead(notificationId, user.id);
       
       if (response.success) {
         dispatch({
@@ -157,8 +206,14 @@ export const NotificationProvider = ({ children }) => {
 
   // Mark all notifications as read
   const markAllAsRead = async () => {
+    if (!isAuthenticated || !user?.id) {
+      // If not authenticated, just update local state
+      dispatch({ type: NOTIFICATION_ACTIONS.MARK_ALL_AS_READ });
+      return;
+    }
+
     try {
-      const response = await notificationService.markAllAsRead();
+      const response = await notificationService.markAllAsRead(user.id);
       
       if (response.success) {
         dispatch({ type: NOTIFICATION_ACTIONS.MARK_ALL_AS_READ });
@@ -170,8 +225,17 @@ export const NotificationProvider = ({ children }) => {
 
   // Delete notification
   const deleteNotification = async (notificationId) => {
+    if (!isAuthenticated || !user?.id) {
+      // If not authenticated, just update local state
+      dispatch({
+        type: NOTIFICATION_ACTIONS.DELETE_NOTIFICATION,
+        payload: notificationId,
+      });
+      return;
+    }
+
     try {
-      const response = await notificationService.deleteNotification(notificationId);
+      const response = await notificationService.deleteNotification(notificationId, user.id);
       
       if (response.success) {
         dispatch({
@@ -194,12 +258,32 @@ export const NotificationProvider = ({ children }) => {
 
   // Get notification stats
   const getNotificationStats = async () => {
+    if (!isAuthenticated || !user?.id) {
+      return null;
+    }
+
     try {
-      const response = await notificationService.getNotificationStats();
+      const response = await notificationService.getNotificationStats(user.id);
       return response.data;
     } catch (error) {
       console.error('Error getting notification stats:', error);
       return null;
+    }
+  };
+
+  // Test API connection
+  const testApiConnection = async () => {
+    console.log('🔔 Testing API connection from NotificationContext...');
+    try {
+      const result = await notificationService.testConnection();
+      console.log('API Test Result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error testing API connection:', error);
+      return {
+        success: false,
+        message: error.message
+      };
     }
   };
 
@@ -212,6 +296,7 @@ export const NotificationProvider = ({ children }) => {
     deleteNotification,
     addNotification,
     getNotificationStats,
+    testApiConnection,
   };
 
   return (

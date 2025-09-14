@@ -43,6 +43,52 @@ apiClient.interceptors.response.use(
 
 // API Service class
 class ApiService {
+  // Generic HTTP methods
+  async get(url, config = {}) {
+    try {
+      const response = await apiClient.get(url, config);
+      return response;
+    } catch (error) {
+      throw new Error(`GET request failed: ${error.message}`);
+    }
+  }
+
+  async post(url, data = {}, config = {}) {
+    try {
+      const response = await apiClient.post(url, data, config);
+      return response;
+    } catch (error) {
+      throw new Error(`POST request failed: ${error.message}`);
+    }
+  }
+
+  async put(url, data = {}, config = {}) {
+    try {
+      const response = await apiClient.put(url, data, config);
+      return response;
+    } catch (error) {
+      throw new Error(`PUT request failed: ${error.message}`);
+    }
+  }
+
+  async patch(url, data = {}, config = {}) {
+    try {
+      const response = await apiClient.patch(url, data, config);
+      return response;
+    } catch (error) {
+      throw new Error(`PATCH request failed: ${error.message}`);
+    }
+  }
+
+  async delete(url, config = {}) {
+    try {
+      const response = await apiClient.delete(url, config);
+      return response;
+    } catch (error) {
+      throw new Error(`DELETE request failed: ${error.message}`);
+    }
+  }
+
   // Get all devices
   async getDevices() {
     try {
@@ -158,4 +204,6 @@ class ApiService {
 }
 
 // Export singleton instance
-export default new ApiService();
+const apiService = new ApiService();
+export { apiService };
+export default apiService;

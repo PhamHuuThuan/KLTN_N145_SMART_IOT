@@ -8,8 +8,22 @@ const logger = pino({
     target: 'pino-pretty',
     options: {
       colorize: true,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname'
+      translateTime: 'HH:MM:ss',
+      ignore: 'pid,hostname,service,version',
+      messageFormat: '[{service}] {msg}',
+      customPrettifiers: {
+        time: (timestamp) => `🕐 ${timestamp}`,
+        level: (level) => {
+          const levels = {
+            10: '🔍 DEBUG',
+            20: 'ℹ️  INFO',
+            30: '⚠️  WARN',
+            40: '❌ ERROR',
+            50: '💀 FATAL'
+          };
+          return levels[level] || level;
+        }
+      }
     }
   } : undefined,
   formatters: {

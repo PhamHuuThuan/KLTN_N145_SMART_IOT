@@ -3,12 +3,12 @@ import logger from '../utils/logger.js';
 
 const kafka = new Kafka({
   clientId: 'alerts-service',
-  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+  brokers: (process.env.KAFKA_BROKERS || 'localhost:29092').split(','),
   retry: {
     initialRetryTime: 100,
-    retries: 8
+    retries: 3
   },
-  connectionTimeout: 3000,
+  connectionTimeout: 5000,
   requestTimeout: 25000
 });
 
@@ -26,12 +26,13 @@ export const TOPICS = {
 // Connect to Kafka
 export const connectKafka = async () => {
   try {
-    const brokers = process.env.KAFKA_BROKERS || 'localhost:9092';
+    const brokers = process.env.KAFKA_BROKERS || 'localhost:29092';
     
+    // Test connection first
     await producer.connect();
     await consumer.connect();
     
-    logger.info('Kafka connected successfully', {
+    logger.info('📡 Kafka connected successfully', {
       brokers: brokers
     });
 
@@ -41,13 +42,21 @@ export const connectKafka = async () => {
       fromBeginning: false
     });
 
-    logger.info('Kafka consumer subscribed to topics', {
+    logger.info('📋 Kafka consumer subscribed to topics', {
       topics: Object.values(TOPICS)
     });
 
+    return true;
   } catch (error) {
-    logger.warn('Kafka connection failed, continuing without Kafka:', error.message);
-    // Don't throw error, just log warning and continue
+    logger.warn('⚠️  Kafka connection failed, continuing without Kafka:', error.message);
+    // Disconnect to prevent retry loops
+    try {
+      await producer.disconnect();
+      await consumer.disconnect();
+    } catch (disconnectError) {
+      // Ignore disconnect errors
+    }
+    return false;
   }
 };
 

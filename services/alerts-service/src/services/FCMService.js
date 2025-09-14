@@ -9,7 +9,12 @@ class FCMService {
 
   _initializeFirebase() {
     try {
-      if (process.env.FCM_PROJECT_ID && process.env.FCM_PRIVATE_KEY && process.env.FCM_CLIENT_EMAIL) {
+      // Check if Firebase credentials are provided
+      const hasCredentials = process.env.FCM_PROJECT_ID && 
+                           process.env.FCM_PRIVATE_KEY && 
+                           process.env.FCM_CLIENT_EMAIL;
+      
+      if (hasCredentials) {
         if (!admin.apps.length) {
           const serviceAccount = {
             type: 'service_account',
@@ -30,9 +35,10 @@ class FCMService {
           });
         }
         this.initialized = true;
-        logger.info('FCM service initialized successfully');
+        logger.info('🔔 FCM service initialized successfully');
       } else {
-        logger.warn('FCM service not initialized - missing Firebase credentials');
+        // Only log as info, not warning, since FCM is optional
+        logger.info('🔔 FCM service disabled - Firebase credentials not provided');
       }
     } catch (error) {
       logger.error('Failed to initialize FCM service:', error);

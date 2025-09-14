@@ -15,13 +15,13 @@ import NotificationConsumer from './consumers/NotificationConsumer.js';
 import logger from './utils/logger.js';
 
 const app = express();
-const PORT = process.env.PORT || 3005;
+const PORT = process.env.PORT || 3004;
 
 // Middleware
 app.use(helmet());
+
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-  credentials: true
+  origin: '*'
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -65,31 +65,35 @@ const initializeServices = async () => {
     // Connect to database
     await connectDatabase();
     
-    // Connect to Kafka
-    await connectKafka();
+    // Try to connect to Kafka
+    const kafkaConnected = await connectKafka();
     
-    // Initialize notification consumer
-    const notificationConsumer = new NotificationConsumer();
-    
-    // Set up message handlers
-    const messageHandlers = {
-      [TOPICS.DEVICE_ALERTS]: (topic, message) => notificationConsumer.handleDeviceAlert(topic, message),
-      [TOPICS.NOTIFICATION_REQUESTS]: (topic, message) => notificationConsumer.handleNotificationRequest(topic, message),
-      [TOPICS.USER_ACTIONS]: (topic, message) => notificationConsumer.handleUserAction(topic, message),
-      [TOPICS.SYSTEM_EVENTS]: (topic, message) => notificationConsumer.handleSystemEvent(topic, message)
-    };
-    
-    // Start consuming messages
-    await consumeMessages((topic, message) => {
-      const handler = messageHandlers[topic];
-      if (handler) {
-        handler(topic, message);
-      } else {
-        logger.warn('No handler found for topic', { topic });
-      }
-    });
-    
-    logger.info('All services initialized successfully');
+    if (kafkaConnected) {
+      // Initialize notification consumer
+      const notificationConsumer = new NotificationConsumer();
+      
+      // Set up message handlers
+      const messageHandlers = {
+        [TOPICS.DEVICE_ALERTS]: (topic, message) => notificationConsumer.handleDeviceAlert(topic, message),
+        [TOPICS.NOTIFICATION_REQUESTS]: (topic, message) => notificationConsumer.handleNotificationRequest(topic, message),
+        [TOPICS.USER_ACTIONS]: (topic, message) => notificationConsumer.handleUserAction(topic, message),
+        [TOPICS.SYSTEM_EVENTS]: (topic, message) => notificationConsumer.handleSystemEvent(topic, message)
+      };
+      
+      // Start consuming messages
+      await consumeMessages((topic, message) => {
+        const handler = messageHandlers[topic];
+        if (handler) {
+          handler(topic, message);
+        } else {
+          logger.warn('No handler found for topic', { topic });
+        }
+      });
+      
+      logger.info('🚀 All services initialized successfully with Kafka');
+    } else {
+      logger.info('🚀 Core services initialized successfully (Kafka disabled)');
+    }
   } catch (error) {
     logger.error('Failed to initialize services:', error);
     process.exit(1);
@@ -102,11 +106,11 @@ const startServer = async () => {
     await initializeServices();
     
     app.listen(PORT, () => {
-      logger.info('Alerts service started', {
-        port: PORT,
-        environment: process.env.NODE_ENV || 'development',
-        nodeVersion: process.version
-      });
+    logger.info('🎉 Alerts service started successfully', {
+      port: PORT,
+      environment: process.env.NODE_ENV || 'development',
+      nodeVersion: process.version
+    });
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

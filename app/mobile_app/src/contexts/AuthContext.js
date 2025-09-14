@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService';
+import { notificationService } from '../services/notificationService';
 
 const AuthContext = createContext();
 
@@ -35,10 +36,14 @@ export const AuthProvider = ({ children }) => {
         }
         setIsAuthenticated(true);
         setToken(authStatus.token);
+        // Set token for notification service
+        notificationService.setAuthToken(authStatus.token);
       } else {
         setUser(null);
         setIsAuthenticated(false);
         setToken(null);
+        // Clear token for notification service
+        notificationService.clearAuthToken();
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
@@ -60,6 +65,8 @@ export const AuthProvider = ({ children }) => {
         setUser(profile?.success && profile.user ? profile.user : result.user);
         setIsAuthenticated(true);
         setToken(result.token);
+        // Set token for notification service
+        notificationService.setAuthToken(result.token);
         return { success: true };
       } else {
         return { success: false, error: result.error };
@@ -81,6 +88,8 @@ export const AuthProvider = ({ children }) => {
         setUser(profile?.success && profile.user ? profile.user : result.user);
         setIsAuthenticated(true);
         setToken(result.token);
+        // Set token for notification service
+        notificationService.setAuthToken(result.token);
         return { success: true };
       } else {
         return { success: false, error: result.error };
@@ -99,6 +108,8 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       setToken(null);
+      // Clear token for notification service
+      notificationService.clearAuthToken();
       return { success: true };
     } catch (error) {
       return { success: false, error: 'Logout failed' };

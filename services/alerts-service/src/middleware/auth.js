@@ -16,7 +16,7 @@ export const authenticateToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-strong-secret');
     req.user = decoded;
     next();
   } catch (error) {
@@ -95,7 +95,7 @@ export const optionalAuth = (req, res, next) => {
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-strong-secret');
       req.user = decoded;
     } catch (error) {
       logger.warn('Optional auth failed:', error.message);

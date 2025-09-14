@@ -4,8 +4,8 @@
   "description": "Smart IoT Kitchen Alerts and Notifications Service",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "start": "node start.js",
+    "dev": "nodemon start.js",
     "test": "jest"
   },
   "keywords": ["notifications", "alerts", "sms", "email", "fcm", "kafka"],

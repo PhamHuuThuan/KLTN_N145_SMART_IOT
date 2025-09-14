@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotificationContext } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
 import NotificationItem from '../components/NotificationItem';
 import { notificationService } from '../services/notificationService';
 
@@ -25,11 +26,15 @@ const NotificationScreen = ({ navigation }) => {
     refreshNotifications,
     markAllAsRead,
     deleteNotification,
+    testApiConnection,
   } = useNotificationContext();
+  
+  const { user } = useAuth();
 
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [testingApi, setTestingApi] = useState(false);
 
   useEffect(() => {
     loadNotifications();
@@ -37,8 +42,24 @@ const NotificationScreen = ({ navigation }) => {
 
   const handleRefresh = async () => {
     setPage(1);
-    setHasMore(true);
     await refreshNotifications();
+    setHasMore(false);
+  };
+
+  const handleTestApi = async () => {
+    setTestingApi(true);
+    try {
+      const result = await testApiConnection();
+      Alert.alert(
+        'API Test Result',
+        `Success: ${result.success}\nMessage: ${result.message}\nStatus: ${result.status || 'N/A'}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('API Test Error', error.message);
+    } finally {
+      setTestingApi(false);
+    }
   };
 
   const handleLoadMore = async () => {
@@ -47,7 +68,12 @@ const NotificationScreen = ({ navigation }) => {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const response = await notificationService.getNotifications(nextPage, 20);
+      if (!user?.id) {
+        console.error('User not authenticated for load more');
+        return;
+      }
+      
+      const response = await notificationService.getNotifications(user.id, nextPage, 20);
       
       if (response.success && response.data.notifications.length > 0) {
         // Add new notifications to existing list
@@ -69,12 +95,12 @@ const NotificationScreen = ({ navigation }) => {
     if (unreadCount === 0) return;
 
     Alert.alert(
-      'Đánh dấu tất cả đã đọc',
-      `Bạn có chắc chắn muốn đánh dấu ${unreadCount} thông báo là đã đọc?`,
+      'Mark All as Read',
+      `Are you sure you want to mark ${unreadCount} notifications as read?`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Đồng ý',
+          text: 'Confirm',
           onPress: markAllAsRead,
         },
       ]
@@ -83,12 +109,17 @@ const NotificationScreen = ({ navigation }) => {
 
   const handleTestNotification = async () => {
     try {
-      const response = await notificationService.testNotification(['inApp']);
+      if (!user?.id) {
+        Alert.alert('Error', 'User not logged in');
+        return;
+      }
+      
+      const response = await notificationService.testNotification(user.id, ['inApp']);
       if (response.success) {
-        Alert.alert('Thành công', 'Thông báo test đã được gửi!');
+        Alert.alert('Success', 'Test notification sent!');
       }
     } catch (error) {
-      Alert.alert('Lỗi', 'Không thể gửi thông báo test');
+      Alert.alert('Error', 'Failed to send test notification');
     }
   };
 
@@ -119,7 +150,7 @@ const NotificationScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Thông báo</Text>
+        <Text style={styles.headerTitle}>Notifications</Text>
       </View>
       <View style={styles.headerRight}>
         {unreadCount > 0 && (
@@ -127,9 +158,20 @@ const NotificationScreen = ({ navigation }) => {
             style={styles.markAllButton}
             onPress={handleMarkAllAsRead}
           >
-            <Text style={styles.markAllText}>Đọc tất cả</Text>
+            <Text style={styles.markAllText}>Mark All Read</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={handleTestApi}
+          disabled={testingApi}
+        >
+          <Ionicons 
+            name={testingApi ? "hourglass-outline" : "bug-outline"} 
+            size={20} 
+            color="#007AFF" 
+          />
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.testButton}
           onPress={handleTestNotification}
@@ -143,16 +185,16 @@ const NotificationScreen = ({ navigation }) => {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="notifications-outline" size={64} color="#C7C7CC" />
-      <Text style={styles.emptyTitle}>Không có thông báo</Text>
+      <Text style={styles.emptyTitle}>No Notifications</Text>
       <Text style={styles.emptyMessage}>
-        Bạn sẽ nhận được thông báo khi có sự kiện quan trọng
+        You'll receive notifications for important events
       </Text>
       <TouchableOpacity
         style={styles.testButtonLarge}
         onPress={handleTestNotification}
       >
         <Ionicons name="send-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.testButtonText}>Gửi thông báo test</Text>
+        <Text style={styles.testButtonText}>Send Test Notification</Text>
       </TouchableOpacity>
     </View>
   );
@@ -169,7 +211,7 @@ const NotificationScreen = ({ navigation }) => {
     return (
       <View style={styles.loadingMore}>
         <ActivityIndicator size="small" color="#007AFF" />
-        <Text style={styles.loadingMoreText}>Đang tải thêm...</Text>
+        <Text style={styles.loadingMoreText}>Loading more...</Text>
       </View>
     );
   };
@@ -180,7 +222,7 @@ const NotificationScreen = ({ navigation }) => {
         {renderHeader()}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Đang tải thông báo...</Text>
+          <Text style={styles.loadingText}>Loading notifications...</Text>
         </View>
       </View>
     );

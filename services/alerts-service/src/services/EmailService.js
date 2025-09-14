@@ -13,9 +13,9 @@ class EmailService {
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
         this.transporter = this._createTransporter();
         this.initialized = true;
-        logger.info('Email service initialized successfully');
+        logger.info('📧 Email service initialized successfully');
       } else {
-        logger.warn('Email service not initialized - missing SMTP credentials');
+        logger.info('📧 Email service disabled - SMTP credentials not provided');
       }
     } catch (error) {
       logger.error('Failed to initialize email service:', error);
