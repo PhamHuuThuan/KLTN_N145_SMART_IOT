@@ -102,10 +102,10 @@ const deviceSchema = new mongoose.Schema({
   },
   latestTelemetry: {
     ts: { type: Number, default: Date.now },
-    temp: { type: Number, default: 0 },
-    humid: { type: Number, default: 0 },
-    smoke: { type: Number, default: 0 },
-    gas_ppm: { type: Number, default: 0 },
+    temp: { type: Number },
+    humid: { type: Number },
+    smoke: { type: Number },
+    gas_ppm: { type: Number },
     o: { type: Object, default: {} }
   }
 }, {

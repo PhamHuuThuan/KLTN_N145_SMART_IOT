@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import CONFIG from '../constants/config';
 import Header from '../components/Header';
+import OverlayLoader from '../components/OverlayLoader';
+import ActionFeedback from '../components/ActionFeedback';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -23,6 +25,8 @@ const LoginScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -37,17 +41,20 @@ const LoginScreen = ({ navigation }) => {
 
     try {
       setIsLoading(true);
+      setShowLoader(true);
       const result = await login(email.trim(), password);
       
       if (result.success) {
         console.log('Login successful');
+        setFeedback({ visible: true, type: 'success', message: 'Đăng nhập thành công' });
       } else {
-        Alert.alert('Đăng nhập thất bại', result.error || 'Có lỗi xảy ra');
+        setFeedback({ visible: true, type: 'error', message: result.error || 'Đăng nhập thất bại' });
       }
     } catch (error) {
-      Alert.alert('Lỗi', 'Có lỗi xảy ra khi đăng nhập');
+      setFeedback({ visible: true, type: 'error', message: 'Có lỗi xảy ra khi đăng nhập' });
     } finally {
       setIsLoading(false);
+      setShowLoader(false);
     }
   };
 
@@ -59,80 +66,80 @@ const LoginScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={CONFIG.THEME.primary} />
-      
       <Header />
-
       <KeyboardAvoidingView 
         style={styles.content}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập email của bạn"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!isLoading}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mật khẩu</Text>
-            <View style={styles.passwordContainer}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
               <TextInput
-                style={styles.passwordInput}
-                placeholder="Nhập mật khẩu"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
+                style={styles.input}
+                placeholder="Nhập email của bạn"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isLoading}
               />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Mật khẩu</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Nhập mật khẩu"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color={CONFIG.COLORS.gray}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.loginButton, isLoading && styles.disabledButton]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color={CONFIG.COLORS.white} />
+              ) : (
+                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Chưa có tài khoản? </Text>
               <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
+                onPress={() => navigation.navigate('Register')}
                 disabled={isLoading}
               >
-                <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color={CONFIG.COLORS.gray}
-                />
+                <Text style={styles.linkText}>Đăng ký ngay</Text>
               </TouchableOpacity>
             </View>
           </View>
-
-          <TouchableOpacity
-            style={[styles.loginButton, isLoading && styles.disabledButton]}
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={CONFIG.COLORS.white} />
-            ) : (
-              <Text style={styles.loginButtonText}>Đăng nhập</Text>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Chưa có tài khoản? </Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Register')}
-              disabled={isLoading}
-            >
-              <Text style={styles.linkText}>Đăng ký ngay</Text>
-            </TouchableOpacity>
-          </View>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <OverlayLoader visible={showLoader} message="Đang đăng nhập..." onCancel={() => setShowLoader(false)} />
+      <ActionFeedback visible={feedback.visible} type={feedback.type} message={feedback.message} onHide={() => setFeedback({ ...feedback, visible: false })} />
     </View>
   );
 };

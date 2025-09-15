@@ -2,8 +2,10 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import CONFIG from '../constants/config';
 import NotificationIcon from './NotificationIcon';
+import { useAuth } from '../contexts/AuthContext';
 
 const Header = ({ onNotificationPress }) => {
+  const { isAuthenticated } = useAuth();
   const handleNotificationPress = () => {
     if (onNotificationPress) {
       onNotificationPress();
@@ -19,11 +21,13 @@ const Header = ({ onNotificationPress }) => {
       />
       <Text style={styles.headerTitle}>Smart IoT Kitchen</Text>
       <View style={styles.headerRight}>
-        <NotificationIcon
-          onPress={handleNotificationPress}
-          size={24}
-          color={CONFIG.THEME.surface}
-        />
+        {isAuthenticated && (
+          <NotificationIcon
+            onPress={handleNotificationPress}
+            size={24}
+            color={CONFIG.THEME.surface}
+          />
+        )}
       </View>
     </View>
   );

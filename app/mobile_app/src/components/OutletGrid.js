@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import OverlayLoader from './OverlayLoader';
+import ActionFeedback from './ActionFeedback';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OutletDetail from './OutletDetail';
 import CONFIG from '../constants/config';
@@ -17,6 +19,8 @@ const OutletGrid = ({
   );
   const [selectedOutlet, setSelectedOutlet] = useState(null);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
 
   // Get outlets from device data; if missing, show empty state
   const getOutlets = () => {
@@ -69,8 +73,15 @@ const OutletGrid = ({
     ]).start();
 
     console.log(`📤 Calling onControlOutlet: ${action}, ${targetDeviceId}, ${outletId}`);
+    setShowLoader(true);
     const success = await onControlOutlet(action, targetDeviceId, outletId);
+    setShowLoader(false);
     console.log(`📊 OutletGrid result: ${success}`);
+    if (success) {
+      setFeedback({ visible: true, type: 'success', message: `Outlet ${action}` });
+    } else {
+      setFeedback({ visible: true, type: 'error', message: 'Failed to send command' });
+    }
     return success;
   };
 
@@ -95,6 +106,12 @@ const OutletGrid = ({
   const handleUpdateOutletSettings = async (outletId, settings) => {
     if (onUpdateOutletSettings) {
       await onUpdateOutletSettings(outletId, settings);
+      // Update local selectedOutlet to reflect latest changes in the detail modal
+      setSelectedOutlet(prev => (prev && prev.id === outletId) ? { ...prev, name: settings.name ?? prev.name, type: settings.type ?? prev.type } : prev);
+      // Optionally refresh device data so grid reflects server state
+      if (onRefreshDeviceData) {
+        setTimeout(() => onRefreshDeviceData(), 200);
+      }
     }
   };
 
@@ -232,6 +249,17 @@ const OutletGrid = ({
         loading={loading}
         deviceData={deviceData}
         onRefreshDeviceData={onRefreshDeviceData}
+      />
+      <OverlayLoader
+        visible={showLoader}
+        message="Working..."
+        onCancel={() => setShowLoader(false)}
+      />
+      <ActionFeedback
+        visible={feedback.visible}
+        type={feedback.type}
+        message={feedback.message}
+        onHide={() => setFeedback({ ...feedback, visible: false })}
       />
     </View>
   );

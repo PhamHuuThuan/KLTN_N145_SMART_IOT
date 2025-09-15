@@ -26,8 +26,7 @@ async function startDeviceStatusConsumer() {
     // Subscribe to device status update topics
     await consumer.subscribe({ 
       topics: [
-        'device.status.updated',
-        'outlet.toggled'
+        'device.status.updated'
       ],
       fromBeginning: false 
     });
@@ -45,10 +44,6 @@ async function startDeviceStatusConsumer() {
             case 'device.status.updated':
               console.log(`🔄 Handling device status update`);
               await handleDeviceStatusUpdate(messageData);
-              break;
-            case 'outlet.toggled':
-              console.log(`🔌 Handling outlet toggle`);
-              await handleOutletToggle(messageData);
               break;
             default:
               console.log(`⚠️ Unknown topic: ${topic}`);

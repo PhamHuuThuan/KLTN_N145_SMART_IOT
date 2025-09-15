@@ -1,5 +1,6 @@
 import NotificationService from '../services/NotificationService.js';
 import logger from '../utils/logger.js';
+import mongoose from 'mongoose';
 
 class NotificationConsumer {
   constructor() {
@@ -12,6 +13,29 @@ class NotificationConsumer {
   async handleDeviceAlert(topic, message) {
     try {
       const { deviceId, deviceName, sensorType, sensorValue, threshold, alertType, userId } = message;
+      
+      // Validate required userId
+      if (!userId) {
+        logger.warn('Device alert message missing userId, skipping notification', {
+          deviceId,
+          alertType,
+          sensorType,
+          message
+        });
+        return;
+      }
+
+      // Validate userId format (MongoDB ObjectId)
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        logger.warn('Device alert message has invalid userId format, skipping notification', {
+          deviceId,
+          alertType,
+          sensorType,
+          userId,
+          message
+        });
+        return;
+      }
       
       const notificationData = {
         userId,
@@ -50,6 +74,29 @@ class NotificationConsumer {
     try {
       const { userId, title, message: notificationMessage, type, category, priority, metadata } = message;
       
+      // Validate required userId
+      if (!userId) {
+        logger.warn('Notification request message missing userId, skipping notification', {
+          title,
+          type,
+          category,
+          message
+        });
+        return;
+      }
+
+      // Validate userId format (MongoDB ObjectId)
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        logger.warn('Notification request message has invalid userId format, skipping notification', {
+          title,
+          type,
+          category,
+          userId,
+          message
+        });
+        return;
+      }
+      
       const notificationData = {
         userId,
         title,
@@ -77,23 +124,120 @@ class NotificationConsumer {
    */
   async handleUserAction(topic, message) {
     try {
-      const { userId, action, deviceId, deviceName, result } = message;
-      
-      const notificationData = {
-        userId,
-        title: 'Device Action Completed',
-        message: this._getActionMessage(action, deviceName, result),
-        type: 'system_notification',
-        category: 'outlet',
-        priority: 'low',
-        metadata: {
-          deviceId,
-          deviceName,
-          action,
-          result
-        }
-      };
+      // Validate message structure
+      if (!message || typeof message !== 'object') {
+        logger.warn('Invalid message format in handleUserAction', { topic, message });
+        return;
+      }
 
+      const { userId, action, deviceId, deviceName, result, outletId, status } = message;
+      
+      // Validate required userId
+      if (!userId) {
+        logger.warn('User action message missing userId, skipping notification', {
+          action,
+          deviceId,
+          message
+        });
+        return;
+      }
+
+      // Validate userId format (MongoDB ObjectId)
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        logger.warn('User action message has invalid userId format, skipping notification', {
+          action,
+          deviceId,
+          userId,
+          message
+        });
+        return;
+      }
+      
+      let notificationData; // Khai báo ở ngoài
+      
+      // Handle outlet toggle specifically
+      if (action === 'outlet_toggled') {
+        notificationData = {
+          userId,
+          title: 'Outlet Control',
+          message: `Outlet ${outletId || 'unknown'} has been turned ${status ? 'ON' : 'OFF'}`,
+          type: 'system_notification',
+          category: 'outlet',
+          priority: 'low',
+          metadata: {
+            deviceId,
+            deviceName,
+            action,
+            outletId,
+            status,
+            result
+          }
+        };
+      } else if (action === 'emergency_mode_activated') {
+        notificationData = {
+          userId,
+          title: 'Emergency Mode Activated',
+          message: `Emergency mode has been activated for device ${deviceName}`,
+          type: 'security_alert',
+          category: 'system',
+          priority: 'urgent',
+          metadata: {
+            deviceId,
+            deviceName,
+            action,
+            result
+          }
+        };
+      } else if (action === 'emergency_mode_deactivated') {
+        notificationData = {
+          userId,
+          title: 'Emergency Mode Deactivated',
+          message: `Emergency mode has been deactivated for device ${deviceName}`,
+          type: 'system_notification',
+          category: 'system',
+          priority: 'medium',
+          metadata: {
+            deviceId,
+            deviceName,
+            action,
+            result
+          }
+        };
+      } else if (action === 'outlet_settings_updated') {
+        notificationData = {
+          userId,
+          title: 'Outlet Settings Updated',
+          message: `Outlet ${outletId} settings have been updated`,
+          type: 'system_notification',
+          category: 'outlet',
+          priority: 'low',
+          metadata: {
+            deviceId,
+            deviceName,
+            action,
+            outletId,
+            result
+          }
+        };
+      } else {
+        // Handle other user actions
+        notificationData = {
+          userId,
+          title: 'Device Action Completed',
+          message: this._getActionMessage(action, deviceName, result),
+          type: 'system_notification',
+          category: 'outlet',
+          priority: 'low',
+          metadata: {
+            deviceId,
+            deviceName,
+            action,
+            result
+          }
+        };
+      }
+  
+      console.log(`📤 Sending notification for action: ${action}`, notificationData);
       await this.notificationService.sendNotification(notificationData);
       
       logger.notification('User action notification sent', {
@@ -101,6 +245,7 @@ class NotificationConsumer {
         action,
         deviceId
       });
+      console.log(`✅ Notification sent successfully for action: ${action}`);
     } catch (error) {
       logger.error('Error handling user action:', error);
     }
@@ -114,7 +259,21 @@ class NotificationConsumer {
       const { eventType, message: eventMessage, affectedUsers, metadata } = message;
       
       if (affectedUsers && affectedUsers.length > 0) {
-        const notifications = affectedUsers.map(userId => ({
+        // Filter out invalid userIds
+        const validUserIds = affectedUsers.filter(userId => 
+          userId && mongoose.Types.ObjectId.isValid(userId)
+        );
+
+        if (validUserIds.length === 0) {
+          logger.warn('System event has no valid userIds, skipping notifications', {
+            eventType,
+            originalCount: affectedUsers.length,
+            message
+          });
+          return;
+        }
+
+        const notifications = validUserIds.map(userId => ({
           userId,
           title: this._getSystemEventTitle(eventType),
           message: eventMessage,
@@ -128,7 +287,9 @@ class NotificationConsumer {
         
         logger.notification('System event notifications sent', {
           eventType,
-          userCount: affectedUsers.length
+          userCount: validUserIds.length,
+          originalCount: affectedUsers.length,
+          filteredCount: affectedUsers.length - validUserIds.length
         });
       }
     } catch (error) {
@@ -223,7 +384,11 @@ class NotificationConsumer {
       turn_on: 'bật',
       turn_off: 'tắt',
       toggle: 'chuyển đổi trạng thái',
-      adjust: 'điều chỉnh'
+      adjust: 'điều chỉnh',
+      outlet_toggled: 'chuyển đổi trạng thái outlet',
+      emergency_mode_activated: 'kích hoạt chế độ khẩn cấp',
+      emergency_mode_deactivated: 'tắt chế độ khẩn cấp',
+      outlet_settings_updated: 'cập nhật cài đặt outlet'
     };
 
     const actionName = actionNames[action] || action;

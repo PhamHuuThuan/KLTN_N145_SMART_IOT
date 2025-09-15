@@ -142,7 +142,7 @@ notificationSchema.statics.getUserNotifications = function(userId, options = {})
     .sort(sort)
     .limit(limit * 1)
     .skip((page - 1) * limit)
-    .populate('userId', 'name email phone');
+    // .populate('userId', 'name email phone');
 };
 
 export default mongoose.model('Notification', notificationSchema);
