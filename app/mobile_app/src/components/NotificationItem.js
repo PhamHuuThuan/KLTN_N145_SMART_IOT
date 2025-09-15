@@ -179,14 +179,14 @@ const NotificationItem = ({ notification, onPress }) => {
 
         <View style={styles.footer}>
           <View style={styles.badges}>
-            <View style={[styles.badge, { backgroundColor: getTypeColor(notification.type) }]}>
+            <View style={[styles.badge, { backgroundColor: getTypeColor(notification.type || 'system_notification') }]}>
               <Text style={styles.badgeText}>
-                {notification.type.replace('_', ' ').toUpperCase()}
+                {(notification.type || 'system_notification').replace('_', ' ').toUpperCase()}
               </Text>
             </View>
-            <View style={[styles.badge, { backgroundColor: getPriorityColor(notification.priority) }]}>
+            <View style={[styles.badge, { backgroundColor: getPriorityColor(notification.priority || 'low') }]}>
               <Text style={styles.badgeText}>
-                {notification.priority.toUpperCase()}
+                {(notification.priority || 'low').toUpperCase()}
               </Text>
             </View>
           </View>
