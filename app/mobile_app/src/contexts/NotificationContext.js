@@ -128,12 +128,14 @@ export const NotificationProvider = ({ children }) => {
         type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
         payload: {
           id: notification.request.identifier,
-          title: notification.request.content.title,
-          body: notification.request.content.body,
-          data: notification.request.content.data,
+          title: notification.request.content.title || 'Notification',
+          body: notification.request.content.body || '',
+          data: notification.request.content.data || {},
           isRead: false,
           createdAt: new Date().toISOString(),
-          type: 'push'
+          type: notification.request.content.data?.type || 'system_notification',
+          priority: notification.request.content.data?.priority || 'low',
+          category: notification.request.content.data?.category || 'system'
         }
       });
     });
