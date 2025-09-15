@@ -11,7 +11,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotificationContext } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
 import NotificationItem from '../components/NotificationItem';
+import OverlayLoader from '../components/OverlayLoader';
+import ActionFeedback from '../components/ActionFeedback';
 import { notificationService } from '../services/notificationService';
 
 const NotificationScreen = ({ navigation }) => {
@@ -25,11 +28,17 @@ const NotificationScreen = ({ navigation }) => {
     refreshNotifications,
     markAllAsRead,
     deleteNotification,
+    testApiConnection,
   } = useNotificationContext();
+  
+  const { user } = useAuth();
 
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
+  
 
   useEffect(() => {
     loadNotifications();
@@ -37,9 +46,19 @@ const NotificationScreen = ({ navigation }) => {
 
   const handleRefresh = async () => {
     setPage(1);
-    setHasMore(true);
-    await refreshNotifications();
+    setShowLoader(true);
+    try {
+      await refreshNotifications();
+      setHasMore(false);
+      setFeedback({ visible: true, type: 'success', message: 'Refreshed' });
+    } catch (e) {
+      setFeedback({ visible: true, type: 'error', message: 'Refresh failed' });
+    } finally {
+      setShowLoader(false);
+    }
   };
+
+  
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) return;
@@ -47,7 +66,12 @@ const NotificationScreen = ({ navigation }) => {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const response = await notificationService.getNotifications(nextPage, 20);
+      if (!user?.id) {
+        console.error('User not authenticated for load more');
+        return;
+      }
+      
+      const response = await notificationService.getNotifications(user.id, nextPage, 20);
       
       if (response.success && response.data.notifications.length > 0) {
         // Add new notifications to existing list
@@ -69,28 +93,29 @@ const NotificationScreen = ({ navigation }) => {
     if (unreadCount === 0) return;
 
     Alert.alert(
-      'Đánh dấu tất cả đã đọc',
-      `Bạn có chắc chắn muốn đánh dấu ${unreadCount} thông báo là đã đọc?`,
+      'Mark All as Read',
+      `Are you sure you want to mark ${unreadCount} notifications as read?`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Đồng ý',
-          onPress: markAllAsRead,
+          text: 'Confirm',
+          onPress: async () => {
+            setShowLoader(true);
+            try {
+              await markAllAsRead();
+              setFeedback({ visible: true, type: 'success', message: 'All marked as read' });
+            } catch (_) {
+              setFeedback({ visible: true, type: 'error', message: 'Failed to mark all' });
+            } finally {
+              setShowLoader(false);
+            }
+          },
         },
       ]
     );
   };
 
-  const handleTestNotification = async () => {
-    try {
-      const response = await notificationService.testNotification(['inApp']);
-      if (response.success) {
-        Alert.alert('Thành công', 'Thông báo test đã được gửi!');
-      }
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể gửi thông báo test');
-    }
-  };
+  
 
   const handleNotificationPress = (notification) => {
     // Navigate to relevant screen based on notification type
@@ -119,7 +144,7 @@ const NotificationScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Thông báo</Text>
+        <Text style={styles.headerTitle}>Notifications</Text>
       </View>
       <View style={styles.headerRight}>
         {unreadCount > 0 && (
@@ -127,14 +152,14 @@ const NotificationScreen = ({ navigation }) => {
             style={styles.markAllButton}
             onPress={handleMarkAllAsRead}
           >
-            <Text style={styles.markAllText}>Đọc tất cả</Text>
+            <Text style={styles.markAllText}>Mark All Read</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
           style={styles.testButton}
-          onPress={handleTestNotification}
+          onPress={() => navigation.navigate('NotificationSettingsFromNotifications')}
         >
-          <Ionicons name="send-outline" size={20} color="#007AFF" />
+          <Ionicons name="settings-outline" size={20} color="#007AFF" />
         </TouchableOpacity>
       </View>
     </View>
@@ -143,17 +168,11 @@ const NotificationScreen = ({ navigation }) => {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="notifications-outline" size={64} color="#C7C7CC" />
-      <Text style={styles.emptyTitle}>Không có thông báo</Text>
+      <Text style={styles.emptyTitle}>No Notifications</Text>
       <Text style={styles.emptyMessage}>
-        Bạn sẽ nhận được thông báo khi có sự kiện quan trọng
+        You'll receive notifications for important events
       </Text>
-      <TouchableOpacity
-        style={styles.testButtonLarge}
-        onPress={handleTestNotification}
-      >
-        <Ionicons name="send-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.testButtonText}>Gửi thông báo test</Text>
-      </TouchableOpacity>
+      
     </View>
   );
 
@@ -169,7 +188,7 @@ const NotificationScreen = ({ navigation }) => {
     return (
       <View style={styles.loadingMore}>
         <ActivityIndicator size="small" color="#007AFF" />
-        <Text style={styles.loadingMoreText}>Đang tải thêm...</Text>
+        <Text style={styles.loadingMoreText}>Loading more...</Text>
       </View>
     );
   };
@@ -180,7 +199,7 @@ const NotificationScreen = ({ navigation }) => {
         {renderHeader()}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Đang tải thông báo...</Text>
+          <Text style={styles.loadingText}>Loading notifications...</Text>
         </View>
       </View>
     );
@@ -217,6 +236,17 @@ const NotificationScreen = ({ navigation }) => {
         onEndReachedThreshold={0.1}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+      />
+      <OverlayLoader
+        visible={showLoader}
+        message="Working..."
+        onCancel={() => setShowLoader(false)}
+      />
+      <ActionFeedback
+        visible={feedback.visible}
+        type={feedback.type}
+        message={feedback.message}
+        onHide={() => setFeedback({ ...feedback, visible: false })}
       />
     </View>
   );

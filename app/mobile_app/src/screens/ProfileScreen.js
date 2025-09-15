@@ -17,6 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../contexts/AuthContext';
 import CONFIG from '../constants/config';
+import OverlayLoader from '../components/OverlayLoader';
+import ActionFeedback from '../components/ActionFeedback';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, updateProfile, logout, isLoading } = useAuth();
@@ -60,8 +62,12 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
+
   const handleSaveProfile = async () => {
     try {
+      setShowLoader(true);
       const result = await updateProfile(
         formData.name,
         formData.phone,
@@ -69,7 +75,7 @@ const ProfileScreen = ({ navigation }) => {
       );
       
       if (result.success) {
-        Alert.alert('Success', 'Profile updated successfully');
+        setFeedback({ visible: true, type: 'success', message: 'Profile updated' });
         const updatedUser = result.user || {};
         setFormData({
           name: updatedUser.name || formData.name,
@@ -79,10 +85,13 @@ const ProfileScreen = ({ navigation }) => {
         });
         setIsEditing(false);
       } else {
-        Alert.alert('Error', result.error || 'Failed to update profile');
+        setFeedback({ visible: true, type: 'error', message: result.error || 'Failed to update profile' });
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile');
+      setFeedback({ visible: true, type: 'error', message: 'Failed to update profile' });
+    }
+    finally {
+      setShowLoader(false);
     }
   };
 
@@ -266,6 +275,8 @@ const ProfileScreen = ({ navigation }) => {
         {renderProfileInfo()}
         {renderAccountActions()}
       </ScrollView>
+      <OverlayLoader visible={showLoader} message={isEditing ? 'Saving...' : 'Loading...'} onCancel={() => setShowLoader(false)} />
+      <ActionFeedback visible={feedback.visible} type={feedback.type} message={feedback.message} onHide={() => setFeedback({ ...feedback, visible: false })} />
     </SafeAreaView>
   );
 };

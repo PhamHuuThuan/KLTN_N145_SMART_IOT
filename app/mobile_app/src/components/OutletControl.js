@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import CONFIG from '../constants/config';
+import OverlayLoader from './OverlayLoader';
+import ActionFeedback from './ActionFeedback';
 
 const OutletControl = ({ 
   selectedDevice, 
@@ -11,6 +13,8 @@ const OutletControl = ({
   const [isPressed, setIsPressed] = useState(false);
   const [pulseAnim] = useState(new Animated.Value(1));
   const [buttonScale] = useState(new Animated.Value(1));
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
 
   // Pulse animation for button
   useEffect(() => {
@@ -38,7 +42,7 @@ const OutletControl = ({
 
   const handleToggle = async () => {
     if (!selectedDevice) {
-      Alert.alert('Error', 'Please select a device first');
+      setFeedback({ visible: true, type: 'error', message: 'Please select a device first' });
       return;
     }
 
@@ -56,11 +60,13 @@ const OutletControl = ({
       }),
     ]).start();
 
+    setShowLoader(true);
     const success = await onControlOutlet('toggle', selectedDevice);
+    setShowLoader(false);
     if (success) {
-      Alert.alert('Success', `Outlet toggle command sent to ${selectedDevice}`);
+      setFeedback({ visible: true, type: 'success', message: `Outlet toggled` });
     } else {
-      Alert.alert('Error', 'Failed to send command');
+      setFeedback({ visible: true, type: 'error', message: 'Failed to send command' });
     }
   };
 
@@ -104,6 +110,17 @@ const OutletControl = ({
           </TouchableOpacity>
         </Animated.View>
       </View>
+      <OverlayLoader
+        visible={showLoader}
+        message="Sending command..."
+        onCancel={() => setShowLoader(false)}
+      />
+      <ActionFeedback
+        visible={feedback.visible}
+        type={feedback.type}
+        message={feedback.message}
+        onHide={() => setFeedback({ ...feedback, visible: false })}
+      />
     </View>
   );
 };

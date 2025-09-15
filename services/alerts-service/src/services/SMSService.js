@@ -17,9 +17,9 @@ class SMSService {
           process.env.TWILIO_AUTH_TOKEN
         );
         this.initialized = true;
-        logger.info('SMS service initialized successfully');
+        logger.info('📱 SMS service initialized successfully');
       } else {
-        logger.warn('SMS service not initialized - missing Twilio credentials');
+        logger.info('📱 SMS service disabled - Twilio credentials not provided');
       }
     } catch (error) {
       logger.error('Failed to initialize SMS service:', error);

@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { notificationService } from '../services/notificationService';
+import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext();
 
@@ -35,10 +38,15 @@ const notificationReducer = (state, action) => {
       return { ...state, error: action.payload, loading: false };
     
     case NOTIFICATION_ACTIONS.SET_NOTIFICATIONS:
+      // Handle both array and object with notifications property
+      const notifications = Array.isArray(action.payload) 
+        ? action.payload 
+        : action.payload.data?.notifications || [];
+      
       return {
         ...state,
-        notifications: action.payload,
-        unreadCount: action.payload.filter(n => !n.isRead).length,
+        notifications: notifications,
+        unreadCount: notifications.filter(n => !n.isRead).length,
         loading: false,
         error: null,
       };
@@ -99,33 +107,176 @@ const notificationReducer = (state, action) => {
 // Provider component
 export const NotificationProvider = ({ children }) => {
   const [state, dispatch] = useReducer(notificationReducer, initialState);
+  const { user, isAuthenticated } = useAuth();
 
-  // Load notifications on mount
+  // Configure notification behavior
   useEffect(() => {
-    // Load demo notifications for testing
-    const demoNotifications = notificationService.createDemoNotifications();
-    dispatch({
-      type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
-      payload: demoNotifications,
+    // Configure how notifications are handled when app is in foreground
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
     });
+
+    // Set notification handler for foreground
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('🔔 Notification received in foreground:', notification);
+      // Add to local state immediately
+      dispatch({
+        type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
+        payload: {
+          id: notification.request.identifier,
+          title: notification.request.content.title,
+          body: notification.request.content.body,
+          data: notification.request.content.data,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          type: 'push'
+        }
+      });
+    });
+
+    // Set response handler for user interactions
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('🔔 Notification response:', response);
+      // Mark as read when user taps notification
+      if (response.notification.request.identifier) {
+        dispatch({
+          type: NOTIFICATION_ACTIONS.MARK_AS_READ,
+          payload: response.notification.request.identifier
+        });
+      }
+    });
+
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+    };
   }, []);
+
+  // Load notifications after auth is ready (token set), with small delay to avoid race on login
+  useEffect(() => {
+    let canceled = false;
+    const init = async () => {
+      if (isAuthenticated && user?.id) {
+        // Try to register FCM token in background
+        registerFCMToken();
+
+        // Wait until auth token is available to NotificationService
+        const maxWaitMs = 1500;
+        const start = Date.now();
+        while (!notificationService.getAuthToken() && Date.now() - start < maxWaitMs) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+        // Extra small delay to ensure axios client is created with token
+        await new Promise(r => setTimeout(r, 100));
+        if (!canceled) await loadNotifications();
+      } else {
+        // Load demo notifications for testing when not authenticated
+        const demoNotifications = notificationService.createDemoNotifications();
+        dispatch({
+          type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
+          payload: demoNotifications,
+        });
+      }
+    };
+    init();
+    return () => { canceled = true; };
+  }, [isAuthenticated, user?.id]);
+
+  // Register device token for push notifications
+  const registerFCMToken = async () => {
+    try {
+      // Request permissions
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.warn('Push notification permission not granted');
+        return;
+      }
+
+      // Get device push token (FCM on Android / APNs on iOS)
+      let rawToken = null;
+      let tokenType = null;
+      try {
+        const devicePushToken = await Notifications.getDevicePushTokenAsync();
+        rawToken = devicePushToken?.data;
+        tokenType = devicePushToken?.type; // 'fcm' on Android, 'apns' on iOS
+        console.log('🔔 Native push token acquired:', { tokenType, token: rawToken?.substring(0, 20) + '...' });
+      } catch (nativeErr) {
+        console.warn('Native device token not available (dev/Expo Go likely). Skipping FCM registration.', nativeErr.message);
+        return;
+      }
+      if (!rawToken) {
+        console.warn('Failed to get device push token');
+        return;
+      }
+
+      const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
+      const res = await notificationService.addFCMToken(user.id, rawToken, platform);
+      console.log('✅ Registered push token with backend:', res?.success ?? true);
+    } catch (error) {
+      console.warn('Failed to register FCM token:', error?.message || String(error));
+    }
+  };
 
   // Load notifications
   const loadNotifications = async (page = 1, limit = 20) => {
+    if (!isAuthenticated || !user?.id) {
+      console.warn('User not authenticated, using demo notifications');
+      const demoNotifications = notificationService.createDemoNotifications();
+      dispatch({
+        type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
+        payload: demoNotifications,
+      });
+      return;
+    }
+    // Ensure auth token is present
+    if (!notificationService.getAuthToken()) {
+      console.warn('Auth token not ready yet, delaying notifications load');
+      await new Promise(r => setTimeout(r, 200));
+      if (!notificationService.getAuthToken()) return; // skip if still not ready
+    }
+
+    // Prevent multiple simultaneous calls
+    if (state.loading) {
+      console.log('Already loading notifications, skipping...');
+      return;
+    }
+
     try {
       dispatch({ type: NOTIFICATION_ACTIONS.SET_LOADING, payload: true });
-      const response = await notificationService.getNotifications(page, limit);
+      const response = await notificationService.getNotifications(user.id, page, limit);
       
       if (response.success) {
+        // Pass the entire response.data object to the reducer
         dispatch({
           type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
-          payload: response.data.notifications,
+          payload: response.data,
         });
       } else {
-        dispatch({ type: NOTIFICATION_ACTIONS.SET_ERROR, payload: response.message });
+        // If API fails, fall back to demo notifications
+        console.warn('API failed, using demo notifications:', response.message);
+        const demoNotifications = notificationService.createDemoNotifications();
+        dispatch({
+          type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
+          payload: demoNotifications,
+        });
       }
     } catch (error) {
-      dispatch({ type: NOTIFICATION_ACTIONS.SET_ERROR, payload: error.message });
+      console.warn('API error, using demo notifications:', error.message);
+      // If API fails, fall back to demo notifications
+      const demoNotifications = notificationService.createDemoNotifications();
+      dispatch({
+        type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
+        payload: demoNotifications,
+      });
     }
   };
 
@@ -141,8 +292,17 @@ export const NotificationProvider = ({ children }) => {
 
   // Mark notification as read
   const markAsRead = async (notificationId) => {
+    if (!isAuthenticated || !user?.id) {
+      // If not authenticated, just update local state
+      dispatch({
+        type: NOTIFICATION_ACTIONS.MARK_AS_READ,
+        payload: notificationId,
+      });
+      return;
+    }
+
     try {
-      const response = await notificationService.markAsRead(notificationId);
+      const response = await notificationService.markAsRead(notificationId, user.id);
       
       if (response.success) {
         dispatch({
@@ -157,8 +317,14 @@ export const NotificationProvider = ({ children }) => {
 
   // Mark all notifications as read
   const markAllAsRead = async () => {
+    if (!isAuthenticated || !user?.id) {
+      // If not authenticated, just update local state
+      dispatch({ type: NOTIFICATION_ACTIONS.MARK_ALL_AS_READ });
+      return;
+    }
+
     try {
-      const response = await notificationService.markAllAsRead();
+      const response = await notificationService.markAllAsRead(user.id);
       
       if (response.success) {
         dispatch({ type: NOTIFICATION_ACTIONS.MARK_ALL_AS_READ });
@@ -170,8 +336,17 @@ export const NotificationProvider = ({ children }) => {
 
   // Delete notification
   const deleteNotification = async (notificationId) => {
+    if (!isAuthenticated || !user?.id) {
+      // If not authenticated, just update local state
+      dispatch({
+        type: NOTIFICATION_ACTIONS.DELETE_NOTIFICATION,
+        payload: notificationId,
+      });
+      return;
+    }
+
     try {
-      const response = await notificationService.deleteNotification(notificationId);
+      const response = await notificationService.deleteNotification(notificationId, user.id);
       
       if (response.success) {
         dispatch({
@@ -194,12 +369,32 @@ export const NotificationProvider = ({ children }) => {
 
   // Get notification stats
   const getNotificationStats = async () => {
+    if (!isAuthenticated || !user?.id) {
+      return null;
+    }
+
     try {
-      const response = await notificationService.getNotificationStats();
+      const response = await notificationService.getNotificationStats(user.id);
       return response.data;
     } catch (error) {
       console.error('Error getting notification stats:', error);
       return null;
+    }
+  };
+
+  // Test API connection
+  const testApiConnection = async () => {
+    console.log('🔔 Testing API connection from NotificationContext...');
+    try {
+      const result = await notificationService.testConnection();
+      console.log('API Test Result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error testing API connection:', error);
+      return {
+        success: false,
+        message: error.message
+      };
     }
   };
 
@@ -212,6 +407,9 @@ export const NotificationProvider = ({ children }) => {
     deleteNotification,
     addNotification,
     getNotificationStats,
+    testApiConnection,
+    // expose for manual re-registration if needed
+    registerFCMToken,
   };
 
   return (
@@ -229,3 +427,4 @@ export const useNotificationContext = () => {
   }
   return context;
 };
+

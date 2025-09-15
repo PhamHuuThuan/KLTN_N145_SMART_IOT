@@ -20,17 +20,34 @@
         "foregroundImage": "./assets/logo_app.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "useNextNotificationsApi": true,
+      "googleServicesFile": "./google-services.json",
+      "package": "com.technooo.smartkitchen"
     },
     "web": {
       "favicon": "./assets/logo_app.png",
       "bundler": "metro"
     },
     "extra": {
-      "apiUrl": "http://127.0.0.1:3002"
+      "apiUrl": "http://127.0.0.1:3002",
+      "eas": {
+        "projectId": "5ea86a56-b10e-4a1b-88a7-6692b50872ed"
+      }
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2C3E50",
+          "sounds": [
+            "./assets/notification.mp3"
+          ],
+          "mode": "production"
+        }
+      ]
     ]
   }
 }

@@ -13,6 +13,7 @@ import RulesScreen from './src/screens/RulesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import NotificationScreen from './src/screens/NotificationScreen';
+import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import CONFIG from './src/constants/config';
 
 function AppContent() {
@@ -48,6 +49,10 @@ function AppContent() {
         }
       case 'Notifications':
         return <NotificationScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
+      case 'NotificationSettingsFromNotifications':
+        return <NotificationSettingsScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Notifications') }} />;
+      case 'NotificationSettingsFromSettings':
+        return <NotificationSettingsScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Settings') }} />;
       case 'Profile':
         return <ProfileScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
       case 'ChangePassword':

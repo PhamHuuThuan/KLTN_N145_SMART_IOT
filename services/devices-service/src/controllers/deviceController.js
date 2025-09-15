@@ -257,20 +257,37 @@ export const toggleOutlet = async (req, res) => {
     
     await device.save();
     
-    // Publish outlet toggle event to Kafka
-    console.log(`📤 Publishing outlet toggle to Kafka: ${deviceId}/${outletId}`);
-    await producer.send({
+    // Get outlet info for notification
+    const outlet = device.outlets.find(o => o.id === outletId);
+    const outletName = outlet ? outlet.name : outletId;
+    
+    // Publish outlet toggle event to Kafka with userId (ownerId) in a timeout-guarded promise
+    console.log(`📤 Publishing outlet toggle to Kafka: ${deviceId}/${outletId} by user ${device.ownerId}`);
+    const sendPromise = producer.send({
       topic: 'outlet.toggled',
       messages: [{
         key: deviceId,
         value: JSON.stringify({
+          userId: device.ownerId,
           deviceId,
+          deviceName: device.name,
           outletId,
+          outletName,
           status,
           action: 'outlet_toggled',
+          result: 'success',
           timestamp: new Date()
         })
       }]
+    });
+
+    // Timeout safeguard to avoid hanging the HTTP request if Kafka is slow
+    const timeoutMs = Number(process.env.KAFKA_SEND_TIMEOUT_MS || 1500);
+    await Promise.race([
+      sendPromise,
+      new Promise((resolve) => setTimeout(() => resolve('timeout'), timeoutMs))
+    ]).catch((err) => {
+      console.error('❌ Kafka send error (non-fatal):', err?.message || err);
     });
     
     res.json({
@@ -279,6 +296,35 @@ export const toggleOutlet = async (req, res) => {
       message: `Outlet ${outletId} ${status ? 'turned on' : 'turned off'} successfully`
     });
   } catch (error) {
+    console.error('❌ Error toggling outlet:', error);
+    
+    // Publish failure event to Kafka if we have device info
+    try {
+      const { deviceId, outletId } = req.params;
+      const device = await Device.findOne({ deviceId });
+      if (device) {
+        await producer.send({
+          topic: 'outlet.toggled',
+          messages: [{
+            key: deviceId,
+            value: JSON.stringify({
+              userId: device.ownerId,
+              deviceId,
+              deviceName: device.name,
+              outletId,
+              status: null,
+              action: 'outlet_toggled',
+              result: 'failed',
+              error: error.message,
+              timestamp: new Date()
+            })
+          }]
+        });
+      }
+    } catch (kafkaError) {
+      console.error('❌ Error publishing failure event:', kafkaError);
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error toggling outlet',
@@ -306,12 +352,15 @@ export const enterEmergencyMode = async (req, res) => {
     
     // Publish emergency mode event to Kafka
     await producer.send({
-      topic: 'device.emergency',
+      topic: 'user-actions',
       messages: [{
         key: deviceId,
         value: JSON.stringify({
+          userId: device.ownerId,
           deviceId,
+          deviceName: device.name,
           action: 'emergency_mode_activated',
+          result: 'success',
           timestamp: new Date(),
           reason: 'manual_activation'
         })
@@ -351,12 +400,15 @@ export const exitEmergencyMode = async (req, res) => {
     
     // Publish emergency mode exit event to Kafka
     await producer.send({
-      topic: 'device.emergency',
+      topic: 'user-actions',
       messages: [{
         key: deviceId,
         value: JSON.stringify({
+          userId: device.ownerId,
           deviceId,
+          deviceName: device.name,
           action: 'emergency_mode_deactivated',
+          result: 'success',
           timestamp: new Date()
         })
       }]
@@ -458,15 +510,21 @@ export const updateOutletSettings = async (req, res) => {
     
     // Publish outlet settings update event to Kafka
     await producer.send({
-      topic: 'outlet.settings.updated',
+      topic: 'user-actions',
       messages: [{
         key: deviceId,
         value: JSON.stringify({
+          userId: device.ownerId,
           deviceId,
+          deviceName: device.name,
           outletId,
-          name: outlet.name,
-          type: outlet.type,
+          outletName: outlet.name,
           action: 'outlet_settings_updated',
+          result: 'success',
+          metadata: {
+            name: outlet.name,
+            type: outlet.type
+          },
           timestamp: new Date()
         })
       }]

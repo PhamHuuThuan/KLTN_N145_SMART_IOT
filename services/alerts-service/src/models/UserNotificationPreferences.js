@@ -188,7 +188,8 @@ userNotificationPreferencesSchema.methods.updateFCMTokenUsage = function(token) 
 
 // Static method to get preferences for user
 userNotificationPreferencesSchema.statics.getUserPreferences = function(userId) {
-  return this.findOne({ userId }).populate('userId', 'name email phone');
+  // Do not populate User to avoid MissingSchemaError in this service
+  return this.findOne({ userId });
 };
 
 // Static method to create default preferences for new user
@@ -213,6 +214,13 @@ userNotificationPreferencesSchema.statics.createDefaultPreferences = function(us
       enabled: true
     }
   });
+};
+
+// Ensure default preferences exist for a user; create if missing
+userNotificationPreferencesSchema.statics.ensureDefaultPreferences = async function(userId, email, phoneNumber = null) {
+  const existing = await this.findOne({ userId });
+  if (existing) return existing;
+  return this.createDefaultPreferences(userId, email, phoneNumber);
 };
 
 export default mongoose.model('UserNotificationPreferences', userNotificationPreferencesSchema);

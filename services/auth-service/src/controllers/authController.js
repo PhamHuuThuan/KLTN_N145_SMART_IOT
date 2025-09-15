@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import axios from 'axios';
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -27,6 +28,27 @@ export const register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({ email, passwordHash, name, phone, avatar });
     const token = signToken({ sub: user._id.toString(), email });
+
+    // Fire-and-forget: initialize notification preferences in alerts-service
+    (async () => {
+      try {
+        const alertsBaseUrl = process.env.ALERTS_SERVICE_URL || 'http://localhost:3004';
+        const client = axios.create({
+          baseURL: `${alertsBaseUrl}/api/notifications`,
+          timeout: 3000,
+          headers: { 'Content-Type': 'application/json' }
+        });
+        await client.put(`/user/${user._id.toString()}/preferences`, {
+          // Create defaults if not exist, keep minimal fields
+          email: { enabled: true, address: email },
+          inApp: { enabled: true },
+          fcm: { enabled: true }
+        });
+      } catch (e) {
+        // Log only, do not block registration
+        console.warn('init_notifications_failed', e?.message || e);
+      }
+    })();
 
     res.status(201).json({
       token,

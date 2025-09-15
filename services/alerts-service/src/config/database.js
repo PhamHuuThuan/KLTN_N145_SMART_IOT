@@ -13,8 +13,7 @@ const connectDatabase = async () => {
 
     await mongoose.connect(mongoUri, options);
     
-    logger.info('MongoDB connected successfully', {
-      uri: mongoUri.replace(/\/\/.*@/, '//***@'), // Hide credentials in logs
+    logger.info('✅ MongoDB connected successfully', {
       host: mongoose.connection.host,
       port: mongoose.connection.port,
       name: mongoose.connection.name
@@ -26,11 +25,11 @@ const connectDatabase = async () => {
     });
 
     mongoose.connection.on('disconnected', () => {
-      logger.warn('MongoDB disconnected');
+      logger.warn('⚠️  MongoDB disconnected');
     });
 
     mongoose.connection.on('reconnected', () => {
-      logger.info('MongoDB reconnected');
+      logger.info('🔄 MongoDB reconnected');
     });
 
     // Graceful shutdown
