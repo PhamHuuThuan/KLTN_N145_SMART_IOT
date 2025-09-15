@@ -52,7 +52,7 @@ class NotificationService {
         throw new Error('userId must be a valid MongoDB ObjectId');
       }
 
-      // Create notification record
+      // Create notification record with timeout
       const notification = new Notification({
         userId,
         title,
@@ -65,14 +65,28 @@ class NotificationService {
         expiresAt
       });
 
-      await notification.save();
+      // Add timeout to prevent hanging
+      const savePromise = notification.save();
+      const saveTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Notification save timeout')), 10000)
+      );
 
-      // Get user preferences
-      const preferences = await UserNotificationPreferences.getUserPreferences(userId);
+      await Promise.race([savePromise, saveTimeoutPromise]);
+
+      // Get user preferences with timeout
+      console.log(`🔍 Getting user preferences for userId: ${userId}`);
+      const preferencesPromise = UserNotificationPreferences.getUserPreferences(userId);
+      const preferencesTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('User preferences fetch timeout')), 5000)
+      );
+      
+      const preferences = await Promise.race([preferencesPromise, preferencesTimeoutPromise]);
       if (!preferences) {
         logger.warn(`No notification preferences found for user ${userId}`);
+        console.log(`⚠️ No preferences found for user ${userId}, skipping channel delivery`);
         return notification;
       }
+      console.log(`✅ User preferences found for userId: ${userId}`);
 
       // Check if notification should be sent immediately or scheduled
       if (scheduledFor && scheduledFor > new Date()) {
@@ -81,7 +95,9 @@ class NotificationService {
       }
 
       // Send through enabled channels
+      console.log(`📡 Sending notification through channels for userId: ${userId}`);
       await this._sendThroughChannels(notification, preferences);
+      console.log(`✅ Notification sent through all channels for userId: ${userId}`);
 
       return notification;
     } catch (error) {
@@ -100,11 +116,17 @@ class NotificationService {
 
     for (const channel of channels) {
       try {
+        console.log(`🔍 Checking channel ${channel} for category ${category}, priority ${priority}`);
         if (preferences.shouldSendNotification(category, channel, priority)) {
+          console.log(`📤 Sending notification through ${channel}`);
           await this._sendThroughChannel(notification, preferences, channel);
+          console.log(`✅ Notification sent through ${channel}`);
+        } else {
+          console.log(`⏭️ Skipping channel ${channel} - not enabled or not matching criteria`);
         }
       } catch (error) {
         logger.error(`Error sending notification through ${channel}:`, error);
+        console.error(`❌ Error in channel ${channel}:`, error.message);
         // Update delivery status with error
         notification.deliveryStatus[channel].error = error.message;
         await notification.save();
@@ -123,33 +145,41 @@ class NotificationService {
     let result;
     switch (channel) {
       case 'inApp':
+        console.log(`📱 Calling inAppService.send for userId: ${userId}`);
         result = await this.inAppService.send(userId, title, message, metadata);
+        console.log(`📱 inAppService.send result:`, result);
         break;
       case 'email':
+        console.log(`📧 Calling emailService.send to: ${preferences.email.address}`);
         result = await this.emailService.send(
           preferences.email.address,
           title,
           message,
           metadata
         );
+        console.log(`📧 emailService.send result:`, result);
         break;
       case 'sms':
         if (preferences.sms.phoneNumber) {
+          console.log(`📱 Calling smsService.send to: ${preferences.sms.phoneNumber}`);
           result = await this.smsService.send(
             preferences.sms.phoneNumber,
             message,
             metadata
           );
+          console.log(`📱 smsService.send result:`, result);
         }
         break;
       case 'fcm':
         if (preferences.fcm.tokens.length > 0) {
+          console.log(`🔥 Calling fcmService.send to ${preferences.fcm.tokens.length} tokens`);
           result = await this.fcmService.send(
             preferences.fcm.tokens,
             title,
             message,
             metadata
           );
+          console.log(`🔥 fcmService.send result:`, result);
         }
         break;
     }
@@ -160,7 +190,13 @@ class NotificationService {
       deliveryStatus.error = null;
     }
 
-    await notification.save();
+    // Save notification with timeout
+    const savePromise = notification.save();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Notification update timeout')), 5000)
+    );
+    
+    await Promise.race([savePromise, timeoutPromise]);
   }
 
   /**

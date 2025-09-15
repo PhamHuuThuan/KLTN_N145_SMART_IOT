@@ -90,24 +90,34 @@ async function updateDeviceStatus(data) {
     
     // Update latest telemetry (only set provided fields; do not default to 0)
     if (payload.temp !== undefined || payload.humid !== undefined || payload.smoke !== undefined || payload.gas_ppm !== undefined || payload.o || payload.outlets) {
-      const prev = device.latestTelemetry || { ts: Date.now(), temp: null, humid: null, smoke: null, gas_ppm: null, o: {} };
+      const prev = device.latestTelemetry || { ts: Date.now(), o: {} };
       device.latestTelemetry = {
         ts: payload.ts || prev.ts || Date.now(),
-        temp: payload.temp !== undefined ? payload.temp : prev.temp ?? null,
-        humid: payload.humid !== undefined ? payload.humid : prev.humid ?? null,
-        smoke: payload.smoke !== undefined ? payload.smoke : prev.smoke ?? null,
-        gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : prev.gas_ppm ?? null,
+        temp: payload.temp !== undefined ? payload.temp : prev.temp,
+        humid: payload.humid !== undefined ? payload.humid : prev.humid,
+        smoke: payload.smoke !== undefined ? payload.smoke : prev.smoke,
+        gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : prev.gas_ppm,
         o: (payload.o || payload.outlets || prev.o || {})
       };
       console.log(`🌡️ Updated latest telemetry:`, device.latestTelemetry);
     } else if (type === 'event' && (payload.o || payload.outlets)) {
       // For event logs, only update outlet status in latestTelemetry
       if (!device.latestTelemetry) {
-        device.latestTelemetry = { ts: Date.now(), temp: null, humid: null, smoke: null, gas_ppm: null, o: {} };
+        device.latestTelemetry = { ts: Date.now(), o: {} };
       }
       device.latestTelemetry.o = payload.o || payload.outlets || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();
       console.log(`🔌 Updated outlet status in latestTelemetry:`, device.latestTelemetry.o);
+    } else if (type === 'event' && payload.ack) {
+      // For ack events, only update timestamp and keep existing telemetry
+      console.log(`✅ ACK event received for device ${deviceId}`);
+      if (!device.latestTelemetry) {
+        device.latestTelemetry = { ts: Date.now(), o: {} };
+      } else {
+        // Only update timestamp, preserve existing sensor values
+        device.latestTelemetry.ts = payload.ts || Date.now();
+      }
+      console.log(`📅 Updated timestamp for ACK event:`, device.latestTelemetry.ts);
     } else {
       console.log(`⚠️ No sensor data found in ${type} log, keeping existing telemetry`);
     }
@@ -159,7 +169,7 @@ async function startLogConsumer() {
           // Create and save device log
           const deviceLog = new DeviceLog(logData);
           await deviceLog.save();
-          console.log(`✅ Device log saved successfully`);
+          console.log(`✅ Device log saved successfully for ${logData.type} event`);
           
           // Update device status if it's telemetry or event data
           if ((logData.type === 'telemetry' || logData.type === 'event') && logData.deviceId) {

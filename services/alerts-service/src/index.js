@@ -83,11 +83,28 @@ const initializeServices = async () => {
       
       // Start consuming messages
       await consumeMessages((topic, message) => {
+        console.log(`📨 Alerts-service received message from topic: ${topic}`);
+        console.log(`📋 Message content:`, JSON.stringify(message, null, 2));
+        
         const handler = messageHandlers[topic];
         if (handler) {
-          handler(topic, message);
+          try {
+            console.log(`🔄 Calling handler for topic: ${topic}`);
+            handler(topic, message);
+            console.log(`✅ Handler completed for topic: ${topic}`);
+          } catch (error) {
+            logger.error('Error in message handler:', {
+              topic,
+              error: error.message,
+              stack: error.stack,
+              message: message
+            });
+            console.error(`❌ Error in handler for topic ${topic}:`, error.message);
+            // Don't throw error to prevent consumer from stopping
+          }
         } else {
           logger.warn('No handler found for topic', { topic });
+          console.warn(`⚠️ No handler found for topic: ${topic}`);
         }
       });
       

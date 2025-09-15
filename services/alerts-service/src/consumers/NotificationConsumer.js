@@ -124,6 +124,12 @@ class NotificationConsumer {
    */
   async handleUserAction(topic, message) {
     try {
+      // Validate message structure
+      if (!message || typeof message !== 'object') {
+        logger.warn('Invalid message format in handleUserAction', { topic, message });
+        return;
+      }
+
       const { userId, action, deviceId, deviceName, result, outletId, status } = message;
       
       // Validate required userId
@@ -231,6 +237,7 @@ class NotificationConsumer {
         };
       }
   
+      console.log(`📤 Sending notification for action: ${action}`, notificationData);
       await this.notificationService.sendNotification(notificationData);
       
       logger.notification('User action notification sent', {
@@ -238,6 +245,7 @@ class NotificationConsumer {
         action,
         deviceId
       });
+      console.log(`✅ Notification sent successfully for action: ${action}`);
     } catch (error) {
       logger.error('Error handling user action:', error);
     }
