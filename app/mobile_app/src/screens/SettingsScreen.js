@@ -84,7 +84,7 @@ const SettingsScreen = ({ navigation }) => {
             'notifications-outline',
             'Notifications',
             'Manage notification preferences',
-            () => Alert.alert('Coming Soon', 'This feature will be available soon')
+            () => navigation.navigate('NotificationSettingsFromSettings')
           )}
           {renderSettingItem(
             'language-outline',

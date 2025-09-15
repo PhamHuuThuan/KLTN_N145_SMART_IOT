@@ -261,9 +261,9 @@ export const toggleOutlet = async (req, res) => {
     const outlet = device.outlets.find(o => o.id === outletId);
     const outletName = outlet ? outlet.name : outletId;
     
-    // Publish outlet toggle event to Kafka with userId (ownerId)
+    // Publish outlet toggle event to Kafka with userId (ownerId) in a timeout-guarded promise
     console.log(`📤 Publishing outlet toggle to Kafka: ${deviceId}/${outletId} by user ${device.ownerId}`);
-    await producer.send({
+    const sendPromise = producer.send({
       topic: 'outlet.toggled',
       messages: [{
         key: deviceId,
@@ -279,6 +279,15 @@ export const toggleOutlet = async (req, res) => {
           timestamp: new Date()
         })
       }]
+    });
+
+    // Timeout safeguard to avoid hanging the HTTP request if Kafka is slow
+    const timeoutMs = Number(process.env.KAFKA_SEND_TIMEOUT_MS || 1500);
+    await Promise.race([
+      sendPromise,
+      new Promise((resolve) => setTimeout(() => resolve('timeout'), timeoutMs))
+    ]).catch((err) => {
+      console.error('❌ Kafka send error (non-fatal):', err?.message || err);
     });
     
     res.json({

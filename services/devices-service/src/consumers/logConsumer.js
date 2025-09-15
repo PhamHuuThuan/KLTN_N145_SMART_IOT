@@ -131,8 +131,8 @@ async function updateDeviceStatus(data) {
     console.error(`📋 Error details:`, {
       message: error.message,
       stack: error.stack,
-      deviceId: telemetryData?.deviceId,
-      payload: telemetryData?.payload
+      deviceId: data?.deviceId,
+      payload: data?.payload
     });
     // Don't throw error to prevent consumer from stopping
   }

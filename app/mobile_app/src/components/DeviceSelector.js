@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
+import apiService from '../services/apiService';
+import { useAuth } from '../contexts/AuthContext';
 
-const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetails }) => {
+const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetails, onDeviceAdded }) => {
   const [showPicker, setShowPicker] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newDeviceId, setNewDeviceId] = useState('');
+  const [newDeviceName, setNewDeviceName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const { user } = useAuth();
 
   return (
     <View style={styles.section}>
@@ -26,13 +33,12 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.detailButton}
-            onPress={onPressDetails}
+            style={styles.addButton}
+            onPress={() => setShowAddModal(true)}
             activeOpacity={0.9}
-            disabled={!selectedDevice}
           >
-            <MaterialCommunityIcons name="information-outline" size={18} color={CONFIG.THEME.surface} />
-            <Text style={styles.detailText}>Details</Text>
+            <MaterialCommunityIcons name="plus" size={18} color={CONFIG.THEME.surface} />
+            <Text style={styles.addText}>Add</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -72,6 +78,90 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add device modal */}
+      <Modal
+        visible={showAddModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Device</Text>
+              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                <MaterialCommunityIcons name="close" size={20} color={CONFIG.COLORS.gray} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ gap: 10, paddingHorizontal: 4, paddingBottom: 8 }}>
+              <Text style={styles.inputLabel}>Device ID / Pairing Code</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter deviceId"
+                autoCapitalize="none"
+                value={newDeviceId}
+                onChangeText={setNewDeviceId}
+              />
+              <Text style={styles.inputLabel}>Name (optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="My Kitchen Controller"
+                value={newDeviceName}
+                onChangeText={setNewDeviceName}
+              />
+              <TouchableOpacity
+                style={[styles.addConfirmButton, submitting && { opacity: 0.7 }]}
+                onPress={async () => {
+                  if (!newDeviceId?.trim()) {
+                    Alert.alert('Validation', 'Please enter a deviceId');
+                    return;
+                  }
+                  if (!user?.id) {
+                    Alert.alert('Not logged in', 'Please login to add devices');
+                    return;
+                  }
+                  try {
+                    setSubmitting(true);
+                    const payload = {
+                      deviceId: newDeviceId.trim(),
+                      ownerId: user.id,
+                      name: (newDeviceName || newDeviceId).trim(),
+                      location: { room: 'kitchen', floor: '1' }
+                    };
+                    const resp = await apiService.post('/api/devices', payload);
+                    if (resp?.data?.success) {
+                      Alert.alert('Success', 'Device added successfully');
+                      setShowAddModal(false);
+                      setNewDeviceId('');
+                      setNewDeviceName('');
+                      onSelectDevice && onSelectDevice(payload.deviceId);
+                      onDeviceAdded && onDeviceAdded(resp.data.data);
+                    } else {
+                      Alert.alert('Failed', resp?.data?.message || 'Could not add device');
+                    }
+                  } catch (e) {
+                    Alert.alert('Error', e?.message || 'Failed to add device');
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                disabled={submitting}
+                activeOpacity={0.9}
+              >
+                {submitting ? (
+                  <ActivityIndicator color={CONFIG.THEME.surface} />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="content-save" size={18} color={CONFIG.THEME.surface} />
+                    <Text style={styles.addConfirmText}>Add Device</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -126,7 +216,7 @@ const styles = StyleSheet.create({
     color: CONFIG.COLORS.dark,
     fontWeight: '600',
   },
-  detailButton: {
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -135,10 +225,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 10,
   },
-  detailText: {
+  addText: {
     color: CONFIG.THEME.surface,
     fontWeight: '700',
     fontSize: 12,
+  },
+  inputLabel: {
+    fontSize: 12,
+    color: CONFIG.COLORS.gray,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: CONFIG.THEME.border,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    color: CONFIG.COLORS.dark,
+    backgroundColor: CONFIG.COLORS.light,
+  },
+  addConfirmButton: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: CONFIG.THEME.primary,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  addConfirmText: {
+    color: CONFIG.THEME.surface,
+    fontWeight: '700',
+    fontSize: 14,
   },
   noDevicesText: {
     fontSize: 16,

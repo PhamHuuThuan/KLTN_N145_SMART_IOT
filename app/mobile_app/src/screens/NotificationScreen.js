@@ -34,7 +34,7 @@ const NotificationScreen = ({ navigation }) => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [testingApi, setTestingApi] = useState(false);
+  
 
   useEffect(() => {
     loadNotifications();
@@ -46,21 +46,7 @@ const NotificationScreen = ({ navigation }) => {
     setHasMore(false);
   };
 
-  const handleTestApi = async () => {
-    setTestingApi(true);
-    try {
-      const result = await testApiConnection();
-      Alert.alert(
-        'API Test Result',
-        `Success: ${result.success}\nMessage: ${result.message}\nStatus: ${result.status || 'N/A'}`,
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      Alert.alert('API Test Error', error.message);
-    } finally {
-      setTestingApi(false);
-    }
-  };
+  
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) return;
@@ -107,21 +93,7 @@ const NotificationScreen = ({ navigation }) => {
     );
   };
 
-  const handleTestNotification = async () => {
-    try {
-      if (!user?.id) {
-        Alert.alert('Error', 'User not logged in');
-        return;
-      }
-      
-      const response = await notificationService.testNotification(user.id, ['inApp']);
-      if (response.success) {
-        Alert.alert('Success', 'Test notification sent!');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send test notification');
-    }
-  };
+  
 
   const handleNotificationPress = (notification) => {
     // Navigate to relevant screen based on notification type
@@ -153,6 +125,12 @@ const NotificationScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>Notifications</Text>
       </View>
       <View style={styles.headerRight}>
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={() => navigation.navigate('NotificationSettingsFromNotifications')}
+        >
+          <Ionicons name="settings-outline" size={20} color="#007AFF" />
+        </TouchableOpacity>
         {unreadCount > 0 && (
           <TouchableOpacity
             style={styles.markAllButton}
@@ -161,23 +139,6 @@ const NotificationScreen = ({ navigation }) => {
             <Text style={styles.markAllText}>Mark All Read</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={handleTestApi}
-          disabled={testingApi}
-        >
-          <Ionicons 
-            name={testingApi ? "hourglass-outline" : "bug-outline"} 
-            size={20} 
-            color="#007AFF" 
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={handleTestNotification}
-        >
-          <Ionicons name="send-outline" size={20} color="#007AFF" />
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -189,13 +150,7 @@ const NotificationScreen = ({ navigation }) => {
       <Text style={styles.emptyMessage}>
         You'll receive notifications for important events
       </Text>
-      <TouchableOpacity
-        style={styles.testButtonLarge}
-        onPress={handleTestNotification}
-      >
-        <Ionicons name="send-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.testButtonText}>Send Test Notification</Text>
-      </TouchableOpacity>
+      
     </View>
   );
 

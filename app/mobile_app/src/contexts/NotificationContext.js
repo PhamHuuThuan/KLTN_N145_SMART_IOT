@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { notificationService } from '../services/notificationService';
 import { useAuth } from './AuthContext';
 
@@ -111,6 +113,8 @@ export const NotificationProvider = ({ children }) => {
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       loadNotifications();
+      // Auto-register FCM/APNs token for push notifications
+      registerFCMToken();
     } else {
       // Load demo notifications for testing when not authenticated
       const demoNotifications = notificationService.createDemoNotifications();
@@ -120,6 +124,51 @@ export const NotificationProvider = ({ children }) => {
       });
     }
   }, [isAuthenticated, user?.id]);
+
+  // Register device token for push notifications
+  const registerFCMToken = async () => {
+    try {
+      // Request permissions
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.warn('Push notification permission not granted');
+        return;
+      }
+
+      // Get device push token (FCM on Android / APNs on iOS)
+      let rawToken = null;
+      try {
+        const devicePushToken = await Notifications.getDevicePushTokenAsync();
+        rawToken = devicePushToken?.data;
+      } catch (nativeErr) {
+        console.warn('Native device token not available, trying Expo push token');
+      }
+      if (!rawToken) {
+        try {
+          const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
+          rawToken = expoPushToken;
+        } catch (expoErr) {
+          console.warn('Expo push token not available');
+        }
+      }
+      if (!rawToken) {
+        console.warn('Failed to get device push token');
+        return;
+      }
+
+      // Register token with backend
+      const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
+      await notificationService.addFCMToken(user.id, rawToken, platform);
+      console.log('✅ Registered push token with backend');
+    } catch (error) {
+      console.warn('Failed to register FCM token:', error?.message || String(error));
+    }
+  };
 
   // Load notifications
   const loadNotifications = async (page = 1, limit = 20) => {
@@ -297,6 +346,8 @@ export const NotificationProvider = ({ children }) => {
     addNotification,
     getNotificationStats,
     testApiConnection,
+    // expose for manual re-registration if needed
+    registerFCMToken,
   };
 
   return (

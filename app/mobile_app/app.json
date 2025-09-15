@@ -20,7 +20,8 @@
         "foregroundImage": "./assets/logo_app.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "useNextNotificationsApi": true
     },
     "web": {
       "favicon": "./assets/logo_app.png",
@@ -30,7 +31,18 @@
       "apiUrl": "http://127.0.0.1:3002"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2C3E50",
+          "sounds": [
+            "./assets/notification.wav"
+          ],
+          "mode": "production"
+        }
+      ]
     ]
   }
 }
