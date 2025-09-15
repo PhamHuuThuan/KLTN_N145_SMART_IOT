@@ -109,20 +109,81 @@ export const NotificationProvider = ({ children }) => {
   const [state, dispatch] = useReducer(notificationReducer, initialState);
   const { user, isAuthenticated } = useAuth();
 
-  // Load notifications on mount
+  // Configure notification behavior
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      loadNotifications();
-      // Auto-register FCM/APNs token for push notifications
-      registerFCMToken();
-    } else {
-      // Load demo notifications for testing when not authenticated
-      const demoNotifications = notificationService.createDemoNotifications();
+    // Configure how notifications are handled when app is in foreground
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+
+    // Set notification handler for foreground
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('🔔 Notification received in foreground:', notification);
+      // Add to local state immediately
       dispatch({
-        type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
-        payload: demoNotifications,
+        type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
+        payload: {
+          id: notification.request.identifier,
+          title: notification.request.content.title,
+          body: notification.request.content.body,
+          data: notification.request.content.data,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          type: 'push'
+        }
       });
-    }
+    });
+
+    // Set response handler for user interactions
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('🔔 Notification response:', response);
+      // Mark as read when user taps notification
+      if (response.notification.request.identifier) {
+        dispatch({
+          type: NOTIFICATION_ACTIONS.MARK_AS_READ,
+          payload: response.notification.request.identifier
+        });
+      }
+    });
+
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+    };
+  }, []);
+
+  // Load notifications after auth is ready (token set), with small delay to avoid race on login
+  useEffect(() => {
+    let canceled = false;
+    const init = async () => {
+      if (isAuthenticated && user?.id) {
+        // Try to register FCM token in background
+        registerFCMToken();
+
+        // Wait until auth token is available to NotificationService
+        const maxWaitMs = 1500;
+        const start = Date.now();
+        while (!notificationService.getAuthToken() && Date.now() - start < maxWaitMs) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+        // Extra small delay to ensure axios client is created with token
+        await new Promise(r => setTimeout(r, 100));
+        if (!canceled) await loadNotifications();
+      } else {
+        // Load demo notifications for testing when not authenticated
+        const demoNotifications = notificationService.createDemoNotifications();
+        dispatch({
+          type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
+          payload: demoNotifications,
+        });
+      }
+    };
+    init();
+    return () => { canceled = true; };
   }, [isAuthenticated, user?.id]);
 
   // Register device token for push notifications
@@ -142,29 +203,24 @@ export const NotificationProvider = ({ children }) => {
 
       // Get device push token (FCM on Android / APNs on iOS)
       let rawToken = null;
+      let tokenType = null;
       try {
         const devicePushToken = await Notifications.getDevicePushTokenAsync();
         rawToken = devicePushToken?.data;
+        tokenType = devicePushToken?.type; // 'fcm' on Android, 'apns' on iOS
+        console.log('🔔 Native push token acquired:', { tokenType, token: rawToken?.substring(0, 20) + '...' });
       } catch (nativeErr) {
-        console.warn('Native device token not available, trying Expo push token');
-      }
-      if (!rawToken) {
-        try {
-          const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
-          rawToken = expoPushToken;
-        } catch (expoErr) {
-          console.warn('Expo push token not available');
-        }
+        console.warn('Native device token not available (dev/Expo Go likely). Skipping FCM registration.', nativeErr.message);
+        return;
       }
       if (!rawToken) {
         console.warn('Failed to get device push token');
         return;
       }
 
-      // Register token with backend
       const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
-      await notificationService.addFCMToken(user.id, rawToken, platform);
-      console.log('✅ Registered push token with backend');
+      const res = await notificationService.addFCMToken(user.id, rawToken, platform);
+      console.log('✅ Registered push token with backend:', res?.success ?? true);
     } catch (error) {
       console.warn('Failed to register FCM token:', error?.message || String(error));
     }
@@ -180,6 +236,12 @@ export const NotificationProvider = ({ children }) => {
         payload: demoNotifications,
       });
       return;
+    }
+    // Ensure auth token is present
+    if (!notificationService.getAuthToken()) {
+      console.warn('Auth token not ready yet, delaying notifications load');
+      await new Promise(r => setTimeout(r, 200));
+      if (!notificationService.getAuthToken()) return; // skip if still not ready
     }
 
     // Prevent multiple simultaneous calls
@@ -365,3 +427,4 @@ export const useNotificationContext = () => {
   }
   return context;
 };
+

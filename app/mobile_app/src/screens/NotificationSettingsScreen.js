@@ -21,8 +21,8 @@ const NotificationSettingsScreen = ({ navigation }) => {
 
   const load = async () => {
     if (!user?.id) return;
-    setLoading(true);
-    setShowLoader(true);
+    // setLoading(true);
+    // setShowLoader(true);
     try {
       const res = await notificationService.getPreferences(user.id);
       if (res.success && res.data?.data) {
