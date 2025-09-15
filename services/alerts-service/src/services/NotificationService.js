@@ -42,6 +42,16 @@ class NotificationService {
         expiresAt = null
       } = notificationData;
 
+      // Validate required fields
+      if (!userId) {
+        throw new Error('userId is required for notification');
+      }
+
+      // Validate userId format (MongoDB ObjectId)
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        throw new Error('userId must be a valid MongoDB ObjectId');
+      }
+
       // Create notification record
       const notification = new Notification({
         userId,

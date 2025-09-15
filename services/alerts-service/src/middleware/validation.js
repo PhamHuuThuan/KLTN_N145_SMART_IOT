@@ -1,8 +1,16 @@
 import Joi from 'joi';
+import mongoose from 'mongoose';
 
 // Notification validation schema
 const notificationSchema = Joi.object({
-  userId: Joi.string().required(),
+  userId: Joi.string().required().custom((value, helpers) => {
+    if (!mongoose.Types.ObjectId.isValid(value)) {
+      return helpers.error('any.invalid');
+    }
+    return value;
+  }).messages({
+    'any.invalid': 'userId must be a valid MongoDB ObjectId'
+  }),
   title: Joi.string().max(200).required(),
   message: Joi.string().max(1000).required(),
   type: Joi.string().valid('device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion').required(),

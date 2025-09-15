@@ -20,7 +20,8 @@ export const TOPICS = {
   DEVICE_ALERTS: 'device-alerts',
   NOTIFICATION_REQUESTS: 'notification-requests',
   USER_ACTIONS: 'user-actions',
-  SYSTEM_EVENTS: 'system-events'
+  SYSTEM_EVENTS: 'system-events',
+  OUTLET_TOGGLED: 'outlet.toggled',
 };
 
 // Connect to Kafka
