@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import CONFIG from '../constants/config';
 import Header from '../components/Header';
+import OverlayLoader from '../components/OverlayLoader';
+import ActionFeedback from '../components/ActionFeedback';
 
 const RegisterScreen = ({ navigation }) => {
   const [name, setName] = useState('');
@@ -26,6 +28,8 @@ const RegisterScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { register } = useAuth();
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
@@ -50,6 +54,7 @@ const RegisterScreen = ({ navigation }) => {
 
     try {
       setIsLoading(true);
+      setShowLoader(true);
       console.log('🚀 RegisterScreen: Starting registration process');
       const result = await register(email.trim(), password, name.trim());
       
@@ -57,20 +62,17 @@ const RegisterScreen = ({ navigation }) => {
       
       if (result.success) {
         console.log('✅ RegisterScreen: Registration successful');
-        Alert.alert(
-          'Đăng ký thành công',
-          'Chào mừng bạn đến với Smart IoT Kitchen!',
-          [{ text: 'OK' }]
-        );
+        setFeedback({ visible: true, type: 'success', message: 'Đăng ký thành công' });
       } else {
         console.log('❌ RegisterScreen: Registration failed:', result.error);
-        Alert.alert('Đăng ký thất bại', result.error || 'Có lỗi xảy ra');
+        setFeedback({ visible: true, type: 'error', message: result.error || 'Đăng ký thất bại' });
       }
     } catch (error) {
       console.error('❌ RegisterScreen: Registration error:', error);
-      Alert.alert('Lỗi', 'Có lỗi xảy ra khi đăng ký');
+      setFeedback({ visible: true, type: 'error', message: 'Có lỗi xảy ra khi đăng ký' });
     } finally {
       setIsLoading(false);
+      setShowLoader(false);
     }
   };
 
@@ -82,120 +84,120 @@ const RegisterScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={CONFIG.THEME.primary} />
-      
       <Header />
-
       <KeyboardAvoidingView 
         style={styles.content}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Họ và tên</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập họ và tên của bạn"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-              autoCorrect={false}
-              editable={!isLoading}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập email của bạn"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!isLoading}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mật khẩu</Text>
-            <View style={styles.passwordContainer}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Họ và tên</Text>
               <TextInput
-                style={styles.passwordInput}
-                placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
+                style={styles.input}
+                placeholder="Nhập họ và tên của bạn"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                autoCorrect={false}
+                editable={!isLoading}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nhập email của bạn"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isLoading}
               />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-                disabled={isLoading}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color={CONFIG.COLORS.gray}
-                />
-              </TouchableOpacity>
             </View>
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Xác nhận mật khẩu</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={styles.passwordInput}
-                placeholder="Nhập lại mật khẩu"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showConfirmPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isLoading}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                disabled={isLoading}
-              >
-                <Ionicons
-                  name={showConfirmPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color={CONFIG.COLORS.gray}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Mật khẩu</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isLoading}
                 />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color={CONFIG.COLORS.gray}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
 
-          <TouchableOpacity
-            style={[styles.registerButton, isLoading && styles.disabledButton]}
-            onPress={handleRegister}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={CONFIG.COLORS.white} />
-            ) : (
-              <Text style={styles.registerButtonText}>Đăng ký</Text>
-            )}
-          </TouchableOpacity>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Xác nhận mật khẩu</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="Nhập lại mật khẩu"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  disabled={isLoading}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color={CONFIG.COLORS.gray}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Đã có tài khoản? </Text>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Login')}
+              style={[styles.registerButton, isLoading && styles.disabledButton]}
+              onPress={handleRegister}
               disabled={isLoading}
             >
-              <Text style={styles.linkText}>Đăng nhập ngay</Text>
+              {isLoading ? (
+                <ActivityIndicator color={CONFIG.COLORS.white} />
+              ) : (
+                <Text style={styles.registerButtonText}>Đăng ký</Text>
+              )}
             </TouchableOpacity>
-          </View>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Đã có tài khoản? </Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Login')}
+                disabled={isLoading}
+              >
+                <Text style={styles.linkText}>Đăng nhập ngay</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <OverlayLoader visible={showLoader} message="Đang đăng ký..." onCancel={() => setShowLoader(false)} />
+      <ActionFeedback visible={feedback.visible} type={feedback.type} message={feedback.message} onHide={() => setFeedback({ ...feedback, visible: false })} />
     </View>
   );
 };

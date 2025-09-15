@@ -5,9 +5,13 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Modal, 
-  TextInput, 
-  Alert 
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView
 } from 'react-native';
+import OverlayLoader from './OverlayLoader';
+import ActionFeedback from './ActionFeedback';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 
@@ -25,6 +29,8 @@ const OutletDetail = ({
   const [isEditing, setIsEditing] = useState(false);
   const [outletName, setOutletName] = useState(outlet?.name || '');
   const [outletGroup, setOutletGroup] = useState(outlet?.type || 'kitchen');
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
   
   // Get real-time outlet status
   const getOutletStatus = (outletId) => {
@@ -52,19 +58,22 @@ const OutletDetail = ({
 
   const handleSave = async () => {
     if (!outletName.trim()) {
-      Alert.alert('Error', 'Please enter outlet name');
+      setFeedback({ visible: true, type: 'error', message: 'Please enter outlet name' });
       return;
     }
 
     try {
+      setShowLoader(true);
       await onUpdateOutlet(outlet.id, {
         name: outletName.trim(),
         type: outletGroup
       });
       setIsEditing(false);
-      Alert.alert('Success', 'Outlet settings updated successfully');
+      setFeedback({ visible: true, type: 'success', message: 'Outlet updated' });
     } catch (error) {
-      Alert.alert('Error', error.message);
+      setFeedback({ visible: true, type: 'error', message: error.message || 'Update failed' });
+    } finally {
+      setShowLoader(false);
     }
   };
 
@@ -81,15 +90,17 @@ const OutletDetail = ({
     
     if (!onControlOutlet) {
       console.error(`❌ onControlOutlet function not provided`);
-      Alert.alert('Error', 'Control function not available');
+      setFeedback({ visible: true, type: 'error', message: 'Control function not available' });
       return;
     }
     
     if (!deviceId || !outlet?.id) {
-      Alert.alert('Info', 'Device or outlet not found');
+      setFeedback({ visible: true, type: 'error', message: 'Device or outlet not found' });
       return;
     }
+    setShowLoader(true);
     const success = await onControlOutlet(action, deviceId, outlet.id);
+    setShowLoader(false);
     console.log(`📊 Detail toggle result: ${success}`);
     
     if (success) {
@@ -102,19 +113,11 @@ const OutletDetail = ({
         }, 300);
       }
       
-      // Show success message briefly
-      Alert.alert('Success', `Outlet ${action} command sent`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Close detail after user acknowledges
-            onClose();
-          }
-        }
-      ]);
+      setFeedback({ visible: true, type: 'success', message: `Outlet ${action} command sent` });
+      onClose();
     } else {
       console.error(`❌ Detail toggle failed: ${outlet.id} -> ${action}`);
-      Alert.alert('Error', 'Failed to send command');
+      setFeedback({ visible: true, type: 'error', message: 'Failed to send command' });
     }
   };
 
@@ -152,7 +155,7 @@ const OutletDetail = ({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <KeyboardAvoidingView style={styles.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
             <Text style={styles.title}>Outlet Details</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -160,7 +163,7 @@ const OutletDetail = ({
             </TouchableOpacity>
           </View>
 
-          <View style={styles.outletInfo}>
+          <ScrollView contentContainerStyle={styles.outletInfo} keyboardShouldPersistTaps="handled">
             <View style={styles.outletHeader}>
               <MaterialCommunityIcons 
                 name={getGroupIcon(outletGroup)} 
@@ -171,23 +174,6 @@ const OutletDetail = ({
                 <Text style={styles.outletId}>{outlet.id.toUpperCase()}</Text>
                 <Text style={styles.outletName}>
                   {isEditing ? outletName : (outlet.name || `Outlet ${outlet.id}`)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.statusSection}>
-              <Text style={styles.statusLabel}>Current Status:</Text>
-              <View style={[
-                styles.statusBadge,
-                { backgroundColor: outletStatus ? CONFIG.COLORS.success : CONFIG.COLORS.danger }
-              ]}>
-                <MaterialCommunityIcons 
-                  name={outletStatus ? 'power' : 'power-off'} 
-                  size={18} 
-                  color={CONFIG.COLORS.white} 
-                />
-                <Text style={styles.statusText}>
-                  {outletStatus ? 'ON' : 'OFF'}
                 </Text>
               </View>
             </View>
@@ -260,7 +246,7 @@ const OutletDetail = ({
                 </View>
               </View>
             )}
-          </View>
+          </ScrollView>
 
           <View style={styles.actions}>
             {!isEditing ? (
@@ -312,8 +298,10 @@ const OutletDetail = ({
               </>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </View>
+      <OverlayLoader visible={showLoader} message={isEditing ? 'Saving...' : 'Sending command...'} onCancel={() => setShowLoader(false)} />
+      <ActionFeedback visible={feedback.visible} type={feedback.type} message={feedback.message} onHide={() => setFeedback({ ...feedback, visible: false })} />
     </Modal>
   );
 };

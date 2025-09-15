@@ -13,6 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNotificationContext } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationItem from '../components/NotificationItem';
+import OverlayLoader from '../components/OverlayLoader';
+import ActionFeedback from '../components/ActionFeedback';
 import { notificationService } from '../services/notificationService';
 
 const NotificationScreen = ({ navigation }) => {
@@ -34,6 +36,8 @@ const NotificationScreen = ({ navigation }) => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
   
 
   useEffect(() => {
@@ -42,8 +46,16 @@ const NotificationScreen = ({ navigation }) => {
 
   const handleRefresh = async () => {
     setPage(1);
-    await refreshNotifications();
-    setHasMore(false);
+    setShowLoader(true);
+    try {
+      await refreshNotifications();
+      setHasMore(false);
+      setFeedback({ visible: true, type: 'success', message: 'Refreshed' });
+    } catch (e) {
+      setFeedback({ visible: true, type: 'error', message: 'Refresh failed' });
+    } finally {
+      setShowLoader(false);
+    }
   };
 
   
@@ -87,7 +99,17 @@ const NotificationScreen = ({ navigation }) => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm',
-          onPress: markAllAsRead,
+          onPress: async () => {
+            setShowLoader(true);
+            try {
+              await markAllAsRead();
+              setFeedback({ visible: true, type: 'success', message: 'All marked as read' });
+            } catch (_) {
+              setFeedback({ visible: true, type: 'error', message: 'Failed to mark all' });
+            } finally {
+              setShowLoader(false);
+            }
+          },
         },
       ]
     );
@@ -125,12 +147,6 @@ const NotificationScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>Notifications</Text>
       </View>
       <View style={styles.headerRight}>
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={() => navigation.navigate('NotificationSettingsFromNotifications')}
-        >
-          <Ionicons name="settings-outline" size={20} color="#007AFF" />
-        </TouchableOpacity>
         {unreadCount > 0 && (
           <TouchableOpacity
             style={styles.markAllButton}
@@ -139,6 +155,12 @@ const NotificationScreen = ({ navigation }) => {
             <Text style={styles.markAllText}>Mark All Read</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={() => navigation.navigate('NotificationSettingsFromNotifications')}
+        >
+          <Ionicons name="settings-outline" size={20} color="#007AFF" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -214,6 +236,17 @@ const NotificationScreen = ({ navigation }) => {
         onEndReachedThreshold={0.1}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+      />
+      <OverlayLoader
+        visible={showLoader}
+        message="Working..."
+        onCancel={() => setShowLoader(false)}
+      />
+      <ActionFeedback
+        visible={feedback.visible}
+        type={feedback.type}
+        message={feedback.message}
+        onHide={() => setFeedback({ ...feedback, visible: false })}
       />
     </View>
   );

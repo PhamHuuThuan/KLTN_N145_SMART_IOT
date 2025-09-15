@@ -3,11 +3,15 @@ import { View, Text, StyleSheet, Switch, TextInput, TouchableOpacity, Alert, Scr
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { notificationService } from '../services/notificationService';
+import OverlayLoader from '../components/OverlayLoader';
+import ActionFeedback from '../components/ActionFeedback';
 
 const NotificationSettingsScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
   const [prefs, setPrefs] = useState({
     email: { enabled: true, address: '' },
     sms: { enabled: false, phoneNumber: '' },
@@ -18,6 +22,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
   const load = async () => {
     if (!user?.id) return;
     setLoading(true);
+    setShowLoader(true);
     try {
       const res = await notificationService.getPreferences(user.id);
       if (res.success && res.data?.data) {
@@ -35,15 +40,17 @@ const NotificationSettingsScreen = ({ navigation }) => {
         });
       }
     } catch (e) {
-      Alert.alert('Error', 'Failed to load preferences');
+      setFeedback({ visible: true, type: 'error', message: 'Failed to load preferences' });
     } finally {
       setLoading(false);
+      setShowLoader(false);
     }
   };
 
   const save = async () => {
     if (!user?.id) return;
     setSaving(true);
+    setShowLoader(true);
     try {
       const payload = {
         email: { enabled: prefs.email.enabled, address: prefs.email.address },
@@ -53,12 +60,13 @@ const NotificationSettingsScreen = ({ navigation }) => {
       };
       const res = await notificationService.updatePreferences(user.id, payload);
       if (res.success) {
-        Alert.alert('Saved', 'Notification preferences updated');
+        setFeedback({ visible: true, type: 'success', message: 'Preferences saved' });
       }
     } catch (e) {
-      Alert.alert('Error', 'Failed to save preferences');
+      setFeedback({ visible: true, type: 'error', message: 'Failed to save preferences' });
     } finally {
       setSaving(false);
+      setShowLoader(false);
     }
   };
 
@@ -71,15 +79,15 @@ const NotificationSettingsScreen = ({ navigation }) => {
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notification Settings</Text>
-        <TouchableOpacity style={styles.saveButton} onPress={save} disabled={saving || loading}>
-          <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save'}</Text>
+        <TouchableOpacity style={styles.saveIconButton} onPress={save} disabled={saving || loading}>
+          <Ionicons name="save-outline" size={22} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.content}>
         <View style={styles.section}>
           <View style={styles.row}>
             <Text style={styles.label}>In-App</Text>
-            <Switch value={prefs.inApp.enabled} onValueChange={(v) => setPrefs({ ...prefs, inApp: { enabled: v } })} />
+            <Switch value={true} onValueChange={() => {}} disabled />
           </View>
           <View style={styles.row}>
             <Text style={styles.label}>FCM Push</Text>
@@ -116,6 +124,23 @@ const NotificationSettingsScreen = ({ navigation }) => {
         </View>
 
       </ScrollView>
+      <OverlayLoader
+        visible={showLoader}
+        message={saving ? 'Saving...' : 'Loading...'}
+        onCancel={() => setShowLoader(false)}
+      />
+      <ActionFeedback
+        visible={feedback.visible}
+        type={feedback.type}
+        message={feedback.message}
+        onHide={() => {
+          setFeedback({ ...feedback, visible: false });
+          if (!saving && feedback.type === 'success') {
+            // Navigate back to notification list after successful save
+            navigation.navigate('Notifications');
+          }
+        }}
+      />
     </View>
   );
 };
@@ -128,8 +153,7 @@ const styles = StyleSheet.create({
   },
   backButton: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: '600', color: '#1C1C1E' },
-  saveButton: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#007AFF', borderRadius: 16 },
-  saveText: { color: '#FFFFFF', fontWeight: '600' },
+  saveIconButton: { paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#007AFF', borderRadius: 18 },
   content: { flex: 1 },
   section: { backgroundColor: '#FFFFFF', padding: 16, marginTop: 12 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },

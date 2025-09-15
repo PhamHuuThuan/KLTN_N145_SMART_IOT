@@ -4,6 +4,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 import apiService from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import OverlayLoader from './OverlayLoader';
+import ActionFeedback from './ActionFeedback';
 
 const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetails, onDeviceAdded }) => {
   const [showPicker, setShowPicker] = useState(false);
@@ -11,6 +13,8 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
   const [newDeviceId, setNewDeviceId] = useState('');
   const [newDeviceName, setNewDeviceName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
   const { user } = useAuth();
 
   return (
@@ -126,6 +130,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                   }
                   try {
                     setSubmitting(true);
+                    setShowLoader(true);
                     const payload = {
                       deviceId: newDeviceId.trim(),
                       ownerId: user.id,
@@ -134,19 +139,20 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                     };
                     const resp = await apiService.post('/api/devices', payload);
                     if (resp?.data?.success) {
-                      Alert.alert('Success', 'Device added successfully');
+                      setFeedback({ visible: true, type: 'success', message: 'Device added successfully' });
                       setShowAddModal(false);
                       setNewDeviceId('');
                       setNewDeviceName('');
                       onSelectDevice && onSelectDevice(payload.deviceId);
                       onDeviceAdded && onDeviceAdded(resp.data.data);
                     } else {
-                      Alert.alert('Failed', resp?.data?.message || 'Could not add device');
+                      setFeedback({ visible: true, type: 'error', message: resp?.data?.message || 'Could not add device' });
                     }
                   } catch (e) {
-                    Alert.alert('Error', e?.message || 'Failed to add device');
+                    setFeedback({ visible: true, type: 'error', message: e?.message || 'Failed to add device' });
                   } finally {
                     setSubmitting(false);
+                    setShowLoader(false);
                   }
                 }}
                 disabled={submitting}
@@ -165,6 +171,22 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
           </View>
         </View>
       </Modal>
+
+      {/* Global overlays */}
+      <OverlayLoader
+        visible={showLoader}
+        message="Adding device..."
+        onCancel={() => {
+          setShowLoader(false);
+          setSubmitting(false);
+        }}
+      />
+      <ActionFeedback
+        visible={feedback.visible}
+        type={feedback.type}
+        message={feedback.message}
+        onHide={() => setFeedback({ ...feedback, visible: false })}
+      />
     </View>
   );
 };
