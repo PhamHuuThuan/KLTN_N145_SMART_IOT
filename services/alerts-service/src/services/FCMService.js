@@ -74,10 +74,13 @@ class FCMService {
           ])
       );
 
+      const imageUrl = typeof data?.imageUrl === 'string' ? data.imageUrl : "https://lh3.googleusercontent.com/pw/AP1GczM7gq9owwwcjM55gVV3gg2g0C4j4nBYCNAguAoItm5XAx4-iRXT64KLF4Gy8B8AFDlmixUuRCPRXwavig0rwsgCcNVsEqd_B-KNC5SNmbeCRFPrW3KKmxVnpp_OGewHdx9INnEiah9E_B6MNBDVYtB2=w444-h444-s-no?authuser=0";
+
       const message = {
         notification: {
           title,
-          body
+          body,
+          ...(imageUrl ? { imageUrl } : {})
         },
         data: {
           ...sanitizedData,
@@ -87,11 +90,12 @@ class FCMService {
         android: {
           priority: 'high',
           notification: {
-            icon: 'ic_notification',
+            // Small icon must be an app resource. Configure in app.json; do not set remote URL here
             color: '#2C3E50',
             sound: 'default',
             clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-            channelId: 'default'
+            channelId: 'default',
+            ...(imageUrl ? { imageUrl } : {})
           }
         },
         apns: {
@@ -108,7 +112,7 @@ class FCMService {
         },
         webpush: {
           notification: {
-            icon: '/icons/icon-192x192.png',
+            ...(imageUrl ? { image: imageUrl } : {}),
             badge: '/icons/badge-72x72.png',
             requireInteraction: true
           }
@@ -173,7 +177,7 @@ class FCMService {
         android: {
           priority: 'high',
           notification: {
-            icon: 'ic_notification',
+            icon: 'https://lh3.googleusercontent.com/pw/AP1GczM7gq9owwwcjM55gVV3gg2g0C4j4nBYCNAguAoItm5XAx4-iRXT64KLF4Gy8B8AFDlmixUuRCPRXwavig0rwsgCcNVsEqd_B-KNC5SNmbeCRFPrW3KKmxVnpp_OGewHdx9INnEiah9E_B6MNBDVYtB2=w444-h444-s-no?authuser=0',
             color: '#2C3E50',
             sound: 'default'
           }
