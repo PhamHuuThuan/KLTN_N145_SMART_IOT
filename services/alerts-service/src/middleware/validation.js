@@ -33,12 +33,12 @@ const notificationSchema = Joi.object({
 const preferencesSchema = Joi.object({
   email: Joi.object({
     enabled: Joi.boolean(),
-    address: Joi.string().email(),
+    address: Joi.string().email().allow(''),
     verified: Joi.boolean()
   }),
   sms: Joi.object({
     enabled: Joi.boolean(),
-    phoneNumber: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/),
+    phoneNumber: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).allow(''),
     verified: Joi.boolean()
   }),
   fcm: Joi.object({
@@ -165,9 +165,14 @@ export const validateNotification = (req, res, next) => {
 };
 
 export const validatePreferences = (req, res, next) => {
-  const { error, value } = preferencesSchema.validate(req.body, { abortEarly: false });
+  const { error, value } = preferencesSchema.validate(req.body, { 
+    abortEarly: false,
+    allowUnknown: true,
+    stripUnknown: true
+  });
   
   if (error) {
+    console.error('Validation error:', error.details);
     return res.status(400).json({
       success: false,
       message: 'Validation error',
