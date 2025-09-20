@@ -77,9 +77,9 @@ const ruleSchema = new mongoose.Schema({
     maxlength: 500
   },
   ownerId: {
-    type: String,
-    required: true,
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
   deviceId: {
     type: String,
