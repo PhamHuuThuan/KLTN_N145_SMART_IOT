@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { notificationService } from '../services/notificationService';
 import OverlayLoader from '../components/OverlayLoader';
 import ActionFeedback from '../components/ActionFeedback';
-import CategoryCard from '../components/CategoryCard';
 import TimePicker from '../components/TimePicker';
 
 const NotificationSettingsScreen = ({ navigation }) => {
@@ -19,15 +18,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
     sms: { enabled: false, phoneNumber: user?.phone || '' },
     fcm: { enabled: true },
     inApp: { enabled: true },
-    categories: {
-      sensor: { enabled: true, methods: { inApp: true, email: true, sms: false, fcm: true } },
-      outlet: { enabled: true, methods: { inApp: true, email: true, sms: false, fcm: true } },
-      rule: { enabled: true, methods: { inApp: true, email: true, sms: false, fcm: true } },
-      system: { enabled: true, methods: { inApp: true, email: true, sms: true, fcm: true } },
-      security: { enabled: true, methods: { inApp: true, email: true, sms: true, fcm: true } },
-      maintenance: { enabled: true, methods: { inApp: true, email: true, sms: false, fcm: true } },
-      marketing: { enabled: false, methods: { inApp: false, email: false, sms: false, fcm: false } }
-    },
     quietHours: {
       enabled: false,
       startTime: '22:00',
@@ -59,15 +49,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
           },
           fcm: { enabled: !!res.data.data.fcm?.enabled },
           inApp: { enabled: !!res.data.data.inApp?.enabled },
-          categories: res.data.data.categories || {
-            sensor: { enabled: true, methods: { inApp: true, email: true, sms: false, fcm: true } },
-            outlet: { enabled: true, methods: { inApp: true, email: true, sms: false, fcm: true } },
-            rule: { enabled: true, methods: { inApp: true, email: true, sms: false, fcm: true } },
-            system: { enabled: true, methods: { inApp: true, email: true, sms: true, fcm: true } },
-            security: { enabled: true, methods: { inApp: true, email: true, sms: true, fcm: true } },
-            maintenance: { enabled: true, methods: { inApp: true, email: true, sms: false, fcm: true } },
-            marketing: { enabled: false, methods: { inApp: false, email: false, sms: false, fcm: false } }
-          },
           quietHours: res.data.data.quietHours || {
             enabled: false,
             startTime: '22:00',
@@ -122,7 +103,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
         },
         fcm: { enabled: prefs.fcm.enabled },
         inApp: { enabled: prefs.inApp.enabled },
-        categories: prefs.categories,
         quietHours: prefs.quietHours
       };
       const res = await notificationService.updatePreferences(user.id, payload);
@@ -245,23 +225,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notification Categories</Text>
-          {Object.entries(prefs.categories).map(([category, config]) => (
-            <CategoryCard
-              key={category}
-              category={category}
-              config={config}
-              onUpdate={(updatedConfig) => setPrefs({
-                ...prefs,
-                categories: {
-                  ...prefs.categories,
-                  [category]: updatedConfig
-                }
-              })}
-            />
-          ))}
-        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quiet Hours</Text>

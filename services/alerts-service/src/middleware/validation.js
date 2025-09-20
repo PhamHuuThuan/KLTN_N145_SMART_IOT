@@ -14,7 +14,6 @@ const notificationSchema = Joi.object({
   title: Joi.string().max(200).required(),
   message: Joi.string().max(1000).required(),
   type: Joi.string().valid('device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion').required(),
-  category: Joi.string().valid('sensor', 'outlet', 'rule', 'system', 'security', 'maintenance', 'marketing').required(),
   priority: Joi.string().valid('low', 'medium', 'high', 'urgent').default('medium'),
   metadata: Joi.object({
     deviceId: Joi.string(),
@@ -24,9 +23,7 @@ const notificationSchema = Joi.object({
     threshold: Joi.number(),
     ruleId: Joi.string(),
     action: Joi.string()
-  }).default({}),
-  scheduledFor: Joi.date().greater('now').optional(),
-  expiresAt: Joi.date().greater('now').optional()
+  }).default({})
 });
 
 // User preferences validation schema
@@ -55,71 +52,6 @@ const preferencesSchema = Joi.object({
   inApp: Joi.object({
     enabled: Joi.boolean()
   }),
-  categories: Joi.object({
-    sensor: Joi.object({
-      enabled: Joi.boolean(),
-      methods: Joi.object({
-        inApp: Joi.boolean(),
-        email: Joi.boolean(),
-        sms: Joi.boolean(),
-        fcm: Joi.boolean()
-      })
-    }),
-    outlet: Joi.object({
-      enabled: Joi.boolean(),
-      methods: Joi.object({
-        inApp: Joi.boolean(),
-        email: Joi.boolean(),
-        sms: Joi.boolean(),
-        fcm: Joi.boolean()
-      })
-    }),
-    rule: Joi.object({
-      enabled: Joi.boolean(),
-      methods: Joi.object({
-        inApp: Joi.boolean(),
-        email: Joi.boolean(),
-        sms: Joi.boolean(),
-        fcm: Joi.boolean()
-      })
-    }),
-    system: Joi.object({
-      enabled: Joi.boolean(),
-      methods: Joi.object({
-        inApp: Joi.boolean(),
-        email: Joi.boolean(),
-        sms: Joi.boolean(),
-        fcm: Joi.boolean()
-      })
-    }),
-    security: Joi.object({
-      enabled: Joi.boolean(),
-      methods: Joi.object({
-        inApp: Joi.boolean(),
-        email: Joi.boolean(),
-        sms: Joi.boolean(),
-        fcm: Joi.boolean()
-      })
-    }),
-    maintenance: Joi.object({
-      enabled: Joi.boolean(),
-      methods: Joi.object({
-        inApp: Joi.boolean(),
-        email: Joi.boolean(),
-        sms: Joi.boolean(),
-        fcm: Joi.boolean()
-      })
-    }),
-    marketing: Joi.object({
-      enabled: Joi.boolean(),
-      methods: Joi.object({
-        inApp: Joi.boolean(),
-        email: Joi.boolean(),
-        sms: Joi.boolean(),
-        fcm: Joi.boolean()
-      })
-    })
-  }),
   quietHours: Joi.object({
     enabled: Joi.boolean(),
     startTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
@@ -131,11 +63,6 @@ const preferencesSchema = Joi.object({
         enabled: Joi.boolean()
       })
     )
-  }),
-  frequency: Joi.object({
-    email: Joi.string().valid('immediate', 'hourly', 'daily', 'weekly'),
-    sms: Joi.string().valid('immediate', 'hourly', 'daily'),
-    fcm: Joi.string().valid('immediate', 'hourly', 'daily')
   })
 });
 
