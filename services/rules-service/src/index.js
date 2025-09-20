@@ -2,10 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-
 import connectDB from './config/database.js';
 import ruleRoutes from './routes/ruleRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import RuleConsumer from './consumers/RuleConsumer.js';
 
 dotenv.config();
 
@@ -33,6 +33,9 @@ async function bootstrap() {
     await connectDB();
     console.log('📦 MongoDB connected to Rules Service');
 
+    const ruleConsumer = new RuleConsumer();
+    await ruleConsumer.start();
+
     const app = createServer();
     const port = process.env.PORT || 3003;
 
@@ -45,6 +48,8 @@ async function bootstrap() {
     const gracefulShutdown = async (signal) => {
       console.log(`\n${signal} received, shutting down gracefully`);
       try {
+        await ruleConsumer.stop();
+        
         server.close(() => {
           console.log('✅ HTTP server closed');
         });

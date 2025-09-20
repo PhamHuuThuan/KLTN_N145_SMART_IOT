@@ -9,7 +9,7 @@ const conditionSchema = new mongoose.Schema({
   },
   sensor: {
     type: String,
-    enum: ['temperature', 'gas_ppm', 'smoke']
+    enum: ['temperature', 'humidity', 'gas_ppm', 'smoke']
   },
   operator: {
     type: String,
@@ -24,7 +24,14 @@ const conditionSchema = new mongoose.Schema({
     days: [{ type: String, enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] }]
   },
   deviceId: String,
-  outletId: String
+  outletId: {
+    type: String,
+    enum: ['o1', 'o2', 'o3', 'o4', 'o5']
+  },
+  deviceStatus: {
+    type: String,
+    enum: ['online', 'offline', 'maintenance', 'error']
+  }
 }, { _id: false });
 
 // Action schema for rule actions
@@ -35,7 +42,14 @@ const actionSchema = new mongoose.Schema({
     enum: ['toggle_outlet', 'send_notification', 'activate_emergency', 'send_alert', 'log_event']
   },
   deviceId: String,
-  outletId: String,
+  outletId: {
+    type: String,
+    enum: ['o1', 'o2', 'o3', 'o4', 'o5']
+  },
+  outletType: {
+    type: String,
+    enum: ['kitchen', 'safety']
+  },
   status: Boolean,
   message: String,
   priority: {
@@ -63,9 +77,9 @@ const ruleSchema = new mongoose.Schema({
     maxlength: 500
   },
   ownerId: {
-    type: String,
-    required: true,
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
   deviceId: {
     type: String,

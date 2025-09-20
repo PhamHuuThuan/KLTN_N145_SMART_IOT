@@ -195,7 +195,7 @@ class EmailService {
               <div class="device-info">
                 <h3>Thông tin thiết bị</h3>
                 <p><strong>Tên thiết bị:</strong> ${deviceName}</p>
-                ${deviceId ? `<p><strong>ID thiết bị:</strong> ${metadata.deviceId}</p>` : ''}
+                ${metadata.deviceId ? `<p><strong>ID thiết bị:</strong> ${metadata.deviceId}</p>` : ''}
               </div>
             ` : ''}
             

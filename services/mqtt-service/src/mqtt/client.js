@@ -120,10 +120,15 @@ function startMqtt() {
         mqttEvents.emit('sensorData', deviceData);
         mqttEvents.emit('deviceData', { deviceId, data: deviceData });
 
+        // Get device info to get ownerId
+        const deviceInfo = await deviceService.getDevice(deviceId);
+        const ownerId = deviceInfo?.ownerId; // Fallback to known ownerId
+
         // Publish to Kafka 
         const telemetryData = {
           type: 'telemetry',
           deviceId: deviceId,
+          ownerId: ownerId, // Add ownerId here
           topic,
           payload: {
             ts: Date.now(),
