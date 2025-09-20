@@ -225,13 +225,30 @@ class NotificationController {
     try {
       const { userId } = req.params;
       
-      const preferences = await UserNotificationPreferences.getUserPreferences(userId);
+      let preferences = await UserNotificationPreferences.getUserPreferences(userId);
       
+      // Create default preferences if not found
       if (!preferences) {
-        return res.status(404).json({
-          success: false,
-          message: 'User preferences not found'
+        logger.info(`Creating default preferences for user ${userId}`);
+        preferences = new UserNotificationPreferences({
+          userId,
+          email: { enabled: true, address: '', verified: false },
+          sms: { enabled: false, phoneNumber: '', verified: false },
+          fcm: { enabled: true, tokens: [] },
+          inApp: { enabled: true },
+          quietHours: {
+            enabled: false,
+            startTime: '22:00',
+            endTime: '08:00',
+            timezone: 'UTC',
+            exceptions: [
+              { type: 'urgent', enabled: true },
+              { type: 'security', enabled: true },
+              { type: 'system', enabled: true }
+            ]
+          }
         });
+        await preferences.save();
       }
       
       res.status(200).json({
@@ -285,6 +302,9 @@ class NotificationController {
       const { userId } = req.params;
       const { token, platform } = req.body;
       
+      logger.info(`FCM token request for user ${userId}:`, { token: token?.substring(0, 20) + '...', platform });
+      logger.info('Request user from JWT:', req.user);
+      
       if (!token || !platform) {
         return res.status(400).json({
           success: false,
@@ -292,12 +312,30 @@ class NotificationController {
         });
       }
       
-      const preferences = await UserNotificationPreferences.findOne({ userId });
+      let preferences = await UserNotificationPreferences.findOne({ userId });
+      
+      // Create default preferences if not found
       if (!preferences) {
-        return res.status(404).json({
-          success: false,
-          message: 'User preferences not found'
+        logger.info(`Creating default preferences for user ${userId}`);
+        preferences = new UserNotificationPreferences({
+          userId,
+          email: { enabled: true, address: '', verified: false },
+          sms: { enabled: false, phoneNumber: '', verified: false },
+          fcm: { enabled: true, tokens: [] },
+          inApp: { enabled: true },
+          quietHours: {
+            enabled: false,
+            startTime: '22:00',
+            endTime: '08:00',
+            timezone: 'UTC',
+            exceptions: [
+              { type: 'urgent', enabled: true },
+              { type: 'security', enabled: true },
+              { type: 'system', enabled: true }
+            ]
+          }
         });
+        await preferences.save();
       }
       
       await preferences.addFCMToken(token, platform);

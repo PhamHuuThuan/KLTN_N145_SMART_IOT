@@ -33,20 +33,111 @@ export const register = async (req, res) => {
     (async () => {
       try {
         const alertsBaseUrl = process.env.ALERTS_SERVICE_URL || 'http://localhost:3004';
+        
+        // Create service-to-service token for internal communication
+        const serviceToken = signToken({ 
+          sub: user._id.toString(), 
+          email: email,
+          role: 'service',
+          service: 'auth-service'
+        });
+        
         const client = axios.create({
           baseURL: `${alertsBaseUrl}/api/notifications`,
-          timeout: 3000,
-          headers: { 'Content-Type': 'application/json' }
+          timeout: 10000,
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceToken}`
+          }
         });
-        await client.put(`/user/${user._id.toString()}/preferences`, {
-          // Create defaults if not exist, keep minimal fields
-          email: { enabled: true, address: email },
-          inApp: { enabled: true },
-          fcm: { enabled: true }
+        
+        // Try to create default preferences
+        const response = await client.put(`/user/${user._id.toString()}/preferences`, {
+          email: { 
+            enabled: true, 
+            address: email,
+            verified: false
+          },
+          sms: { 
+            enabled: false, 
+            phoneNumber: '',
+            verified: false
+          },
+          fcm: { 
+            enabled: true,
+            tokens: []
+          },
+          inApp: { 
+            enabled: true 
+          },
+          quietHours: {
+            enabled: false,
+            startTime: '22:00',
+            endTime: '08:00',
+            timezone: 'UTC',
+            exceptions: [
+              { type: 'urgent', enabled: true },
+              { type: 'security', enabled: true },
+              { type: 'system', enabled: true }
+            ]
+          }
         });
+        
+        console.log('✅ UserNotificationPreferences created for user:', user._id.toString(), 'Response:', response.status);
       } catch (e) {
         // Log only, do not block registration
-        console.warn('init_notifications_failed', e?.message || e);
+        console.warn('❌ Failed to initialize notification preferences:', e?.message || e);
+        console.warn('❌ Error details:', {
+          status: e.response?.status,
+          data: e.response?.data,
+          url: e.config?.url,
+          headers: e.config?.headers
+        });
+        
+        // Retry after 2 seconds
+        setTimeout(async () => {
+          try {
+            console.log('🔄 Retrying to create notification preferences...');
+            const alertsBaseUrl = process.env.ALERTS_SERVICE_URL || 'http://localhost:3004';
+            const serviceToken = signToken({ 
+              sub: user._id.toString(), 
+              email: email,
+              role: 'service',
+              service: 'auth-service'
+            });
+            
+            const retryClient = axios.create({
+              baseURL: `${alertsBaseUrl}/api/notifications`,
+              timeout: 10000,
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${serviceToken}`
+              }
+            });
+            
+            await retryClient.put(`/user/${user._id.toString()}/preferences`, {
+              email: { enabled: true, address: email, verified: false },
+              sms: { enabled: false, phoneNumber: '', verified: false },
+              fcm: { enabled: true, tokens: [] },
+              inApp: { enabled: true },
+              quietHours: {
+                enabled: false,
+                startTime: '22:00',
+                endTime: '08:00',
+                timezone: 'UTC',
+                exceptions: [
+                  { type: 'urgent', enabled: true },
+                  { type: 'security', enabled: true },
+                  { type: 'system', enabled: true }
+                ]
+              }
+            });
+            
+            console.log('✅ UserNotificationPreferences created on retry for user:', user._id.toString());
+          } catch (retryError) {
+            console.error('❌ Retry failed to create notification preferences:', retryError?.message || retryError);
+          }
+        }, 2000);
       }
     })();
 
@@ -54,7 +145,7 @@ export const register = async (req, res) => {
       token,
       user: {
         id: user._id,
-        email,
+        email: user.email,
         name: user.name,
         phone: user.phone,
         avatar: user.avatar,
@@ -90,7 +181,7 @@ export const login = async (req, res) => {
       token,
       user: {
         id: user._id,
-        email,
+        email: user.email, // Use user.email instead of email parameter
         name: user.name,
         phone: user.phone,
         avatar: user.avatar,

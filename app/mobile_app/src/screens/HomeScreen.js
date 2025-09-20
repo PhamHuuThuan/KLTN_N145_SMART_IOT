@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   View,
-  Alert,
 } from 'react-native';
 import { useDeviceData } from '../hooks/useDeviceData';
 import { useOutletControl } from '../hooks/useOutletControl';
@@ -16,6 +15,7 @@ import DeviceSelector from '../components/DeviceSelector';
 import SensorGrid from '../components/SensorGrid';
 import OutletGrid from '../components/OutletGrid';
 import DeviceInfoModal from '../components/DeviceInfoModal';
+import ActionFeedback from '../components/ActionFeedback';
 import apiService from '../services/apiService';
 import CONFIG from '../constants/config';
 
@@ -34,6 +34,7 @@ const HomeScreen = ({ navigation }) => {
   } = useDeviceData();
 
   const [showDeviceInfo, setShowDeviceInfo] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
 
   const { controlOutlet, loading: controlLoading } = useOutletControl();
 
@@ -81,7 +82,7 @@ const HomeScreen = ({ navigation }) => {
               await fetchDeviceStatus(selectedDevice);
             } catch (error) {
               console.error('Error updating outlet settings:', error);
-              Alert.alert('Error', error.message);
+              setFeedback({ visible: true, type: 'error', message: error.message || 'Failed to update outlet settings' });
             }
           }}
           loading={controlLoading}
@@ -108,6 +109,13 @@ const HomeScreen = ({ navigation }) => {
           </View>
         )}
       </ScrollView>
+      
+      <ActionFeedback
+        visible={feedback.visible}
+        type={feedback.type}
+        message={feedback.message}
+        onHide={() => setFeedback({ ...feedback, visible: false })}
+      />
     </SafeAreaView>
   );
 };

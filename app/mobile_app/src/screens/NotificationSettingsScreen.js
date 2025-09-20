@@ -107,7 +107,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
       };
       const res = await notificationService.updatePreferences(user.id, payload);
       if (res.success) {
-        setFeedback({ visible: true, type: 'success', message: 'Notification preferences saved successfully' });
+        setFeedback({ visible: true, type: 'success', message: 'Notification preferences saved successfully!' });
       } else {
         setFeedback({ visible: true, type: 'error', message: res.message || 'Failed to save preferences' });
       }
@@ -333,10 +333,11 @@ const NotificationSettingsScreen = ({ navigation }) => {
         visible={feedback.visible}
         type={feedback.type}
         message={feedback.message}
+        duration={feedback.type === 'success' ? 2000 : 4000}
         onHide={() => {
           setFeedback({ ...feedback, visible: false });
-          if (!saving && feedback.type === 'success') {
-            // Navigate back to notification list after successful save
+          // Navigate back to notification list after successful save
+          if (feedback.type === 'success') {
             navigation.navigate('Notifications');
           }
         }}

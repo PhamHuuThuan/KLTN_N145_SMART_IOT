@@ -12,18 +12,32 @@ const ICONS = {
   error: 'close-circle-outline',
 };
 
-const ActionFeedback = ({ type = 'success', message = 'Done', visible, onHide, duration = 1800 }) => {
+const ActionFeedback = ({ type = 'success', message = 'Done', visible, onHide, duration = 3000 }) => {
   const [opacity] = useState(new Animated.Value(0));
+  const [translateY] = useState(new Animated.Value(-50));
 
   useEffect(() => {
     let timer;
     if (visible) {
-      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      // Animate in from top
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 300, useNativeDriver: true })
+      ]).start();
+      
       timer = setTimeout(() => {
-        Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        // Animate out to top
+        Animated.parallel([
+          Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+          Animated.timing(translateY, { toValue: -50, duration: 300, useNativeDriver: true })
+        ]).start(() => {
           onHide && onHide();
         });
       }, duration);
+    } else {
+      // Reset position when not visible
+      opacity.setValue(0);
+      translateY.setValue(-50);
     }
     return () => timer && clearTimeout(timer);
   }, [visible, duration]);
@@ -31,7 +45,13 @@ const ActionFeedback = ({ type = 'success', message = 'Done', visible, onHide, d
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.container, { opacity }]}> 
+    <Animated.View style={[
+      styles.container, 
+      { 
+        opacity,
+        transform: [{ translateY }]
+      }
+    ]}> 
       <View style={[styles.card, { borderLeftColor: COLORS[type] }]}> 
         <Ionicons name={ICONS[type]} size={22} color={COLORS[type]} />
         <Text style={styles.text}>{message}</Text>
@@ -45,8 +65,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 24,
+    top: 60, // Show at top of screen instead of bottom
     alignItems: 'center',
+    zIndex: 1000, // Ensure it's above other content
   },
   card: {
     flexDirection: 'row',
