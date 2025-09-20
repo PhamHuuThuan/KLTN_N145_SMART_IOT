@@ -11,22 +11,23 @@ import {
   exitEmergencyMode,
   getDeviceStatus
 } from '../controllers/deviceController.js';
+import { authenticateToken, checkDeviceOwnership } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Device management routes
-router.get('/', getAllDevices);
-router.get('/status', getAllDevices); // General status endpoint
-router.get('/:deviceId', getDeviceById);
-router.post('/', createDevice);
-router.put('/:deviceId', updateDevice);
-router.delete('/:deviceId', deleteDevice);
+// Device management routes - all require authentication
+router.get('/', authenticateToken, getAllDevices);
+router.get('/status', authenticateToken, getAllDevices); // General status endpoint
+router.get('/:deviceId', authenticateToken, checkDeviceOwnership, getDeviceById);
+router.post('/', authenticateToken, createDevice);
+router.put('/:deviceId', authenticateToken, checkDeviceOwnership, updateDevice);
+router.delete('/:deviceId', authenticateToken, checkDeviceOwnership, deleteDevice);
 
-// Device control routes
-router.get('/:deviceId/status', getDeviceStatus);
-router.put('/:deviceId/outlets/:outletId/toggle', toggleOutlet);
-router.put('/:deviceId/outlets/:outletId', updateOutletSettings);
-router.put('/:deviceId/emergency/enter', enterEmergencyMode);
-router.put('/:deviceId/emergency/exit', exitEmergencyMode);
+// Device control routes - all require authentication and ownership check
+router.get('/:deviceId/status', authenticateToken, checkDeviceOwnership, getDeviceStatus);
+router.put('/:deviceId/outlets/:outletId/toggle', authenticateToken, checkDeviceOwnership, toggleOutlet);
+router.put('/:deviceId/outlets/:outletId', authenticateToken, checkDeviceOwnership, updateOutletSettings);
+router.put('/:deviceId/emergency/enter', authenticateToken, checkDeviceOwnership, enterEmergencyMode);
+router.put('/:deviceId/emergency/exit', authenticateToken, checkDeviceOwnership, exitEmergencyMode);
 
 export default router;

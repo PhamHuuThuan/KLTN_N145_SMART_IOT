@@ -1,14 +1,39 @@
 import Device from '../models/Device.js';
 import DeviceLog from '../models/DeviceLog.js';
 import { producer } from '../config/kafka.js';
+import logger from '../utils/logger.js';
 
-// Get all devices
+// Helper function to check device ownership
+const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
+  const device = await Device.findOne({ deviceId });
+  if (!device) {
+    return { success: false, message: 'Device not found', device: null };
+  }
+  
+  if (!isAdmin && device.ownerId !== userId) {
+    return { success: false, message: 'Access denied: You can only access your own devices', device: null };
+  }
+  
+  return { success: true, device };
+};
+
+// Get all devices for the authenticated user
 export const getAllDevices = async (req, res) => {
   try {
-    const { ownerId, status, limit = 50, page = 1 } = req.query;
+    const userId = req.user.sub || req.user.userId || req.user.id;
+    const { status, limit = 50, page = 1 } = req.query;
     
+    logger.info(`Getting devices for user ${userId}`);
+    
+    // Only get devices owned by the authenticated user (unless admin)
     let query = {};
-    if (ownerId) query.ownerId = ownerId;
+    if (req.user.role !== 'admin') {
+      query.ownerId = userId;
+    } else if (req.query.ownerId) {
+      // Admin can filter by ownerId
+      query.ownerId = req.query.ownerId;
+    }
+    
     if (status) query.status = status;
     
     const devices = await Device.find(query)
@@ -17,6 +42,8 @@ export const getAllDevices = async (req, res) => {
       .sort({ createdAt: -1 });
     
     const total = await Device.countDocuments(query);
+    
+    logger.info(`Found ${devices.length} devices for user ${userId}`);
     
     res.json({
       success: true,
@@ -29,6 +56,7 @@ export const getAllDevices = async (req, res) => {
       }
     });
   } catch (error) {
+    logger.error('Error fetching devices:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching devices',
@@ -41,6 +69,9 @@ export const getAllDevices = async (req, res) => {
 export const getDeviceById = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user.sub || req.user.userId || req.user.id;
+    
+    logger.info(`Getting device ${deviceId} for user ${userId}`);
     
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -50,11 +81,23 @@ export const getDeviceById = async (req, res) => {
       });
     }
     
+    // Check ownership (unless admin)
+    if (req.user.role !== 'admin' && device.ownerId !== userId) {
+      logger.warn(`Access denied: User ${userId} trying to access device ${deviceId} owned by ${device.ownerId}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You can only access your own devices'
+      });
+    }
+    
+    logger.info(`Device ${deviceId} access granted for user ${userId}`);
+    
     res.json({
       success: true,
       data: device
     });
   } catch (error) {
+    logger.error('Error fetching device:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching device',
@@ -66,12 +109,14 @@ export const getDeviceById = async (req, res) => {
 // Create new device
 export const createDevice = async (req, res) => {
   try {
+    const userId = req.user.sub || req.user.userId || req.user.id;
     const {
       deviceId,
-      ownerId,
       name,
       outlets
     } = req.body;
+    
+    logger.info(`Creating device ${deviceId} for user ${userId}`);
     
     // Check if device already exists
     const existingDevice = await Device.findOne({ deviceId });
@@ -93,7 +138,7 @@ export const createDevice = async (req, res) => {
     
     const device = new Device({
       deviceId,
-      ownerId,
+      ownerId: userId, // Set ownerId from JWT token
       name,
       outlets: defaultOutlets
     });
@@ -178,6 +223,19 @@ export const updateDevice = async (req, res) => {
 export const deleteDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user.sub || req.user.userId || req.user.id;
+    const isAdmin = req.user.role === 'admin';
+    
+    logger.info(`Deleting device ${deviceId} for user ${userId}`);
+    
+    // Check ownership first
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
+        success: false,
+        message: ownershipCheck.message
+      });
+    }
     
     const device = await Device.findOneAndDelete({ deviceId });
     if (!device) {

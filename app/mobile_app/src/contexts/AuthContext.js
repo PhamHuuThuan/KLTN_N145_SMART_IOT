@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService';
 import { notificationService } from '../services/notificationService';
+import { setAuthToken, clearAuthToken } from '../services/apiService';
 import * as Notifications from 'expo-notifications';
 
 const AuthContext = createContext();
@@ -66,8 +67,9 @@ export const AuthProvider = ({ children }) => {
         setUser(profile?.success && profile.user ? profile.user : result.user);
         setIsAuthenticated(true);
         setToken(result.token);
-        // Set token for notification service
+        // Set token for all services
         notificationService.setAuthToken(result.token);
+        setAuthToken(result.token);
         
         // Register FCM token after successful login
         try {
@@ -98,8 +100,9 @@ export const AuthProvider = ({ children }) => {
         setUser(profile?.success && profile.user ? profile.user : result.user);
         setIsAuthenticated(true);
         setToken(result.token);
-        // Set token for notification service
+        // Set token for all services
         notificationService.setAuthToken(result.token);
+        setAuthToken(result.token);
         
         // Register FCM token after successful registration
         try {
@@ -127,8 +130,9 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       setToken(null);
-      // Clear token for notification service
+      // Clear token for all services
       notificationService.clearAuthToken();
+      clearAuthToken();
       return { success: true };
     } catch (error) {
       return { success: false, error: 'Logout failed' };
