@@ -1,4 +1,5 @@
 import Rule from '../models/Rule.js';
+import mongoose from 'mongoose';
 
 // Get all rules for a user
 export const getAllRules = async (req, res) => {
@@ -6,7 +7,11 @@ export const getAllRules = async (req, res) => {
     const { ownerId, deviceId, category, isActive, limit = 50, page = 1 } = req.query;
     
     let query = {};
-    if (ownerId) query.ownerId = ownerId;
+    if (ownerId) {
+      query.ownerId = mongoose.Types.ObjectId.isValid(ownerId)
+        ? new mongoose.Types.ObjectId(ownerId)
+        : ownerId;
+    }
     if (deviceId) query.deviceId = deviceId;
     if (category) query.category = category;
     if (isActive !== undefined) query.isActive = isActive === 'true';
@@ -329,7 +334,9 @@ export const getRulesByDevice = async (req, res) => {
 
     const query = { deviceId };
     if (ownerId) {
-      query.ownerId = ownerId;
+      query.ownerId = mongoose.Types.ObjectId.isValid(ownerId)
+        ? new mongoose.Types.ObjectId(ownerId)
+        : ownerId;
     }
     if (isActive !== undefined) {
       query.isActive = isActive === 'true';
@@ -358,7 +365,9 @@ export const getRulesByOwner = async (req, res) => {
     const { ownerId } = req.params;
     const { deviceId, category, isActive, page = 1, limit = 10 } = req.query;
 
-    const query = { ownerId };
+    const query = { ownerId: mongoose.Types.ObjectId.isValid(ownerId)
+      ? new mongoose.Types.ObjectId(ownerId)
+      : ownerId };
     if (deviceId) query.deviceId = deviceId;
     if (category) query.category = category;
     if (isActive !== undefined) query.isActive = isActive === 'true';
@@ -469,51 +478,13 @@ export const createBulkRules = async (req, res) => {
   }
 };
 
-// Simulate sensor data
-export const simulateSensorData = async (req, res) => {
-  try {
-    const { deviceId, sensorData } = req.body;
-    
-    if (!deviceId || !sensorData) {
-      return res.status(400).json({
-        success: false,
-        message: 'deviceId and sensorData are required'
-      });
-    }
-
-    // Import RuleEvaluationService dynamically to avoid circular dependency
-    const { default: RuleEvaluationService } = await import('../services/RuleEvaluationService.js');
-    const ruleEvaluationService = new RuleEvaluationService();
-
-    // Evaluate all rules for this device
-    await ruleEvaluationService.evaluateRules(deviceId, sensorData);
-
-    res.json({
-      success: true,
-      message: 'Sensor data processed and rules evaluated',
-      data: {
-        deviceId,
-        sensorData,
-        timestamp: new Date().toISOString()
-      }
-    });
-  } catch (error) {
-    console.error('Error simulating sensor data:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error processing sensor data',
-      error: error.message
-    });
-  }
-};
-
 // Get rule statistics
 export const getRuleStats = async (req, res) => {
   try {
     const { ownerId } = req.params;
 
     const stats = await Rule.aggregate([
-      { $match: { ownerId: ownerId } },
+      { $match: { ownerId: mongoose.Types.ObjectId.isValid(ownerId) ? new mongoose.Types.ObjectId(ownerId) : ownerId } },
       {
         $group: {
           _id: null,
@@ -525,7 +496,7 @@ export const getRuleStats = async (req, res) => {
     ]);
 
     const categoryStats = await Rule.aggregate([
-      { $match: { ownerId: ownerId } },
+      { $match: { ownerId: mongoose.Types.ObjectId.isValid(ownerId) ? new mongoose.Types.ObjectId(ownerId) : ownerId } },
       {
         $group: {
           _id: '$category',
@@ -547,54 +518,6 @@ export const getRuleStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error getting rule statistics',
-      error: error.message
-    });
-  }
-};
-
-// Test rule evaluation with sample data
-export const testRuleEvaluation = async (req, res) => {
-  try {
-    const { ruleId, sensorData } = req.body;
-    
-    if (!ruleId || !sensorData) {
-      return res.status(400).json({
-        success: false,
-        message: 'ruleId and sensorData are required'
-      });
-    }
-
-    const rule = await Rule.findById(ruleId);
-    if (!rule) {
-      return res.status(404).json({
-        success: false,
-        message: 'Rule not found'
-      });
-    }
-
-    // Import RuleEvaluationService dynamically to avoid circular dependency
-    const { default: RuleEvaluationService } = await import('../services/RuleEvaluationService.js');
-    const ruleEvaluationService = new RuleEvaluationService();
-
-    // Test rule evaluation
-    await ruleEvaluationService.evaluateRule(rule, sensorData);
-
-    res.json({
-      success: true,
-      message: 'Rule evaluation completed',
-      data: {
-        ruleId: rule._id,
-        ruleName: rule.name,
-        sensorData,
-        conditions: rule.conditions,
-        actions: rule.actions
-      }
-    });
-  } catch (error) {
-    console.error('Error testing rule evaluation:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error testing rule evaluation',
       error: error.message
     });
   }
