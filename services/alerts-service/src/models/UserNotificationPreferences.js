@@ -34,71 +34,6 @@ const userNotificationPreferencesSchema = new mongoose.Schema({
   inApp: {
     enabled: { type: Boolean, default: true }
   },
-  categories: {
-    sensor: {
-      enabled: { type: Boolean, default: true },
-      methods: {
-        inApp: { type: Boolean, default: true },
-        email: { type: Boolean, default: true },
-        sms: { type: Boolean, default: false },
-        fcm: { type: Boolean, default: true }
-      }
-    },
-    outlet: {
-      enabled: { type: Boolean, default: true },
-      methods: {
-        inApp: { type: Boolean, default: true },
-        email: { type: Boolean, default: true },
-        sms: { type: Boolean, default: false },
-        fcm: { type: Boolean, default: true }
-      }
-    },
-    rule: {
-      enabled: { type: Boolean, default: true },
-      methods: {
-        inApp: { type: Boolean, default: true },
-        email: { type: Boolean, default: true },
-        sms: { type: Boolean, default: false },
-        fcm: { type: Boolean, default: true }
-      }
-    },
-    system: {
-      enabled: { type: Boolean, default: true },
-      methods: {
-        inApp: { type: Boolean, default: true },
-        email: { type: Boolean, default: true },
-        sms: { type: Boolean, default: true },
-        fcm: { type: Boolean, default: true }
-      }
-    },
-    security: {
-      enabled: { type: Boolean, default: true },
-      methods: {
-        inApp: { type: Boolean, default: true },
-        email: { type: Boolean, default: true },
-        sms: { type: Boolean, default: true },
-        fcm: { type: Boolean, default: true }
-      }
-    },
-    maintenance: {
-      enabled: { type: Boolean, default: true },
-      methods: {
-        inApp: { type: Boolean, default: true },
-        email: { type: Boolean, default: true },
-        sms: { type: Boolean, default: false },
-        fcm: { type: Boolean, default: true }
-      }
-    },
-    marketing: {
-      enabled: { type: Boolean, default: false },
-      methods: {
-        inApp: { type: Boolean, default: true },
-        email: { type: Boolean, default: false },
-        sms: { type: Boolean, default: false },
-        fcm: { type: Boolean, default: false }
-      }
-    }
-  },
   quietHours: {
     enabled: { type: Boolean, default: false },
     startTime: { type: String, default: '22:00' }, // HH:MM format
@@ -108,11 +43,6 @@ const userNotificationPreferencesSchema = new mongoose.Schema({
       type: { type: String, enum: ['urgent', 'security', 'system'] },
       enabled: { type: Boolean, default: true }
     }]
-  },
-  frequency: {
-    email: { type: String, enum: ['immediate', 'hourly', 'daily', 'weekly'], default: 'immediate' },
-    sms: { type: String, enum: ['immediate', 'hourly', 'daily'], default: 'immediate' },
-    fcm: { type: String, enum: ['immediate', 'hourly', 'daily'], default: 'immediate' }
   }
 }, {
   timestamps: true,
@@ -121,14 +51,18 @@ const userNotificationPreferencesSchema = new mongoose.Schema({
 });
 
 // Method to check if notification should be sent via specific method
-userNotificationPreferencesSchema.methods.shouldSendNotification = function(category, method, priority = 'medium') {
-  const categoryConfig = this.categories[category];
-  if (!categoryConfig || !categoryConfig.enabled) {
+userNotificationPreferencesSchema.methods.shouldSendNotification = function(method, priority = 'medium') {
+  // Check if method is enabled
+  if (method === 'email' && !this.email.enabled) {
     return false;
   }
-
-  // Check if method is enabled for this category
-  if (!categoryConfig.methods[method]) {
+  if (method === 'sms' && !this.sms.enabled) {
+    return false;
+  }
+  if (method === 'fcm' && !this.fcm.enabled) {
+    return false;
+  }
+  if (method === 'inApp' && !this.inApp.enabled) {
     return false;
   }
 

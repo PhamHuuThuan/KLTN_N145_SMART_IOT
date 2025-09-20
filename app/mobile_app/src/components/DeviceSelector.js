@@ -46,7 +46,21 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
           </TouchableOpacity>
         </View>
       ) : (
-        <Text style={styles.noDevicesText}>No devices connected</Text>
+        <View style={styles.emptyState}>
+          <MaterialCommunityIcons name="devices" size={48} color={CONFIG.COLORS.gray} />
+          <Text style={styles.emptyStateTitle}>No Devices Connected</Text>
+          <Text style={styles.emptyStateSubtitle}>
+            Add your first smart kitchen device to get started
+          </Text>
+          <TouchableOpacity
+            style={styles.emptyStateButton}
+            onPress={() => setShowAddModal(true)}
+            activeOpacity={0.9}
+          >
+            <MaterialCommunityIcons name="plus" size={20} color={CONFIG.THEME.surface} />
+            <Text style={styles.emptyStateButtonText}>Add Device</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       <Modal
@@ -101,55 +115,97 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                 <MaterialCommunityIcons name="close" size={20} color={CONFIG.COLORS.gray} />
               </TouchableOpacity>
             </View>
-            <View style={{ gap: 10, paddingHorizontal: 4, paddingBottom: 8 }}>
-              <Text style={styles.inputLabel}>Device ID / Pairing Code</Text>
+            <View style={styles.modalContent}>
+              <Text style={styles.inputLabel}>Device ID / Pairing Code *</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Enter deviceId"
+                placeholder="e.g., KITCHEN-ESP32-001"
                 autoCapitalize="none"
+                autoCorrect={false}
                 value={newDeviceId}
                 onChangeText={setNewDeviceId}
+                maxLength={50}
               />
-              <Text style={styles.inputLabel}>Name (optional)</Text>
+              <Text style={styles.inputHint}>
+                Enter the unique identifier for your device
+              </Text>
+              
+              <Text style={styles.inputLabel}>Device Name (optional)</Text>
               <TextInput
                 style={styles.textInput}
                 placeholder="My Kitchen Controller"
                 value={newDeviceName}
                 onChangeText={setNewDeviceName}
+                maxLength={50}
               />
+              <Text style={styles.inputHint}>
+                Give your device a friendly name
+              </Text>
               <TouchableOpacity
                 style={[styles.addConfirmButton, submitting && { opacity: 0.7 }]}
                 onPress={async () => {
                   if (!newDeviceId?.trim()) {
-                    Alert.alert('Validation', 'Please enter a deviceId');
+                    Alert.alert('Validation Error', 'Please enter a device ID');
                     return;
                   }
+                  
+                  if (newDeviceId.trim().length < 3) {
+                    Alert.alert('Validation Error', 'Device ID must be at least 3 characters long');
+                    return;
+                  }
+                  
                   if (!user?.id) {
-                    Alert.alert('Not logged in', 'Please login to add devices');
+                    Alert.alert('Authentication Required', 'Please login to add devices');
                     return;
                   }
+                  
                   try {
                     setSubmitting(true);
                     setShowLoader(true);
+                    
                     const payload = {
                       deviceId: newDeviceId.trim(),
                       ownerId: user.id,
-                      name: (newDeviceName || newDeviceId).trim(),
-                      location: { room: 'kitchen', floor: '1' }
+                      name: (newDeviceName || newDeviceId).trim()
                     };
+                    
                     const resp = await apiService.post('/api/devices', payload);
+                    
                     if (resp?.data?.success) {
-                      setFeedback({ visible: true, type: 'success', message: 'Device added successfully' });
+                      setFeedback({ 
+                        visible: true, 
+                        type: 'success', 
+                        message: 'Device added successfully!' 
+                      });
                       setShowAddModal(false);
                       setNewDeviceId('');
                       setNewDeviceName('');
                       onSelectDevice && onSelectDevice(payload.deviceId);
                       onDeviceAdded && onDeviceAdded(resp.data.data);
                     } else {
-                      setFeedback({ visible: true, type: 'error', message: resp?.data?.message || 'Could not add device' });
+                      setFeedback({ 
+                        visible: true, 
+                        type: 'error', 
+                        message: resp?.data?.message || 'Could not add device' 
+                      });
                     }
                   } catch (e) {
-                    setFeedback({ visible: true, type: 'error', message: e?.message || 'Failed to add device' });
+                    console.error('Add device error:', e);
+                    let errorMessage = 'Failed to add device';
+                    
+                    if (e.response?.status === 400) {
+                      errorMessage = 'Invalid device ID or device already exists';
+                    } else if (e.response?.status === 401) {
+                      errorMessage = 'Authentication failed. Please login again';
+                    } else if (e.response?.status === 500) {
+                      errorMessage = 'Server error. Please try again later';
+                    }
+                    
+                    setFeedback({ 
+                      visible: true, 
+                      type: 'error', 
+                      message: errorMessage 
+                    });
                   } finally {
                     setSubmitting(false);
                     setShowLoader(false);
@@ -253,8 +309,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: CONFIG.COLORS.dark,
+    marginBottom: 6,
+  },
+  inputHint: {
     fontSize: 12,
     color: CONFIG.COLORS.gray,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  modalContent: {
+    gap: 8,
+    paddingHorizontal: 4,
+    paddingBottom: 8,
   },
   textInput: {
     borderWidth: 1,
@@ -280,11 +349,44 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
-  noDevicesText: {
-    fontSize: 16,
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: CONFIG.COLORS.dark,
+    marginTop: 12,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateSubtitle: {
+    fontSize: 14,
     color: CONFIG.COLORS.gray,
     textAlign: 'center',
-    fontStyle: 'italic',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  emptyStateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: CONFIG.THEME.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  emptyStateButtonText: {
+    color: CONFIG.THEME.surface,
+    fontWeight: '700',
+    fontSize: 16,
   },
   modalOverlay: {
     flex: 1,

@@ -117,7 +117,7 @@ class NotificationService {
     for (const channel of channels) {
       try {
         console.log(`🔍 Checking channel ${channel} for category ${category}, priority ${priority}`);
-        if (preferences.shouldSendNotification(category, channel, priority)) {
+        if (preferences.shouldSendNotification(channel, priority)) {
           console.log(`📤 Sending notification through ${channel}`);
           await this._sendThroughChannel(notification, preferences, channel);
           console.log(`✅ Notification sent through ${channel}`);

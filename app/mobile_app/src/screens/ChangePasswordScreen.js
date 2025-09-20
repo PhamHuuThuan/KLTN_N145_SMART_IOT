@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import CONFIG from '../constants/config';
 import { useAuth } from '../contexts/AuthContext';
+import ActionFeedback from '../components/ActionFeedback';
 
 const ChangePasswordScreen = ({ navigation }) => {
   const { changePassword, isLoading } = useAuth();
@@ -11,23 +12,24 @@ const ChangePasswordScreen = ({ navigation }) => {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
 
   const onSubmit = async () => {
     if (passwords.newPassword !== passwords.confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
+      setFeedback({ visible: true, type: 'error', message: 'New passwords do not match' });
       return;
     }
     if (passwords.newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      setFeedback({ visible: true, type: 'error', message: 'Password must be at least 6 characters' });
       return;
     }
     const result = await changePassword(passwords.currentPassword, passwords.newPassword);
     if (result.success) {
-      Alert.alert('Success', 'Password changed successfully');
+      setFeedback({ visible: true, type: 'success', message: 'Password changed successfully!' });
       setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowCurrent(false); setShowNew(false); setShowConfirm(false);
     } else {
-      Alert.alert('Error', result.error || 'Failed to change password');
+      setFeedback({ visible: true, type: 'error', message: result.error || 'Failed to change password' });
     }
   };
 

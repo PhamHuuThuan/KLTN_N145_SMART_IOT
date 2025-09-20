@@ -27,11 +27,6 @@ const notificationSchema = new mongoose.Schema({
     enum: ['low', 'medium', 'high', 'urgent'],
     default: 'medium'
   },
-  category: {
-    type: String,
-    enum: ['sensor', 'outlet', 'rule', 'system', 'security', 'maintenance', 'marketing'],
-    required: true
-  },
   isRead: {
     type: Boolean,
     default: false
@@ -69,14 +64,6 @@ const notificationSchema = new mongoose.Schema({
     threshold: { type: Number },
     ruleId: { type: String },
     action: { type: String }
-  },
-  scheduledFor: {
-    type: Date,
-    default: null
-  },
-  expiresAt: {
-    type: Date,
-    default: null
   }
 }, {
   timestamps: true,
@@ -88,8 +75,6 @@ const notificationSchema = new mongoose.Schema({
 notificationSchema.index({ userId: 1, isRead: 1 });
 notificationSchema.index({ userId: 1, createdAt: -1 });
 notificationSchema.index({ type: 1, priority: 1 });
-notificationSchema.index({ scheduledFor: 1 }, { sparse: true });
-notificationSchema.index({ expiresAt: 1 }, { sparse: true });
 
 // Virtual for notification age
 notificationSchema.virtual('age').get(function() {
@@ -121,7 +106,6 @@ notificationSchema.statics.getUserNotifications = function(userId, options = {})
     page = 1,
     limit = 20,
     type,
-    category,
     priority,
     isRead,
     sortBy = 'createdAt',
@@ -131,7 +115,6 @@ notificationSchema.statics.getUserNotifications = function(userId, options = {})
   const query = { userId };
   
   if (type) query.type = type;
-  if (category) query.category = category;
   if (priority) query.priority = priority;
   if (isRead !== undefined) query.isRead = isRead;
 

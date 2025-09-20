@@ -1,14 +1,39 @@
 import Device from '../models/Device.js';
 import DeviceLog from '../models/DeviceLog.js';
 import { producer } from '../config/kafka.js';
+import logger from '../utils/logger.js';
 
-// Get all devices
+// Helper function to check device ownership
+const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
+  const device = await Device.findOne({ deviceId });
+  if (!device) {
+    return { success: false, message: 'Device not found', device: null };
+  }
+  
+  if (!isAdmin && device.ownerId !== userId) {
+    return { success: false, message: 'Access denied: You can only access your own devices', device: null };
+  }
+  
+  return { success: true, device };
+};
+
+// Get all devices for the authenticated user
 export const getAllDevices = async (req, res) => {
   try {
-    const { ownerId, status, limit = 50, page = 1 } = req.query;
+    const userId = req.user.sub || req.user.userId || req.user.id;
+    const { status, limit = 50, page = 1 } = req.query;
     
+    logger.info(`Getting devices for user ${userId}`);
+    
+    // Only get devices owned by the authenticated user (unless admin)
     let query = {};
-    if (ownerId) query.ownerId = ownerId;
+    if (req.user.role !== 'admin') {
+      query.ownerId = userId;
+    } else if (req.query.ownerId) {
+      // Admin can filter by ownerId
+      query.ownerId = req.query.ownerId;
+    }
+    
     if (status) query.status = status;
     
     const devices = await Device.find(query)
@@ -17,6 +42,8 @@ export const getAllDevices = async (req, res) => {
       .sort({ createdAt: -1 });
     
     const total = await Device.countDocuments(query);
+    
+    logger.info(`Found ${devices.length} devices for user ${userId}`);
     
     res.json({
       success: true,
@@ -29,6 +56,7 @@ export const getAllDevices = async (req, res) => {
       }
     });
   } catch (error) {
+    logger.error('Error fetching devices:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching devices',
@@ -41,6 +69,9 @@ export const getAllDevices = async (req, res) => {
 export const getDeviceById = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user.sub || req.user.userId || req.user.id;
+    
+    logger.info(`Getting device ${deviceId} for user ${userId}`);
     
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -50,11 +81,23 @@ export const getDeviceById = async (req, res) => {
       });
     }
     
+    // Check ownership (unless admin)
+    if (req.user.role !== 'admin' && device.ownerId !== userId) {
+      logger.warn(`Access denied: User ${userId} trying to access device ${deviceId} owned by ${device.ownerId}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You can only access your own devices'
+      });
+    }
+    
+    logger.info(`Device ${deviceId} access granted for user ${userId}`);
+    
     res.json({
       success: true,
       data: device
     });
   } catch (error) {
+    logger.error('Error fetching device:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching device',
@@ -66,14 +109,14 @@ export const getDeviceById = async (req, res) => {
 // Create new device
 export const createDevice = async (req, res) => {
   try {
+    const userId = req.user.sub || req.user.userId || req.user.id;
     const {
       deviceId,
-      ownerId,
       name,
-      location,
-      outlets,
-      thresholds
+      outlets
     } = req.body;
+    
+    logger.info(`Creating device ${deviceId} for user ${userId}`);
     
     // Check if device already exists
     const existingDevice = await Device.findOne({ deviceId });
@@ -86,20 +129,18 @@ export const createDevice = async (req, res) => {
     
     // Create default outlets if not provided
     const defaultOutlets = outlets || [
-      { id: 'o1', name: 'Kitchen Outlet 1', type: 'kitchen' },
-      { id: 'o2', name: 'Kitchen Outlet 2', type: 'kitchen' },
-      { id: 'o3', name: 'Kitchen Outlet 3', type: 'kitchen' },
-      { id: 'o4', name: 'Safety Outlet 1', type: 'safety' },
-      { id: 'o5', name: 'Safety Outlet 2', type: 'safety' }
+      { id: 'o1', name: 'Kitchen Outlet 1' },
+      { id: 'o2', name: 'Kitchen Outlet 2' },
+      { id: 'o3', name: 'Kitchen Outlet 3' },
+      { id: 'o4', name: 'Safety Outlet 1' },
+      { id: 'o5', name: 'Safety Outlet 2' }
     ];
     
     const device = new Device({
       deviceId,
-      ownerId,
+      ownerId: userId, // Set ownerId from JWT token
       name,
-      location,
-      outlets: defaultOutlets,
-      thresholds
+      outlets: defaultOutlets
     });
     
     await device.save();
@@ -182,6 +223,19 @@ export const updateDevice = async (req, res) => {
 export const deleteDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user.sub || req.user.userId || req.user.id;
+    const isAdmin = req.user.role === 'admin';
+    
+    logger.info(`Deleting device ${deviceId} for user ${userId}`);
+    
+    // Check ownership first
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
+        success: false,
+        message: ownershipCheck.message
+      });
+    }
     
     const device = await Device.findOneAndDelete({ deviceId });
     if (!device) {
@@ -473,7 +527,7 @@ export const getDeviceStatus = async (req, res) => {
 export const updateOutletSettings = async (req, res) => {
   try {
     const { deviceId, outletId } = req.params;
-    const { name, type } = req.body;
+    const { name } = req.body;
     
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -494,17 +548,6 @@ export const updateOutletSettings = async (req, res) => {
     
     // Update outlet settings
     if (name) outlet.name = name;
-    if (type) {
-      // Validate type enum
-      const validTypes = ['kitchen', 'safety'];
-      if (!validTypes.includes(type)) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid outlet type. Must be one of: ${validTypes.join(', ')}`
-        });
-      }
-      outlet.type = type;
-    }
     
     await device.save();
     
@@ -522,8 +565,7 @@ export const updateOutletSettings = async (req, res) => {
           action: 'outlet_settings_updated',
           result: 'success',
           metadata: {
-            name: outlet.name,
-            type: outlet.type
+            name: outlet.name
           },
           timestamp: new Date()
         })
@@ -544,33 +586,3 @@ export const updateOutletSettings = async (req, res) => {
   }
 };
 
-// Update device thresholds
-export const updateThresholds = async (req, res) => {
-  try {
-    const { deviceId } = req.params;
-    const { thresholds } = req.body;
-    
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        message: 'Device not found'
-      });
-    }
-    
-    device.thresholds = { ...device.thresholds, ...thresholds };
-    await device.save();
-    
-    res.json({
-      success: true,
-      data: device,
-      message: 'Thresholds updated successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error updating thresholds',
-      error: error.message
-    });
-  }
-};

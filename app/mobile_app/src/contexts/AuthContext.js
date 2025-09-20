@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService';
 import { notificationService } from '../services/notificationService';
+import { setAuthToken, clearAuthToken } from '../services/apiService';
+import * as Notifications from 'expo-notifications';
 
 const AuthContext = createContext();
 
@@ -38,6 +40,7 @@ export const AuthProvider = ({ children }) => {
         setToken(authStatus.token);
         // Set token for notification service
         notificationService.setAuthToken(authStatus.token);
+        setAuthToken(authStatus.token);
       } else {
         setUser(null);
         setIsAuthenticated(false);
@@ -65,8 +68,18 @@ export const AuthProvider = ({ children }) => {
         setUser(profile?.success && profile.user ? profile.user : result.user);
         setIsAuthenticated(true);
         setToken(result.token);
-        // Set token for notification service
+        // Set token for all services
         notificationService.setAuthToken(result.token);
+        setAuthToken(result.token);
+        
+        // Register FCM token after successful login
+        try {
+          await registerFCMToken(result.user.id);
+        } catch (fcmError) {
+          console.warn('FCM token registration failed during login:', fcmError);
+          // Don't fail login if FCM registration fails
+        }
+        
         return { success: true };
       } else {
         return { success: false, error: result.error };
@@ -88,8 +101,18 @@ export const AuthProvider = ({ children }) => {
         setUser(profile?.success && profile.user ? profile.user : result.user);
         setIsAuthenticated(true);
         setToken(result.token);
-        // Set token for notification service
+        // Set token for all services
         notificationService.setAuthToken(result.token);
+        setAuthToken(result.token);
+        
+        // Register FCM token after successful registration
+        try {
+          await registerFCMToken(result.user.id);
+        } catch (fcmError) {
+          console.warn('FCM token registration failed during registration:', fcmError);
+          // Don't fail registration if FCM registration fails
+        }
+        
         return { success: true };
       } else {
         return { success: false, error: result.error };
@@ -108,8 +131,9 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       setToken(null);
-      // Clear token for notification service
+      // Clear token for all services
       notificationService.clearAuthToken();
+      clearAuthToken();
       return { success: true };
     } catch (error) {
       return { success: false, error: 'Logout failed' };
@@ -162,6 +186,59 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const registerFCMToken = async (userId) => {
+    try {
+      if (!userId) {
+        console.warn('No userId provided for FCM token registration');
+        return;
+      }
+
+      // Get FCM token - try to get the actual FCM token first
+      let fcmToken = null;
+      
+      try {
+        // Try to get the actual FCM token from Expo
+        const token = await Notifications.getExpoPushTokenAsync({
+          projectId: '5ea86a56-b10e-4a1b-88a7-6692b50872ed'
+        });
+
+        console.log('🔔 Expo push token acquired:', token.data);
+        console.log('📱 Full token object:', token);
+        
+        // Check if it's a real FCM token or Expo push token
+        if (token.data.startsWith('ExponentPushToken[')) {
+          console.warn('⚠️ Got Expo push token instead of FCM token - skipping registration');
+          // Don't register Expo push token, only register real FCM tokens
+          return;
+        } else {
+          console.log('✅ Got real FCM token');
+          fcmToken = token.data;
+        }
+      } catch (error) {
+        console.error('Error getting Expo push token:', error);
+        throw error;
+      }
+
+      if (fcmToken) {
+        // Register token with notification service
+        const result = await notificationService.addFCMToken(userId, fcmToken, 'android');
+        
+        if (result.success) {
+          console.log('✅ FCM token registered successfully for user:', userId);
+          console.log('📊 Token count:', result.data?.tokenCount);
+        } else {
+          console.warn('⚠️ FCM token registration failed:', result.message);
+          throw new Error(result.message || 'FCM token registration failed');
+        }
+      } else {
+        console.warn('❌ No FCM token available - token:', token);
+      }
+    } catch (error) {
+      console.error('Error registering FCM token:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     isAuthenticated,
@@ -174,6 +251,7 @@ export const AuthProvider = ({ children }) => {
     changePassword,
     refreshProfile,
     checkAuthStatus,
+    registerFCMToken, // Export FCM token registration function
   };
 
   return (
