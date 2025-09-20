@@ -17,6 +17,23 @@ const apiClient = axios.create({
   }),
 });
 
+// Auth token management
+let authToken = null;
+
+export const setAuthToken = (token) => {
+  authToken = token;
+  if (token) {
+    apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  } else {
+    delete apiClient.defaults.headers.common['Authorization'];
+  }
+};
+
+export const clearAuthToken = () => {
+  authToken = null;
+  delete apiClient.defaults.headers.common['Authorization'];
+};
+
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
@@ -189,6 +206,36 @@ class ApiService {
       return response.data;
     } catch (error) {
       throw new Error(`Failed to update outlet settings: ${error.message}`);
+    }
+  }
+
+  // Device methods
+  async getDevices() {
+    try {
+      const response = await apiClient.get(CONFIG.ENDPOINTS.DEVICES);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch devices: ${error.message}`);
+    }
+  }
+
+  async getDeviceDetail(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.DEVICE_DETAIL.replace(':deviceId', deviceId);
+      const response = await apiClient.get(url);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch device detail: ${error.message}`);
+    }
+  }
+
+  async getDeviceStatus(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.DEVICE_STATUS.replace(':deviceId', deviceId);
+      const response = await apiClient.get(url);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch device status: ${error.message}`);
     }
   }
 

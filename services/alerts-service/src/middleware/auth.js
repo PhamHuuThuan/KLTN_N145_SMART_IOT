@@ -8,7 +8,14 @@ export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
+  logger.info(`Auth request to ${req.method} ${req.path}`, { 
+    hasAuthHeader: !!authHeader,
+    hasToken: !!token,
+    url: req.url 
+  });
+
   if (!token) {
+    logger.warn('No token provided for authenticated route');
     return res.status(401).json({
       success: false,
       message: 'Access token required'
@@ -16,11 +23,12 @@ export const authenticateToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-strong-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret-change-me');-
+    logger.info('Token decoded successfully:', { sub: decoded.sub, email: decoded.email });
     req.user = decoded;
     next();
   } catch (error) {
-    logger.error('Token verification failed:', error);
+    logger.error('Token verification failed:', error.message);
     return res.status(403).json({
       success: false,
       message: 'Invalid or expired token'
@@ -67,15 +75,22 @@ export const checkResourceAccess = (resourceParam = 'userId') => {
     }
 
     const userId = req.params[resourceParam];
-    const currentUserId = req.user.userId || req.user.id;
+    const currentUserId = req.user.sub || req.user.userId || req.user.id;
 
     // Admin can access all resources
     if (req.user.role === 'admin') {
       return next();
     }
 
+    // Service-to-service authentication (for internal service calls)
+    if (req.user.service && req.user.role === 'service') {
+      logger.info(`Service-to-service access: ${req.user.service} accessing user ${userId}`);
+      return next();
+    }
+
     // User can only access their own resources
     if (currentUserId !== userId) {
+      logger.warn(`Access denied: User ${currentUserId} trying to access ${userId}'s resource`);
       return res.status(403).json({
         success: false,
         message: 'Access denied: You can only access your own resources'
@@ -95,7 +110,7 @@ export const optionalAuth = (req, res, next) => {
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-strong-secret');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret-change-me');
       req.user = decoded;
     } catch (error) {
       logger.warn('Optional auth failed:', error.message);

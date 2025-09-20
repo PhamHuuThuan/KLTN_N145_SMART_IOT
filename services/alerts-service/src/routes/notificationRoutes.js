@@ -1,7 +1,7 @@
 import express from 'express';
 import NotificationController from '../controllers/NotificationController.js';
 import { validateNotification, validatePreferences } from '../middleware/validation.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, checkResourceAccess } from '../middleware/auth.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
@@ -69,6 +69,7 @@ router.put('/user/:userId/preferences',
 // Add FCM token
 router.post('/user/:userId/fcm-token',
   authenticateToken,
+  checkResourceAccess('userId'),
   (req, res) => notificationController.addFCMToken(req, res)
 );
 
@@ -83,5 +84,14 @@ router.post('/user/:userId/test',
   authenticateToken,
   (req, res) => notificationController.testNotification(req, res)
 );
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Alerts service is healthy',
+    timestamp: new Date().toISOString()
+  });
+});
 
 export default router;

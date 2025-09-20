@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,6 +21,13 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('Home');
   const [currentScreen, setCurrentScreen] = useState('Main');
 
+  // Reset to Home tab when user becomes authenticated (login success)
+  useEffect(() => {
+    if (isAuthenticated && currentScreen === 'Main') {
+      setActiveTab('Home');
+    }
+  }, [isAuthenticated, currentScreen]);
+
   const renderScreen = () => {
     if (!isAuthenticated) {
       switch (currentScreen) {
@@ -31,6 +38,12 @@ function AppContent() {
         default:
           return <LoginScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Login') }} />;
       }
+    }
+
+    // Reset to Main screen and Home tab when authenticated (fix for registration/login redirect issue)
+    if (currentScreen !== 'Main' && !['Notifications', 'NotificationSettingsFromNotifications', 'NotificationSettingsFromSettings', 'Profile', 'ChangePassword'].includes(currentScreen)) {
+      setCurrentScreen('Main');
+      setActiveTab('Home'); // Always go to Home tab after login
     }
 
     switch (currentScreen) {
