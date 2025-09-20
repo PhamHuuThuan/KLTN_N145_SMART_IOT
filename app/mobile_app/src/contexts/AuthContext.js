@@ -40,6 +40,7 @@ export const AuthProvider = ({ children }) => {
         setToken(authStatus.token);
         // Set token for notification service
         notificationService.setAuthToken(authStatus.token);
+        setAuthToken(authStatus.token);
       } else {
         setUser(null);
         setIsAuthenticated(false);
