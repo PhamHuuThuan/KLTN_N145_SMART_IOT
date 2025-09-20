@@ -188,22 +188,45 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // Get FCM token
-      const token = await Notifications.getExpoPushTokenAsync();
+      // Get FCM token - try to get the actual FCM token first
+      let fcmToken = null;
+      
+      try {
+        // Try to get the actual FCM token from Expo
+        const token = await Notifications.getExpoPushTokenAsync({
+          projectId: '5ea86a56-b10e-4a1b-88a7-6692b50872ed'
+        });
 
-      if (token && token.data) {
-        console.log('🔔 Native push token acquired:', token);
+        console.log('🔔 Expo push token acquired:', token.data);
+        console.log('📱 Full token object:', token);
         
+        // Check if it's a real FCM token or Expo push token
+        if (token.data.startsWith('ExponentPushToken[')) {
+          console.warn('⚠️ Got Expo push token instead of FCM token - skipping registration');
+          // Don't register Expo push token, only register real FCM tokens
+          return;
+        } else {
+          console.log('✅ Got real FCM token');
+          fcmToken = token.data;
+        }
+      } catch (error) {
+        console.error('Error getting Expo push token:', error);
+        throw error;
+      }
+
+      if (fcmToken) {
         // Register token with notification service
-        const result = await notificationService.addFCMToken(userId, token.data, 'android');
+        const result = await notificationService.addFCMToken(userId, fcmToken, 'android');
         
         if (result.success) {
-          console.log('✅ FCM token registered successfully');
+          console.log('✅ FCM token registered successfully for user:', userId);
+          console.log('📊 Token count:', result.data?.tokenCount);
         } else {
           console.warn('⚠️ FCM token registration failed:', result.message);
+          throw new Error(result.message || 'FCM token registration failed');
         }
       } else {
-        console.warn('No FCM token available');
+        console.warn('❌ No FCM token available - token:', token);
       }
     } catch (error) {
       console.error('Error registering FCM token:', error);
@@ -223,6 +246,7 @@ export const AuthProvider = ({ children }) => {
     changePassword,
     refreshProfile,
     checkAuthStatus,
+    registerFCMToken, // Export FCM token registration function
   };
 
   return (

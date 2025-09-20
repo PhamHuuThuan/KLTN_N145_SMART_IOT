@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Switch, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { useAuth } from '../contexts/AuthContext';
 import { notificationService } from '../services/notificationService';
 import OverlayLoader from '../components/OverlayLoader';
@@ -8,7 +9,7 @@ import ActionFeedback from '../components/ActionFeedback';
 import TimePicker from '../components/TimePicker';
 
 const NotificationSettingsScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, registerFCMToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
@@ -30,6 +31,46 @@ const NotificationSettingsScreen = ({ navigation }) => {
       ]
     }
   });
+
+  const handleFCMToggle = async (enabled) => {
+    console.log('🔧 handleFCMToggle called with enabled:', enabled);
+    console.log('🔧 Current prefs.fcm:', prefs.fcm);
+    console.log('🔧 User ID:', user?.id);
+    
+    setPrefs({ ...prefs, fcm: { enabled } });
+    
+    // If enabling FCM, register the token
+    if (enabled && user?.id) {
+      try {
+        console.log('🔄 Registering FCM token for user:', user.id);
+        await registerFCMToken(user.id);
+        console.log('✅ FCM token registered after enabling push notifications');
+        
+        // Don't call save() here because addFCMToken API already handles the token storage
+        // and save() would overwrite the tokens array
+        
+        setFeedback({ visible: true, type: 'success', message: 'Push notifications enabled successfully!' });
+      } catch (error) {
+        console.error('❌ Failed to register FCM token:', error);
+        console.error('❌ Error details:', error.response?.data);
+        // Revert the toggle on error
+        setPrefs({ ...prefs, fcm: { enabled: false } });
+        // Show error feedback
+        let errorMessage = 'Failed to register push token. Please try again.';
+        if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        setFeedback({ visible: true, type: 'error', message: errorMessage });
+      }
+    } else {
+      console.log('🔧 FCM toggle to disabled or no user ID, skipping token registration');
+      // When disabling FCM, save preferences to update fcm.enabled = false
+      if (user?.id) {
+        console.log('🔄 Saving preferences to database...');
+        await save();
+      }
+    }
+  };
 
   const load = async () => {
     if (!user?.id) return;
@@ -172,7 +213,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
               <Text style={styles.label}>Push Notifications</Text>
               <Text style={styles.description}>Receive notifications even when app is closed</Text>
             </View>
-            <Switch value={prefs.fcm.enabled} onValueChange={(v) => setPrefs({ ...prefs, fcm: { enabled: v } })} />
+            <Switch value={prefs.fcm.enabled} onValueChange={handleFCMToggle} />
           </View>
         </View>
 
