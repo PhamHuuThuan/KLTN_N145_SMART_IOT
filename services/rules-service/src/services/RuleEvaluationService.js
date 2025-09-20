@@ -160,7 +160,7 @@ class RuleEvaluationService {
         sensorValue = sensorData.temp;
         break;
       case 'humidity':
-        sensorValue = sensorData.humid; // MQTT sends 'humid' not 'humidity'
+        sensorValue = sensorData.humid;
         break;
       case 'gas_ppm':
         sensorValue = sensorData.gas_ppm;
@@ -415,7 +415,7 @@ class RuleEvaluationService {
       const result = await this.producer.send({
         topic: 'notification-requests',
         messages: [{
-          key: rule.ownerId.toString(), // Convert ObjectId to string
+          key: rule.ownerId.toString(),
           value: JSON.stringify(message)
         }]
       });
@@ -639,7 +639,7 @@ class RuleEvaluationService {
           case 'temperature':
             return sensorData.temp;
           case 'humidity':
-            return sensorData.humid; // MQTT sends 'humid' not 'humidity'
+            return sensorData.humid;
           case 'gas_ppm':
             return sensorData.gas_ppm;
           case 'smoke':
