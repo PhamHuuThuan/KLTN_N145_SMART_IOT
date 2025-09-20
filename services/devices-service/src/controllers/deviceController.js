@@ -70,9 +70,7 @@ export const createDevice = async (req, res) => {
       deviceId,
       ownerId,
       name,
-      location,
-      outlets,
-      thresholds
+      outlets
     } = req.body;
     
     // Check if device already exists
@@ -86,20 +84,18 @@ export const createDevice = async (req, res) => {
     
     // Create default outlets if not provided
     const defaultOutlets = outlets || [
-      { id: 'o1', name: 'Kitchen Outlet 1', type: 'kitchen' },
-      { id: 'o2', name: 'Kitchen Outlet 2', type: 'kitchen' },
-      { id: 'o3', name: 'Kitchen Outlet 3', type: 'kitchen' },
-      { id: 'o4', name: 'Safety Outlet 1', type: 'safety' },
-      { id: 'o5', name: 'Safety Outlet 2', type: 'safety' }
+      { id: 'o1', name: 'Kitchen Outlet 1' },
+      { id: 'o2', name: 'Kitchen Outlet 2' },
+      { id: 'o3', name: 'Kitchen Outlet 3' },
+      { id: 'o4', name: 'Safety Outlet 1' },
+      { id: 'o5', name: 'Safety Outlet 2' }
     ];
     
     const device = new Device({
       deviceId,
       ownerId,
       name,
-      location,
-      outlets: defaultOutlets,
-      thresholds
+      outlets: defaultOutlets
     });
     
     await device.save();
@@ -473,7 +469,7 @@ export const getDeviceStatus = async (req, res) => {
 export const updateOutletSettings = async (req, res) => {
   try {
     const { deviceId, outletId } = req.params;
-    const { name, type } = req.body;
+    const { name } = req.body;
     
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -494,17 +490,6 @@ export const updateOutletSettings = async (req, res) => {
     
     // Update outlet settings
     if (name) outlet.name = name;
-    if (type) {
-      // Validate type enum
-      const validTypes = ['kitchen', 'safety'];
-      if (!validTypes.includes(type)) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid outlet type. Must be one of: ${validTypes.join(', ')}`
-        });
-      }
-      outlet.type = type;
-    }
     
     await device.save();
     
@@ -522,8 +507,7 @@ export const updateOutletSettings = async (req, res) => {
           action: 'outlet_settings_updated',
           result: 'success',
           metadata: {
-            name: outlet.name,
-            type: outlet.type
+            name: outlet.name
           },
           timestamp: new Date()
         })
@@ -544,33 +528,3 @@ export const updateOutletSettings = async (req, res) => {
   }
 };
 
-// Update device thresholds
-export const updateThresholds = async (req, res) => {
-  try {
-    const { deviceId } = req.params;
-    const { thresholds } = req.body;
-    
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        message: 'Device not found'
-      });
-    }
-    
-    device.thresholds = { ...device.thresholds, ...thresholds };
-    await device.save();
-    
-    res.json({
-      success: true,
-      data: device,
-      message: 'Thresholds updated successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error updating thresholds',
-      error: error.message
-    });
-  }
-};

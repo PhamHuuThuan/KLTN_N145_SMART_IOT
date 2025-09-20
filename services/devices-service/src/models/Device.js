@@ -10,19 +10,9 @@ const outletSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  type: {
-    type: String,
-    required: true,
-    enum: ['kitchen', 'safety'],
-    default: 'kitchen'
-  },
   status: {
     type: Boolean,
     default: false
-  },
-  powerConsumption: {
-    type: Number,
-    default: 0
   },
   lastToggleAt: {
     type: Date,
@@ -30,22 +20,6 @@ const outletSchema = new mongoose.Schema({
   }
 });
 
-const thresholdSchema = new mongoose.Schema({
-  temperature: {
-    min: { type: Number, default: 15 },
-    max: { type: Number, default: 50 }
-  },
-  humidity: {
-    min: { type: Number, default: 30 },
-    max: { type: Number, default: 80 }
-  },
-  smoke: {
-    max: { type: Number, default: 100 }
-  },
-  gas: {
-    max: { type: Number, default: 1000 }
-  }
-});
 
 const deviceSchema = new mongoose.Schema({
   deviceId: {
@@ -64,11 +38,6 @@ const deviceSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  type: {
-    type: String,
-    required: true,
-    default: 'kitchen_controller'
-  },
   status: {
     type: String,
     enum: ['online', 'offline', 'maintenance', 'error'],
@@ -78,27 +47,13 @@ const deviceSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  location: {
-    room: { type: String, default: 'kitchen' },
-    floor: { type: String, default: '1' }
-  },
   outlets: [outletSchema],
-  thresholds: thresholdSchema,
   emergencyMode: {
     type: Boolean,
     default: false
   },
   lastEmergencyAt: {
     type: Date
-  },
-  firmware: {
-    version: { type: String, default: '1.0.0' },
-    lastUpdate: { type: Date }
-  },
-  settings: {
-    autoShutdown: { type: Boolean, default: true },
-    notificationEnabled: { type: Boolean, default: true },
-    emergencyResponseDelay: { type: Number, default: 5000 } // milliseconds
   },
   latestTelemetry: {
     ts: { type: Number, default: Date.now },
@@ -140,11 +95,9 @@ deviceSchema.methods.enterEmergencyMode = function() {
   this.emergencyMode = true;
   this.lastEmergencyAt = new Date();
   
-  // Turn off all kitchen outlets
+  // Turn off all outlets
   this.outlets.forEach(outlet => {
-    if (outlet.type === 'kitchen') {
-      outlet.status = false;
-    }
+    outlet.status = false;
   });
   
   return this;

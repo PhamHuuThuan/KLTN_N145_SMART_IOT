@@ -61,6 +61,10 @@ const HomeScreen = ({ navigation }) => {
             await fetchDeviceDetail(deviceId);
           }}
           onPressDetails={() => setShowDeviceInfo(true)}
+          onDeviceAdded={async () => {
+            // Refresh devices list when a new device is added
+            await fetchDevices();
+          }}
         />
 
         <SensorGrid deviceData={deviceData} />

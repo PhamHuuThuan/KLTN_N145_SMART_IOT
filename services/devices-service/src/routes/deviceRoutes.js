@@ -9,8 +9,7 @@ import {
   updateOutletSettings,
   enterEmergencyMode,
   exitEmergencyMode,
-  getDeviceStatus,
-  updateThresholds
+  getDeviceStatus
 } from '../controllers/deviceController.js';
 
 const router = express.Router();
@@ -29,6 +28,5 @@ router.put('/:deviceId/outlets/:outletId/toggle', toggleOutlet);
 router.put('/:deviceId/outlets/:outletId', updateOutletSettings);
 router.put('/:deviceId/emergency/enter', enterEmergencyMode);
 router.put('/:deviceId/emergency/exit', exitEmergencyMode);
-router.put('/:deviceId/thresholds', updateThresholds);
 
 export default router;

@@ -103,5 +103,6 @@ export const useDeviceData = () => {
     selectDevice,
     fetchDeviceStatus,
     fetchDeviceDetail,
+    refreshDevices: fetchDevices, // Alias for consistency
   };
 };
