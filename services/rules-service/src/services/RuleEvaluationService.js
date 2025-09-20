@@ -1,8 +1,6 @@
 import Rule from '../models/Rule.js';
+import mongoose from 'mongoose';
 import { Kafka } from 'kafkajs';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 class RuleEvaluationService {
   constructor() {
@@ -36,11 +34,23 @@ class RuleEvaluationService {
       };
       
       if (ownerId) {
-        query.ownerId = ownerId;
+        if (mongoose.Types.ObjectId.isValid(ownerId)) {
+          query.ownerId = new mongoose.Types.ObjectId(ownerId);
+        } else {
+          console.log(`⚠️ Provided ownerId is not a valid ObjectId, ignoring owner filter:`, ownerId);
+        }
       }
 
       const rules = await Rule.find(query);
       console.log(`📋 Found ${rules.length} active rules for device ${deviceId}`);
+      console.log(`🔍 Query used:`, JSON.stringify(query, null, 2));
+      
+      // Debug: Log all rules in database for this device
+      const allRules = await Rule.find({ deviceId });
+      console.log(`🔍 All rules for device ${deviceId}:`, allRules.length);
+      allRules.forEach(rule => {
+        console.log(`  - Rule: ${rule.name}, Active: ${rule.isActive}, Owner: ${rule.ownerId}`);
+      });
 
       if (rules.length === 0) {
         console.log(`⚠️ No active rules found for device ${deviceId}`);
@@ -149,6 +159,9 @@ class RuleEvaluationService {
       case 'temperature':
         sensorValue = sensorData.temp;
         break;
+      case 'humidity':
+        sensorValue = sensorData.humid; // MQTT sends 'humid' not 'humidity'
+        break;
       case 'gas_ppm':
         sensorValue = sensorData.gas_ppm;
         break;
@@ -169,6 +182,7 @@ class RuleEvaluationService {
     const result = this.compareValues(sensorValue, operator, value);
     
     console.log(`🔍 Sensor condition: ${sensor} ${operator} ${value}, actual: ${sensorValue}, result: ${result}`);
+    console.log(`📊 Full sensor data:`, JSON.stringify(sensorData, null, 2));
     
     return result;
   }
@@ -344,10 +358,37 @@ class RuleEvaluationService {
    */
   async sendNotificationAction(action, rule, sensorData) {
     try {
+      // Tạo message chi tiết dựa trên sensor data
+      const sensorType = this.getTriggeredSensorType(rule.conditions, sensorData);
+      const sensorValue = this.getTriggeredSensorValue(rule.conditions, sensorData);
+      const threshold = this.getTriggeredThreshold(rule.conditions);
+      const operator = this.getTriggeredOperator(rule.conditions);
+      
+      let detailedMessage = action.message;
+      if (!detailedMessage) {
+        // Tạo message chi tiết dựa trên sensor type
+        switch (sensorType) {
+          case 'temperature':
+            detailedMessage = `Cảm biến nhiệt độ đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}°C, Ngưỡng: ${threshold}°C`;
+            break;
+          case 'humidity':
+            detailedMessage = `Cảm biến độ ẩm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}%, Ngưỡng: ${threshold}%`;
+            break;
+          case 'gas_ppm':
+            detailedMessage = `Cảm biến gas_ppm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`;
+            break;
+          case 'smoke':
+            detailedMessage = `Cảm biến khói đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`;
+            break;
+          default:
+            detailedMessage = `Rule "${rule.name}" has been triggered. Sensor: ${sensorType}, Value: ${sensorValue}, Threshold: ${threshold}`;
+        }
+      }
+
       const message = {
-        userId: rule.ownerId,
-        title: `Rule Alert: ${rule.name}`,
-        message: action.message || `Rule "${rule.name}" has been triggered`,
+        userId: rule.ownerId.toString(), // Convert ObjectId to string
+        title: `Cảnh báo ${sensorType}`,
+        message: detailedMessage,
         type: 'device_alert',
         category: 'rule',
         priority: action.priority || 'medium',
@@ -356,13 +397,17 @@ class RuleEvaluationService {
           ruleName: rule.name,
           deviceId: rule.deviceId,
           sensorData: sensorData,
-          actionType: action.type
+          actionType: action.type,
+          sensorType: sensorType,
+          sensorValue: sensorValue,
+          threshold: threshold,
+          operator: operator
         }
       };
 
       console.log(`📧 Sending notification to Kafka:`, {
         topic: 'notification-requests',
-        userId: rule.ownerId,
+        userId: rule.ownerId.toString(),
         ruleId: rule._id.toString(),
         ruleName: rule.name
       });
@@ -370,7 +415,7 @@ class RuleEvaluationService {
       const result = await this.producer.send({
         topic: 'notification-requests',
         messages: [{
-          key: rule.ownerId,
+          key: rule.ownerId.toString(), // Convert ObjectId to string
           value: JSON.stringify(message)
         }]
       });
@@ -397,7 +442,7 @@ class RuleEvaluationService {
       sensorType: this.getTriggeredSensorType(rule.conditions, sensorData),
       sensorValue: this.getTriggeredSensorValue(rule.conditions, sensorData),
       threshold: this.getTriggeredThreshold(rule.conditions),
-      alertType: 'rule_triggered',
+      alertType: 'threshold_exceeded',
       userId: rule.ownerId,
       ruleId: rule._id.toString(),
       ruleName: rule.name,
@@ -593,6 +638,8 @@ class RuleEvaluationService {
         switch (condition.sensor) {
           case 'temperature':
             return sensorData.temp;
+          case 'humidity':
+            return sensorData.humid; // MQTT sends 'humid' not 'humidity'
           case 'gas_ppm':
             return sensorData.gas_ppm;
           case 'smoke':
@@ -615,6 +662,20 @@ class RuleEvaluationService {
       }
     }
     return 0;
+  }
+
+  /**
+   * Lấy operator được trigger
+   * @param {Array} conditions - Rule conditions
+   * @returns {string}
+   */
+  getTriggeredOperator(conditions) {
+    for (const condition of conditions) {
+      if (condition.type === 'sensor' && condition.operator) {
+        return condition.operator;
+      }
+    }
+    return '>';
   }
 }
 
