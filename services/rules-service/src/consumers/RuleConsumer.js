@@ -1,8 +1,5 @@
 import { Kafka } from 'kafkajs';
 import RuleEvaluationService from '../services/RuleEvaluationService.js';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 class RuleConsumer {
   constructor() {
