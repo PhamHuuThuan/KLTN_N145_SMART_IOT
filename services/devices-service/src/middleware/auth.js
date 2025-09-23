@@ -28,7 +28,7 @@ export const authenticateToken = (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     logger.info('Token decoded successfully:', { 
-      userId: decoded.sub || decoded.userId || decoded.id,
+      userId: decoded.sub,
       role: decoded.role 
     });
     next();
@@ -45,7 +45,7 @@ export const authenticateToken = (req, res, next) => {
  * Check if user can access resource (device ownership)
  */
 export const checkDeviceOwnership = (req, res, next) => {
-  const userId = req.user.sub || req.user.userId || req.user.id;
+  const userId = req.user.sub;
   const deviceId = req.params.deviceId;
 
   logger.info(`Checking device ownership:`, { userId, deviceId });
@@ -57,7 +57,7 @@ export const checkDeviceOwnership = (req, res, next) => {
   }
 
   // Admin can access all devices
-  if (req.user.role === 'admin') {
+  if (req.user.role === 'admin' || req.user.role === 'service') {
     logger.info(`Admin access granted for device ${deviceId}`);
     return next();
   }
@@ -72,7 +72,7 @@ export const checkDeviceOwnership = (req, res, next) => {
  */
 export const checkResourceAccess = (resourceParam = 'ownerId') => {
   return (req, res, next) => {
-    const userId = req.user.sub || req.user.userId || req.user.id;
+    const userId = req.user.sub;
     const resourceOwnerId = req.params[resourceParam] || req.query[resourceParam];
 
     logger.info(`Checking resource access:`, { userId, resourceOwnerId, resourceParam });

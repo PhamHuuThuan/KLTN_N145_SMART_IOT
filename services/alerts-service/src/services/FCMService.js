@@ -90,7 +90,6 @@ class FCMService {
         android: {
           priority: 'high',
           notification: {
-            // Small icon must be an app resource. Configure in app.json; do not set remote URL here
             color: '#2C3E50',
             sound: 'default',
             clickAction: 'FLUTTER_NOTIFICATION_CLICK',

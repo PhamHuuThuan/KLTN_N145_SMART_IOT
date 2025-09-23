@@ -130,7 +130,7 @@ class NotificationConsumer {
         return;
       }
 
-      const { userId, action, deviceId, deviceName, result, outletId, status } = message;
+      const { userId, action, deviceId, deviceName, result, outletId, outletName, status } = message;
       
       // Validate required userId
       if (!userId) {
@@ -153,14 +153,15 @@ class NotificationConsumer {
         return;
       }
       
-      let notificationData; // Khai báo ở ngoài
+      let notificationData;
       
       // Handle outlet toggle specifically
       if (action === 'outlet_toggled') {
+        console.log(`🔌 Outlet toggle: ${outletName} -> ${status} -> ${action}`);
         notificationData = {
           userId,
           title: 'Outlet Control',
-          message: `Outlet ${outletId || 'unknown'} has been turned ${status ? 'ON' : 'OFF'}`,
+          message: `[${deviceName??deviceId}] - Đã ${status ? 'bật' : 'tắt'} ${outletName}`,
           type: 'system_notification',
           category: 'outlet',
           priority: 'low',
@@ -333,12 +334,10 @@ class NotificationConsumer {
    */
   _getAlertMessage(alertType, sensorType, sensorValue, threshold) {
     const sensorNames = {
-      temperature: 'nhiệt độ',
-      humidity: 'độ ẩm',
-      gas: 'khí gas',
+      temp: 'nhiệt độ',
+      humid: 'độ ẩm',
+      gas_ppm: 'khí gas',
       smoke: 'khói',
-      motion: 'chuyển động',
-      light: 'ánh sáng'
     };
 
     const sensorName = sensorNames[sensorType] || sensorType;
@@ -381,14 +380,8 @@ class NotificationConsumer {
    */
   _getActionMessage(action, deviceName, result) {
     const actionNames = {
-      turn_on: 'bật',
-      turn_off: 'tắt',
-      toggle: 'chuyển đổi trạng thái',
-      adjust: 'điều chỉnh',
-      outlet_toggled: 'chuyển đổi trạng thái outlet',
-      emergency_mode_activated: 'kích hoạt chế độ khẩn cấp',
-      emergency_mode_deactivated: 'tắt chế độ khẩn cấp',
-      outlet_settings_updated: 'cập nhật cài đặt outlet'
+      ON: 'bật',
+      OFF: 'tắt',
     };
 
     const actionName = actionNames[action] || action;

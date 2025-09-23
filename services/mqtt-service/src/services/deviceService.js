@@ -6,6 +6,16 @@ class DeviceService {
     this.deviceCache = new Map();
     this.cacheExpiry = 5 * 60 * 1000; // 5 minutes
     this.validationEnabled = process.env.DEVICE_VALIDATION_ENABLED === 'true';
+
+    // Prefer Bearer token, fallback to API Key header
+    const bearerToken = process.env.DEVICE_SERVICE_TOKEN;
+    const apiKey = process.env.DEVICE_SERVICE_API_KEY;
+    this.authHeaders = {};
+    if (bearerToken) {
+      this.authHeaders.Authorization = `Bearer ${bearerToken}`;
+    } else if (apiKey) {
+      this.authHeaders['x-api-key'] = apiKey;
+    }
   }
 
   async getDevice(deviceId) {
@@ -18,7 +28,8 @@ class DeviceService {
 
       // Fetch from devices-service
       const response = await axios.get(`${this.deviceServiceUrl}/api/devices/${deviceId}`, {
-        timeout: 5000 // 5 second timeout
+        timeout: 5000, // 5 second timeout
+        headers: this.authHeaders
       });
       
       if (response.data.success) {
@@ -50,7 +61,9 @@ class DeviceService {
 
   async getAllDevices() {
     try {
-      const response = await axios.get(`${this.deviceServiceUrl}/api/devices`);
+      const response = await axios.get(`${this.deviceServiceUrl}/api/devices`, {
+        headers: this.authHeaders
+      });
       
       if (response.data.success) {
         const devices = response.data.data;
