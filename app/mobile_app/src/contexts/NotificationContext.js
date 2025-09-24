@@ -5,7 +5,9 @@ import { notificationService } from '../services/notificationService';
 import { useAuth } from './AuthContext';
 import { io } from 'socket.io-client';
 import ENV from '../config/environment';
-import { Linking } from 'react-native';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('NotifContext');
 
 const NotificationContext = createContext();
 
@@ -139,10 +141,10 @@ export const NotificationProvider = ({ children }) => {
                           (data.category || '').toLowerCase() === 'security' ||
                           (data.type || '').toLowerCase() === 'security_alert';
       if (!isEmergency) {
-        console.log('🔕 Ignoring non-emergency FCM (socket handles list/unread)');
+        log.debug('Ignore non-emergency FCM (socket handles list/unread)');
         return;
       }
-      console.log('🚨 Emergency FCM received (handled natively for full screen). Skipping list/unread.');
+      log.info('Emergency FCM (handled natively). Skipping list/unread.');
     });
 
     // Handle FCM data-only messages (when app is in foreground)
@@ -153,16 +155,15 @@ export const NotificationProvider = ({ children }) => {
                           (data.category || '').toLowerCase() === 'security' ||
                           (data.type || '').toLowerCase() === 'security_alert';
       if (!isEmergency) {
-        console.log('🔕 Ignoring non-emergency FCM data (socket handles list/unread)');
+        log.debug('Ignore non-emergency FCM data');
         return;
       }
-      console.log('🚨 Emergency FCM data received — native layer will handle full screen.');
+      log.info('Emergency FCM data — native layer handles full screen');
     };
 
     // Listen for FCM data messages from Android native code
     const fcmDataListener = DeviceEventEmitter.addListener('FCMDataMessage', (message) => {
-      console.log('📱 Received FCMDataMessage from native:', message);
-      console.log('📱 FCMDataMessage listener is working!');
+      log.debug('FCMDataMessage from native', message);
       handleFCMDataMessage(message);
     });
 
@@ -184,8 +185,8 @@ export const NotificationProvider = ({ children }) => {
         });
 
         socket.on('connect', () => {
-          console.log('🔌 WebSocket connected for notifications');
-          console.log('🔌 Socket ID:', socket.id);
+          log.info('WebSocket connected');
+          log.debug('Socket ID', socket.id);
           // Send authentication once userId is available
           if (user?.id) {
             socket.emit('authenticate', { userId: user.id });
@@ -206,8 +207,7 @@ export const NotificationProvider = ({ children }) => {
         });
 
         socket.on('notification', (notification) => {
-          console.log('📱 WebSocket notification received:', notification);
-          console.log('📱 Current state notifications count:', state.notifications.length);
+          log.debug('WS notification received');
           
           // Map WebSocket notification to match API structure
           const notificationData = {
@@ -236,8 +236,7 @@ export const NotificationProvider = ({ children }) => {
           pushRecentKey(dedupeKey);
           lastSocketAt = Date.now();
 
-          console.log('📱 Processing WebSocket notification:', notificationData);
-          console.log('📱 WebSocket notification structure:', JSON.stringify(notificationData, null, 2));
+          log.debug('Process WS notification', notificationData?.id);
           
           // Add to local state
           dispatch({
@@ -247,24 +246,23 @@ export const NotificationProvider = ({ children }) => {
           
           // Update badge count
           const newBadgeCount = state.notifications.length + 1;
-          console.log('🔔 Setting badge count to:', newBadgeCount);
           Notifications.setBadgeCountAsync(newBadgeCount);
         });
 
         socket.on('disconnect', (reason) => {
-          console.log('🔌 WebSocket disconnected:', reason);
+          log.info('WebSocket disconnected', reason);
         });
 
         socket.on('error', (error) => {
-          console.error('🔌 WebSocket error:', error);
+          log.error('WebSocket error', error?.message || error);
         });
 
         socket.on('connect_error', (error) => {
-          console.error('🔌 WebSocket connection error:', error);
+          log.error('WebSocket connect_error', error?.message || error);
         });
 
       } catch (error) {
-        console.error('🔌 WebSocket connection failed:', error);
+        log.error('WebSocket connection failed', error?.message || error);
       }
     };
 
@@ -281,7 +279,7 @@ export const NotificationProvider = ({ children }) => {
     // Reconnect on app resume/focus (basic)
     const visibilityHandler = () => {
       if (!socket || !socket.connected) {
-        console.log('🔄 App visible -> ensure socket connected');
+        log.debug('App visible -> ensure socket connected');
         reconnectOnAuth();
       }
     };
@@ -291,7 +289,7 @@ export const NotificationProvider = ({ children }) => {
 
     // Set response handler for user interactions
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('🔔 Notification response:', response);
+      log.debug('Notification response');
       // Mark as read when user taps notification
       if (response.notification.request.identifier) {
         dispatch({
@@ -307,7 +305,7 @@ export const NotificationProvider = ({ children }) => {
       fcmDataListener.remove();
       if (socket) {
         socket.disconnect();
-        console.log('🔌 WebSocket disconnected on cleanup');
+        log.debug('WebSocket disconnected on cleanup');
       }
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', visibilityHandler);
@@ -362,7 +360,7 @@ export const NotificationProvider = ({ children }) => {
         // If unauthorized -> force logout to show login screen
         const status = e?.response?.status || e?.status;
         if (status === 401) {
-          console.warn('Token invalid or expired. Redirecting to login...');
+          log.warn('Token invalid or expired. Redirecting to login...');
           try { await logout(); } catch {}
         }
       }
@@ -381,7 +379,7 @@ export const NotificationProvider = ({ children }) => {
         finalStatus = status;
       }
       if (finalStatus !== 'granted') {
-        console.warn('Push notification permission not granted');
+        log.warn('Push notification permission not granted');
         return;
       }
 
@@ -392,28 +390,28 @@ export const NotificationProvider = ({ children }) => {
         const devicePushToken = await Notifications.getDevicePushTokenAsync();
         rawToken = devicePushToken?.data;
         tokenType = devicePushToken?.type; // 'fcm' on Android, 'apns' on iOS
-        console.log('🔔 Native push token acquired:', { tokenType, token: rawToken?.substring(0, 20) + '...' });
+        log.info('Native push token acquired', { tokenType, token: rawToken?.substring(0, 20) + '...' });
       } catch (nativeErr) {
-        console.warn('Native device token not available (dev/Expo Go likely). Skipping FCM registration.', nativeErr.message);
+        log.warn('Native device token not available (dev/Expo Go likely). Skipping FCM registration.', nativeErr.message);
         return;
       }
       if (!rawToken) {
-        console.warn('Failed to get device push token');
+        log.warn('Failed to get device push token');
         return;
       }
 
       const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
       const res = await notificationService.addFCMToken(user.id, rawToken, platform);
-      console.log('✅ Registered push token with backend:', res?.success ?? true);
+      log.info('Registered push token with backend', res?.success ?? true);
     } catch (error) {
-      console.warn('Failed to register FCM token:', error?.message || String(error));
+      log.warn('Failed to register FCM token', error?.message || String(error));
     }
   };
 
   // Load notifications
   const loadNotifications = async (page = 1, limit = 20) => {
     if (!isAuthenticated || !user?.id) {
-      console.warn('User not authenticated, using demo notifications');
+      log.warn('User not authenticated, using demo notifications');
       const demoNotifications = notificationService.createDemoNotifications();
       dispatch({
         type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
@@ -423,14 +421,14 @@ export const NotificationProvider = ({ children }) => {
     }
     // Ensure auth token is present
     if (!notificationService.getAuthToken()) {
-      console.warn('Auth token not ready yet, delaying notifications load');
+      log.warn('Auth token not ready yet, delaying notifications load');
       await new Promise(r => setTimeout(r, 200));
       if (!notificationService.getAuthToken()) return; // skip if still not ready
     }
 
     // Prevent multiple simultaneous calls
     if (state.loading) {
-      console.log('Already loading notifications, skipping...');
+      log.debug('Already loading notifications, skipping...');
       return;
     }
 
@@ -446,7 +444,7 @@ export const NotificationProvider = ({ children }) => {
         });
       } else {
         // If API fails, fall back to demo notifications
-        console.warn('API failed, using demo notifications:', response.message);
+        log.warn('API failed, using demo notifications', response.message);
         const demoNotifications = notificationService.createDemoNotifications();
         dispatch({
           type: NOTIFICATION_ACTIONS.SET_NOTIFICATIONS,
@@ -454,7 +452,7 @@ export const NotificationProvider = ({ children }) => {
         });
       }
     } catch (error) {
-      console.warn('API error, using demo notifications:', error.message);
+      log.warn('API error, using demo notifications', error.message);
       // If API fails, fall back to demo notifications
       const demoNotifications = notificationService.createDemoNotifications();
       dispatch({
@@ -495,7 +493,7 @@ export const NotificationProvider = ({ children }) => {
         });
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      log.error('Error marking notification as read', error?.message || error);
     }
   };
 
@@ -514,7 +512,7 @@ export const NotificationProvider = ({ children }) => {
         dispatch({ type: NOTIFICATION_ACTIONS.MARK_ALL_AS_READ });
       }
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      log.error('Error marking all notifications as read', error?.message || error);
     }
   };
 
@@ -539,7 +537,7 @@ export const NotificationProvider = ({ children }) => {
         });
       }
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      log.error('Error deleting notification', error?.message || error);
     }
   };
 
@@ -561,20 +559,20 @@ export const NotificationProvider = ({ children }) => {
       const response = await notificationService.getNotificationStats(user.id);
       return response.data;
     } catch (error) {
-      console.error('Error getting notification stats:', error);
+      log.error('Error getting notification stats', error?.message || error);
       return null;
     }
   };
 
   // Test API connection
   const testApiConnection = async () => {
-    console.log('🔔 Testing API connection from NotificationContext...');
+    log.info('Testing API connection from NotificationContext...');
     try {
       const result = await notificationService.testConnection();
-      console.log('API Test Result:', result);
+      log.info('API Test Result', result);
       return result;
     } catch (error) {
-      console.error('Error testing API connection:', error);
+      log.error('Error testing API connection', error?.message || error);
       return {
         success: false,
         message: error.message

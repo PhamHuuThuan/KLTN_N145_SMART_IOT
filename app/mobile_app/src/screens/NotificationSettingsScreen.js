@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, Switch, TextInput, TouchableOpacity, Alert, Scr
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Application from 'expo-application';
 import { Ionicons } from '@expo/vector-icons';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('NotifSettings');
 import { useAuth } from '../contexts/AuthContext';
 import { notificationService } from '../services/notificationService';
 import OverlayLoader from '../components/OverlayLoader';
@@ -34,26 +37,23 @@ const NotificationSettingsScreen = ({ navigation }) => {
   });
 
   const handleFCMToggle = async (enabled) => {
-    console.log('🔧 handleFCMToggle called with enabled:', enabled);
-    console.log('🔧 Current prefs.fcm:', prefs.fcm);
-    console.log('🔧 User ID:', user?.id);
+    log.debug('handleFCMToggle', enabled, 'prefs.fcm', prefs.fcm, 'userId', user?.id);
     
     setPrefs({ ...prefs, fcm: { enabled } });
     
     // If enabling FCM, register the token
     if (enabled && user?.id) {
       try {
-        console.log('🔄 Registering FCM token for user:', user.id);
+        log.info('Registering FCM token for user', user.id);
         await registerFCMToken(user.id);
-        console.log('✅ FCM token registered after enabling push notifications');
+        log.info('FCM token registered after enabling push notifications');
         
         // Don't call save() here because addFCMToken API already handles the token storage
         // and save() would overwrite the tokens array
         
         setFeedback({ visible: true, type: 'success', message: 'Push notifications enabled successfully!' });
       } catch (error) {
-        console.error('❌ Failed to register FCM token:', error);
-        console.error('❌ Error details:', error.response?.data);
+        log.error('Failed to register FCM token', error?.message || error);
         // Revert the toggle on error
         setPrefs({ ...prefs, fcm: { enabled: false } });
         // Show error feedback
@@ -64,10 +64,10 @@ const NotificationSettingsScreen = ({ navigation }) => {
         setFeedback({ visible: true, type: 'error', message: errorMessage });
       }
     } else {
-      console.log('🔧 FCM toggle to disabled or no user ID, skipping token registration');
+      log.debug('FCM toggle to disabled or no user ID, skipping token registration');
       // When disabling FCM, save preferences to update fcm.enabled = false
       if (user?.id) {
-        console.log('🔄 Saving preferences to database...');
+        log.info('Saving preferences to database...');
         await save();
       }
     }

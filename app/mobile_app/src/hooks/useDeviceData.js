@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import apiService from '../services/apiService';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('useDeviceData');
 import CONFIG from '../constants/config';
 
 export const useDeviceData = () => {
@@ -15,9 +18,9 @@ export const useDeviceData = () => {
     if (!deviceId) return;
     
     try {
-      console.log('📱 Fetching status for device:', deviceId);
+      log.debug('fetch status', deviceId);
       const response = await apiService.getDeviceStatus(deviceId);
-      console.log('📱 Device status received:', response);
+      log.debug('status received');
       // apiService returns already-unwrapped data; ensure safe defaults
       const data = response?.data || response || {};
       setDeviceData({
@@ -27,7 +30,7 @@ export const useDeviceData = () => {
         ...data,
       });
     } catch (err) {
-      console.error('Error fetching device status:', err);
+      log.error('fetchDeviceStatus error', err?.message || err);
       setError(err.message);
     }
   }, []);
@@ -41,7 +44,7 @@ export const useDeviceData = () => {
       const response = await apiService.getDevices();
       const devices = response.data || [];
       
-      console.log('📱 Devices received:', devices);
+      log.info('devices loaded', devices.length);
       
       // Map devices to get deviceId, guard against bad entries
       const deviceIds = devices.map(device => device?.deviceId).filter(Boolean);
@@ -50,12 +53,12 @@ export const useDeviceData = () => {
       // Only auto-select first device if nothing selected yet
       if (!selectedDevice && deviceIds.length > 0) {
         const firstDevice = deviceIds[0];
-        console.log('📱 Auto-selected device:', firstDevice);
+        log.info('auto-selected device', firstDevice);
         setSelectedDevice(firstDevice);
         await fetchDeviceStatus(firstDevice);
       }
     } catch (err) {
-      console.error('Error fetching devices:', err);
+      log.error('fetchDevices error', err?.message || err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -69,7 +72,7 @@ export const useDeviceData = () => {
       const response = await apiService.getDeviceDetail(deviceId);
       setDeviceDetail(response.data || response);
     } catch (err) {
-      console.error('Error fetching device detail:', err);
+      log.error('fetchDeviceDetail error', err?.message || err);
     }
   }, []);
 
@@ -103,6 +106,6 @@ export const useDeviceData = () => {
     selectDevice,
     fetchDeviceStatus,
     fetchDeviceDetail,
-    refreshDevices: fetchDevices, // Alias for consistency
+    refreshDevices: fetchDevices,
   };
 };

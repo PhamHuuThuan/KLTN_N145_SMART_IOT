@@ -14,10 +14,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { createLogger } from '../utils/logger';
 import CONFIG from '../constants/config';
 import Header from '../components/Header';
 import OverlayLoader from '../components/OverlayLoader';
 import ActionFeedback from '../components/ActionFeedback';
+
+const log = createLogger('Login');
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -45,7 +48,7 @@ const LoginScreen = ({ navigation }) => {
       const result = await login(email.trim(), password);
       
       if (result.success) {
-        console.log('Login successful');
+        log.info('Login successful');
         setFeedback({ visible: true, type: 'success', message: 'Đăng nhập thành công' });
       } else {
         setFeedback({ visible: true, type: 'error', message: result.error || 'Đăng nhập thất bại' });

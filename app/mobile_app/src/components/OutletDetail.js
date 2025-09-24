@@ -14,6 +14,9 @@ import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('OutletDetail');
 
 const OutletDetail = ({ 
   outlet, 
@@ -47,7 +50,7 @@ const OutletDetail = ({
 
   // Force re-render when deviceData changes
   useEffect(() => {
-    console.log(`🔄 OutletDetail: deviceData updated for ${outlet?.id}`);
+    log.debug('deviceData updated', outlet?.id);
   }, [deviceData?.latestTelemetry?.o]);
 
   const handleEdit = () => {
@@ -85,8 +88,7 @@ const OutletDetail = ({
 
   const handleToggle = async () => {
     const action = outletStatus ? 'off' : 'on';
-    console.log(`🔌 Detail toggle: ${outlet.id} -> ${action}`);
-    console.log(`📋 Detail props: deviceId=${deviceId}, onControlOutlet=${typeof onControlOutlet}`);
+    log.debug('toggle', outlet?.id, '->', action);
     
     if (!onControlOutlet) {
       console.error(`❌ onControlOutlet function not provided`);
@@ -101,10 +103,10 @@ const OutletDetail = ({
     setShowLoader(true);
     const success = await onControlOutlet(action, deviceId, outlet.id);
     setShowLoader(false);
-    console.log(`📊 Detail toggle result: ${success}`);
+    log.debug('toggle result', success);
     
     if (success) {
-      console.log(`✅ Detail toggle success: ${outlet.id} -> ${action}`);
+      log.info('toggle success', outlet?.id, '->', action);
       
       // Refresh device data after successful toggle
       if (onRefreshDeviceData) {
@@ -116,7 +118,7 @@ const OutletDetail = ({
       setFeedback({ visible: true, type: 'success', message: `Outlet ${action} command sent` });
       onClose();
     } else {
-      console.error(`❌ Detail toggle failed: ${outlet.id} -> ${action}`);
+      log.error('toggle failed', outlet?.id, '->', action);
       setFeedback({ visible: true, type: 'error', message: 'Failed to send command' });
     }
   };

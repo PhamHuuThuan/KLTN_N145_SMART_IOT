@@ -2,6 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('DeviceInfo');
 
 const Row = ({ icon, label, value }) => (
   <View style={styles.row}>
@@ -22,7 +25,7 @@ const DeviceInfo = ({ deviceData, compact = false }) => {
   const firmwareVersion = meta.firmwareVersion || deviceData.firmware?.version;
 
   React.useEffect(() => {
-    console.log('deviceData', deviceData);
+    log.debug('deviceData updated');
   }, [deviceData]);
 
   const rows = compact
