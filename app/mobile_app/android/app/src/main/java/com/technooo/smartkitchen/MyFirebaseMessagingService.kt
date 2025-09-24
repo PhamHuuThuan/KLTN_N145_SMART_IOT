@@ -166,6 +166,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
       // If starting activity fails, the full-screen intent will still work
       android.util.Log.e("FCMService", "Failed to start emergency activity directly", e)
     }
+
+    // Start foreground sound/vibration service for continuous alert
+    try {
+      val svc = Intent(this, EmergencySoundService::class.java)
+      androidx.core.content.ContextCompat.startForegroundService(this, svc)
+      android.util.Log.d("FCMService", "EmergencySoundService started")
+    } catch (e: Exception) {
+      android.util.Log.e("FCMService", "Failed to start EmergencySoundService", e)
+    }
   }
 
   private fun handleNormalNotification(data: Map<String, String>, notification: RemoteMessage.Notification?) {

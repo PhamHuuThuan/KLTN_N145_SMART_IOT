@@ -13,6 +13,7 @@ import android.widget.Toast
 import android.view.View
 import android.graphics.drawable.GradientDrawable
 import android.graphics.Typeface
+import android.app.KeyguardManager
 
 class EmergencyActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +64,7 @@ class EmergencyActivity : Activity() {
 
     // Title
     val titleText = TextView(this).apply {
-      text = "🚨  CẢNH BÁO KHẨN CẤP"
+      text = "🚨  CẢNH BÁO"
       textSize = 28f
       setTextColor(Color.WHITE)
       gravity = Gravity.CENTER
@@ -85,7 +86,7 @@ class EmergencyActivity : Activity() {
       val valueText = sensorValue ?: "—"
       val thresholdText = threshold ?: "—"
       text = when (sensorType.lowercase()) {
-        "gas_ppm" -> "Khí gas (ppm): $valueText  •  Ngưỡng: $thresholdText"
+        "gas_ppm" -> "Khí gas: $valueText  •  Ngưỡng: $thresholdText"
         "smoke" -> "Khói: $valueText  •  Ngưỡng: $thresholdText"
         "temperature", "temp" -> "Nhiệt độ: $valueText°C  •  Ngưỡng: $thresholdText"
         else -> "$sensorType: $valueText  •  Ngưỡng: $thresholdText"
@@ -132,7 +133,9 @@ class EmergencyActivity : Activity() {
       textSize = 16f
       setPadding(40, 22, 40, 22)
       setOnClickListener {
-        startMainWithAction("inspect_device", deviceId, deviceName)
+        unlockIfNeededThen {
+          startMainWithAction("inspect_device", deviceId, deviceName)
+        }
       }
     }
 
@@ -143,7 +146,9 @@ class EmergencyActivity : Activity() {
       textSize = 16f
       setPadding(40, 22, 40, 22)
       setOnClickListener {
-        startMainWithAction("activate_emergency", deviceId, deviceName)
+        unlockIfNeededThen {
+          startMainWithAction("activate_emergency", deviceId, deviceName)
+        }
       }
     }
 
@@ -159,7 +164,7 @@ class EmergencyActivity : Activity() {
     }
 
     val btnParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-      topMargin = 10
+      topMargin = 20
     }
     val cardParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
       leftMargin = 24
@@ -183,6 +188,8 @@ class EmergencyActivity : Activity() {
   }
 
   private fun startMainWithAction(action: String, deviceId: String?, deviceName: String?) {
+    // Stop continuous alarm service when user acts
+    try { stopService(Intent(this, EmergencySoundService::class.java)) } catch (_: Exception) {}
     val intent = Intent(this@EmergencyActivity, MainActivity::class.java)
     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
     intent.putExtra("emergencyAction", action)
@@ -190,6 +197,29 @@ class EmergencyActivity : Activity() {
     if (deviceName != null) intent.putExtra("deviceName", deviceName)
     startActivity(intent)
     finish()
+  }
+
+  private fun unlockIfNeededThen(next: () -> Unit) {
+    try {
+      val km = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+      if (km.isKeyguardLocked) {
+        km.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
+          override fun onDismissSucceeded() {
+            next()
+          }
+          override fun onDismissCancelled() {
+            next() // still try
+          }
+          override fun onDismissError() {
+            next()
+          }
+        })
+      } else {
+        next()
+      }
+    } catch (e: Exception) {
+      next()
+    }
   }
 
   override fun onBackPressed() {

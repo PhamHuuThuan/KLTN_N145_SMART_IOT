@@ -5,6 +5,7 @@ import { notificationService } from '../services/notificationService';
 import { useAuth } from './AuthContext';
 import { io } from 'socket.io-client';
 import ENV from '../config/environment';
+import { Linking } from 'react-native';
 
 const NotificationContext = createContext();
 
@@ -109,7 +110,7 @@ const notificationReducer = (state, action) => {
 // Provider component
 export const NotificationProvider = ({ children }) => {
   const [state, dispatch] = useReducer(notificationReducer, initialState);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout, checkAuthStatus } = useAuth();
 
   // Configure notification behavior
   useEffect(() => {
@@ -344,6 +345,31 @@ export const NotificationProvider = ({ children }) => {
     return () => { canceled = true; };
   }, [isAuthenticated, user?.id]);
 
+  // Validate token and redirect to Login if missing/invalid
+  useEffect(() => {
+    const validateToken = async () => {
+      if (!isAuthenticated || !user?.id) {
+        return;
+      }
+      try {
+        // simple ping; backend will return 401 if token invalid/expired
+        const result = await notificationService.testConnection();
+        if (!result?.success) {
+          // fall through to re-check auth
+          await checkAuthStatus();
+        }
+      } catch (e) {
+        // If unauthorized -> force logout to show login screen
+        const status = e?.response?.status || e?.status;
+        if (status === 401) {
+          console.warn('Token invalid or expired. Redirecting to login...');
+          try { await logout(); } catch {}
+        }
+      }
+    };
+    validateToken();
+  }, [isAuthenticated, user?.id]);
+
   // Register device token for push notifications
   const registerFCMToken = async () => {
     try {
@@ -555,6 +581,46 @@ export const NotificationProvider = ({ children }) => {
       };
     }
   };
+
+  useEffect(() => {
+    const ensurePermissionsAndChannels = async () => {
+      if (Platform.OS === 'android') {
+        const { status: existing } = await Notifications.getPermissionsAsync();
+        if (existing !== 'granted') {
+          await Notifications.requestPermissionsAsync();
+        }
+
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Default',
+          importance: Notifications.AndroidImportance.HIGH,
+          sound: 'default',
+          vibrationPattern: [0, 250, 250, 250],
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          enableVibrate: true,
+          enableLights: true,
+        });
+  
+        await Notifications.setNotificationChannelAsync('emergency', {
+          name: 'Emergency',
+          importance: Notifications.AndroidImportance.MAX,
+          sound: 'emergy_sound',
+          vibrationPattern: [0, 1000, 500, 1000],
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true,
+          enableVibrate: true,
+          enableLights: true,
+        });
+      } else {
+        await Notifications.requestPermissionsAsync({
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+        });
+      }
+    };
+  
+    ensurePermissionsAndChannels();
+  }, []);
 
   const value = {
     ...state,
