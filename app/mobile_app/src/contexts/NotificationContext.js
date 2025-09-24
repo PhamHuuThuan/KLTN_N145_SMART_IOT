@@ -165,26 +165,43 @@ export const NotificationProvider = ({ children }) => {
       handleFCMDataMessage(message);
     });
 
-    // WebSocket connection for real-time notifications
+    // WebSocket connection for real-time notifications with auto-reconnect
     let socket = null;
-    if (isAuthenticated && user?.id) {
+    const connectSocket = () => {
       try {
-        console.log('🔌 Attempting WebSocket connection for user:', user.id);
         const alertsUrl = ENV.getServiceUrl('ALERTS_SERVICE');
-        console.log('🔌 Connecting to', alertsUrl);
         
         socket = io(alertsUrl, {
-          auth: {
-            userId: user.id
-          },
-          transports: ['polling']
+          auth: user?.id ? { userId: user.id } : undefined,
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 10000,
+          timeout: 10000,
+          forceNew: true
         });
 
         socket.on('connect', () => {
           console.log('🔌 WebSocket connected for notifications');
           console.log('🔌 Socket ID:', socket.id);
-          // Send authentication
-          socket.emit('authenticate', { userId: user.id });
+          // Send authentication once userId is available
+          if (user?.id) {
+            socket.emit('authenticate', { userId: user.id });
+          } else {
+            setTimeout(() => {
+              if (user?.id && socket?.connected) {
+                socket.emit('authenticate', { userId: user.id });
+              }
+            }, 1000);
+          }
+        });
+
+        // Also authenticate after any reconnect
+        socket.on('reconnect', () => {
+          if (user?.id && socket?.connected) {
+            socket.emit('authenticate', { userId: user.id });
+          }
         });
 
         socket.on('notification', (notification) => {
@@ -233,8 +250,8 @@ export const NotificationProvider = ({ children }) => {
           Notifications.setBadgeCountAsync(newBadgeCount);
         });
 
-        socket.on('disconnect', () => {
-          console.log('🔌 WebSocket disconnected');
+        socket.on('disconnect', (reason) => {
+          console.log('🔌 WebSocket disconnected:', reason);
         });
 
         socket.on('error', (error) => {
@@ -245,21 +262,30 @@ export const NotificationProvider = ({ children }) => {
           console.error('🔌 WebSocket connection error:', error);
         });
 
-        // Test connection after 2 seconds
-        setTimeout(() => {
-          if (socket && socket.connected) {
-            console.log('✅ WebSocket connection test successful');
-          } else {
-            console.log('❌ WebSocket connection test failed');
-          }
-        }, 2000);
-
       } catch (error) {
         console.error('🔌 WebSocket connection failed:', error);
       }
-    } else {
-      console.log('🔌 WebSocket not connected - user not authenticated or no user ID');
-      console.log('🔌 isAuthenticated:', isAuthenticated, 'user.id:', user?.id);
+    };
+
+    connectSocket();
+
+    // Reconnect on auth changes
+    const reconnectOnAuth = () => {
+      if (socket) {
+        try { socket.disconnect(); } catch {}
+      }
+      connectSocket();
+    };
+
+    // Reconnect on app resume/focus (basic)
+    const visibilityHandler = () => {
+      if (!socket || !socket.connected) {
+        console.log('🔄 App visible -> ensure socket connected');
+        reconnectOnAuth();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', visibilityHandler);
     }
 
     // Set response handler for user interactions
@@ -282,8 +308,11 @@ export const NotificationProvider = ({ children }) => {
         socket.disconnect();
         console.log('🔌 WebSocket disconnected on cleanup');
       }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', visibilityHandler);
+      }
     };
-  }, []);
+  }, [isAuthenticated, user?.id]);
 
   // Load notifications after auth is ready (token set), with small delay to avoid race on login
   useEffect(() => {

@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.graphics.Color
 import android.view.Gravity
 import android.widget.Toast
+import android.view.View
 
 class EmergencyActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,14 +45,15 @@ class EmergencyActivity : Activity() {
   private fun createEmergencyUI() {
     val layout = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
-      setBackgroundColor(Color.parseColor("#D90429")) // Red background
+      setBackgroundColor(Color.parseColor("#B00020")) // Deep emergency red
       gravity = Gravity.CENTER
-      setPadding(50, 100, 50, 100)
+      setPadding(50, 80, 50, 60)
     }
 
     // Get data from intent
     val title = intent.getStringExtra("title") ?: "Cảnh báo khẩn cấp"
     val body = intent.getStringExtra("body") ?: "Phát hiện sự cố an toàn!"
+    val deviceId = intent.getStringExtra("deviceId")
     val deviceName = intent.getStringExtra("deviceName") ?: "Thiết bị"
     val sensorType = intent.getStringExtra("sensorType") ?: "cảm biến"
     val sensorValue = intent.getStringExtra("sensorValue")
@@ -59,45 +61,40 @@ class EmergencyActivity : Activity() {
 
     // Title
     val titleText = TextView(this).apply {
-      text = "🚨 CẢNH BÁO KHẨN CẤP 🚨"
-      textSize = 24f
+      text = "🚨 CẢNH BÁO KHẨN CẤP"
+      textSize = 26f
       setTextColor(Color.WHITE)
       gravity = Gravity.CENTER
-      setPadding(0, 0, 0, 30)
+      setPadding(0, 0, 0, 20)
     }
 
     // Device info
     val deviceText = TextView(this).apply {
       text = "Thiết bị: $deviceName"
       textSize = 18f
-      setTextColor(Color.WHITE)
+      setTextColor(Color.parseColor("#FFEBEE"))
       gravity = Gravity.CENTER
       setPadding(0, 0, 0, 10)
     }
 
     // Sensor info
     val sensorText = TextView(this).apply {
-      val sensorInfo = if (sensorValue != null && threshold != null) {
-        "$sensorType: $sensorValue (ngưỡng: $threshold)"
-      } else if (sensorValue != null) {
-        "$sensorType: $sensorValue"
-      } else {
-        sensorType
-      }
-      text = sensorInfo
-      textSize = 16f
+      val valueText = sensorValue ?: "—"
+      val thresholdText = threshold ?: "—"
+      text = "$sensorType: $valueText   •   Ngưỡng: $thresholdText"
+      textSize = 18f
       setTextColor(Color.WHITE)
       gravity = Gravity.CENTER
-      setPadding(0, 0, 0, 20)
+      setPadding(0, 0, 0, 16)
     }
 
     // Message
     val messageText = TextView(this).apply {
       text = body
-      textSize = 18f
-      setTextColor(Color.WHITE)
+      textSize = 16f
+      setTextColor(Color.parseColor("#FFCDD2"))
       gravity = Gravity.CENTER
-      setPadding(0, 0, 0, 50)
+      setPadding(0, 0, 0, 28)
     }
 
     // Action buttons
@@ -108,16 +105,23 @@ class EmergencyActivity : Activity() {
 
     val checkButton = Button(this).apply {
       text = "KIỂM TRA NGAY"
-      setBackgroundColor(Color.parseColor("#FF6B35"))
+      setBackgroundColor(Color.parseColor("#FF6B35")) // orange
       setTextColor(Color.WHITE)
       textSize = 16f
       setPadding(40, 20, 40, 20)
       setOnClickListener {
-        // Start main activity
-        val intent = Intent(this@EmergencyActivity, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        startActivity(intent)
-        finish()
+        startMainWithAction("inspect_device", deviceId, deviceName)
+      }
+    }
+
+    val activateButton = Button(this).apply {
+      text = "BẬT CHẾ ĐỘ KHẨN CẤP"
+      setBackgroundColor(Color.parseColor("#C62828")) // darker red
+      setTextColor(Color.WHITE)
+      textSize = 16f
+      setPadding(40, 20, 40, 20)
+      setOnClickListener {
+        startMainWithAction("activate_emergency", deviceId, deviceName)
       }
     }
 
@@ -133,6 +137,9 @@ class EmergencyActivity : Activity() {
     }
 
     buttonLayout.addView(checkButton)
+    buttonLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 16) })
+    buttonLayout.addView(activateButton)
+    buttonLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 12) })
     buttonLayout.addView(dismissButton)
 
     layout.addView(titleText)
@@ -142,6 +149,16 @@ class EmergencyActivity : Activity() {
     layout.addView(buttonLayout)
 
     setContentView(layout)
+  }
+
+  private fun startMainWithAction(action: String, deviceId: String?, deviceName: String?) {
+    val intent = Intent(this@EmergencyActivity, MainActivity::class.java)
+    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+    intent.putExtra("emergencyAction", action)
+    if (deviceId != null) intent.putExtra("deviceId", deviceId)
+    if (deviceName != null) intent.putExtra("deviceName", deviceName)
+    startActivity(intent)
+    finish()
   }
 
   override fun onBackPressed() {
