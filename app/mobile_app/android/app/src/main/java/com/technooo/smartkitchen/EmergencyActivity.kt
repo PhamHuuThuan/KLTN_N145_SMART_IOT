@@ -11,6 +11,8 @@ import android.graphics.Color
 import android.view.Gravity
 import android.widget.Toast
 import android.view.View
+import android.graphics.drawable.GradientDrawable
+import android.graphics.Typeface
 
 class EmergencyActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,40 +63,60 @@ class EmergencyActivity : Activity() {
 
     // Title
     val titleText = TextView(this).apply {
-      text = "🚨 CẢNH BÁO KHẨN CẤP"
-      textSize = 26f
+      text = "🚨  CẢNH BÁO KHẨN CẤP"
+      textSize = 28f
       setTextColor(Color.WHITE)
       gravity = Gravity.CENTER
-      setPadding(0, 0, 0, 20)
+      setPadding(0, 0, 0, 24)
+      setTypeface(typeface, Typeface.BOLD)
     }
 
     // Device info
     val deviceText = TextView(this).apply {
       text = "Thiết bị: $deviceName"
       textSize = 18f
-      setTextColor(Color.parseColor("#FFEBEE"))
+      setTextColor(Color.parseColor("#FFE6E9"))
       gravity = Gravity.CENTER
-      setPadding(0, 0, 0, 10)
+      setPadding(0, 0, 0, 6)
     }
 
     // Sensor info
     val sensorText = TextView(this).apply {
       val valueText = sensorValue ?: "—"
       val thresholdText = threshold ?: "—"
-      text = "$sensorType: $valueText   •   Ngưỡng: $thresholdText"
-      textSize = 18f
+      text = when (sensorType.lowercase()) {
+        "gas_ppm" -> "Khí gas (ppm): $valueText  •  Ngưỡng: $thresholdText"
+        "smoke" -> "Khói: $valueText  •  Ngưỡng: $thresholdText"
+        "temperature", "temp" -> "Nhiệt độ: $valueText°C  •  Ngưỡng: $thresholdText"
+        else -> "$sensorType: $valueText  •  Ngưỡng: $thresholdText"
+      }
+      textSize = 20f
       setTextColor(Color.WHITE)
       gravity = Gravity.CENTER
-      setPadding(0, 0, 0, 16)
+      setPadding(0, 0, 0, 12)
+      setTypeface(typeface, Typeface.BOLD)
     }
 
     // Message
     val messageText = TextView(this).apply {
       text = body
       textSize = 16f
-      setTextColor(Color.parseColor("#FFCDD2"))
+      setTextColor(Color.parseColor("#FFE6E9"))
       gravity = Gravity.CENTER
-      setPadding(0, 0, 0, 28)
+      setPadding(0, 0, 0, 20)
+    }
+
+    // Content card for clarity
+    val card = LinearLayout(this).apply {
+      orientation = LinearLayout.VERTICAL
+      gravity = Gravity.CENTER
+      val bg = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = 24f
+        setColor(Color.parseColor("#B71C1C"))
+      }
+      background = bg
+      setPadding(36, 28, 36, 28)
     }
 
     // Action buttons
@@ -108,7 +130,7 @@ class EmergencyActivity : Activity() {
       setBackgroundColor(Color.parseColor("#FF6B35")) // orange
       setTextColor(Color.WHITE)
       textSize = 16f
-      setPadding(40, 20, 40, 20)
+      setPadding(40, 22, 40, 22)
       setOnClickListener {
         startMainWithAction("inspect_device", deviceId, deviceName)
       }
@@ -119,7 +141,7 @@ class EmergencyActivity : Activity() {
       setBackgroundColor(Color.parseColor("#C62828")) // darker red
       setTextColor(Color.WHITE)
       textSize = 16f
-      setPadding(40, 20, 40, 20)
+      setPadding(40, 22, 40, 22)
       setOnClickListener {
         startMainWithAction("activate_emergency", deviceId, deviceName)
       }
@@ -136,17 +158,26 @@ class EmergencyActivity : Activity() {
       }
     }
 
-    buttonLayout.addView(checkButton)
-    buttonLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 16) })
-    buttonLayout.addView(activateButton)
-    buttonLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 12) })
-    buttonLayout.addView(dismissButton)
+    val btnParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+      topMargin = 10
+    }
+    val cardParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+      leftMargin = 24
+      rightMargin = 24
+      bottomMargin = 20
+    }
+
+    buttonLayout.addView(checkButton, btnParams)
+    buttonLayout.addView(activateButton, btnParams)
+    buttonLayout.addView(dismissButton, btnParams)
+
+    card.addView(deviceText)
+    card.addView(sensorText)
+    card.addView(messageText)
 
     layout.addView(titleText)
-    layout.addView(deviceText)
-    layout.addView(sensorText)
-    layout.addView(messageText)
-    layout.addView(buttonLayout)
+    layout.addView(card, cardParams)
+    layout.addView(buttonLayout, cardParams)
 
     setContentView(layout)
   }

@@ -184,10 +184,6 @@ class FCMService {
           // Send both notification and data for better compatibility
           await admin.messaging().send({
             token: t,
-            notification: {
-              title: baseData.title,
-              body: baseData.body
-            },
             data: {
               ...baseData,
               timestamp: Date.now().toString(),
@@ -199,18 +195,7 @@ class FCMService {
             },
             android: {
               priority: 'high',
-              notification: {
-                channelId: 'emergency',
-                sound: 'emergy_sound',
-                color: '#D90429',
-                visibility: 'public',
-                clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-                tag: 'emergency_alert',
-                priority: 'max',
-                defaultSound: true,
-                defaultVibrateTimings: true,
-                defaultLightSettings: true
-              }
+              ttl: 0,
             },
             apns: {
               payload: {

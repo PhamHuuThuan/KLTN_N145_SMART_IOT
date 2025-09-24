@@ -3,14 +3,19 @@ package com.technooo.smartkitchen
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.technooo.smartkitchen.R
+import android.media.AudioAttributes
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
   companion object {
@@ -36,8 +41,16 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         description = "High priority emergency alerts"
         enableLights(true)
         enableVibration(true)
+        vibrationPattern = longArrayOf(0, 1000, 500, 1000)
         setShowBadge(true)
         lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+        setSound(
+          Uri.parse("android.resource://" + packageName + "/" + R.raw.emergy_sound),
+          AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        )
       }
       
       // Create default channel for regular notifications
@@ -115,6 +128,27 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
       .setVibrate(longArrayOf(0, 1000, 500, 1000))
       .setDefaults(NotificationCompat.DEFAULT_ALL)
       .setTimeoutAfter(30000) // Auto dismiss after 30 seconds
+
+    // Proactively wake the screen and vibrate
+    try {
+      val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+      @Suppress("DEPRECATION")
+      val wakeLock = pm.newWakeLock(
+        PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+        "smartkitchen:emergencyWake"
+      )
+      wakeLock.acquire(5000)
+
+      val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 1000, 500, 1000), -1))
+      } else {
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(longArrayOf(0, 1000, 500, 1000), -1)
+      }
+    } catch (e: Exception) {
+      android.util.Log.w("FCMService", "Wake/vibrate setup failed: ${e.message}")
+    }
 
     // Show notification immediately and trigger full-screen intent
     val notificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
