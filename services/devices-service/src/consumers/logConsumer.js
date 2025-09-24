@@ -1,6 +1,7 @@
 import { Kafka } from 'kafkajs';
 import DeviceLog from '../models/DeviceLog.js';
 import Device from '../models/Device.js';
+import { emitDeviceTelemetry } from '../realtime/socket.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -100,6 +101,8 @@ async function updateDeviceStatus(data) {
         o: (payload.o || payload.outlets || prev.o || {})
       };
       console.log(`🌡️ Updated latest telemetry:`, device.latestTelemetry);
+      // Emit to socket clients
+      emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else if (type === 'event' && (payload.o || payload.outlets)) {
       // For event logs, only update outlet status in latestTelemetry
       if (!device.latestTelemetry) {
@@ -108,6 +111,8 @@ async function updateDeviceStatus(data) {
       device.latestTelemetry.o = payload.o || payload.outlets || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();
       console.log(`🔌 Updated outlet status in latestTelemetry:`, device.latestTelemetry.o);
+      // Emit to socket clients
+      emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else if (type === 'event' && payload.ack) {
       // For ack events, only update timestamp and keep existing telemetry
       console.log(`✅ ACK event received for device ${deviceId}`);
@@ -118,6 +123,7 @@ async function updateDeviceStatus(data) {
         device.latestTelemetry.ts = payload.ts || Date.now();
       }
       console.log(`📅 Updated timestamp for ACK event:`, device.latestTelemetry.ts);
+      emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else {
       console.log(`⚠️ No sensor data found in ${type} log, keeping existing telemetry`);
     }

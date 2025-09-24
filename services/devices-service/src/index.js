@@ -1,4 +1,6 @@
 import app from './app.js';
+import http from 'http';
+import { setupSocket, emitDeviceTelemetry, emitDeviceOutletUpdate } from './realtime/socket.js';
 import connectDB from './config/database.js';
 import { producer, consumer } from './config/kafka.js';
 import { startLogConsumer, stopLogConsumer } from './consumers/logConsumer.js';
@@ -76,8 +78,10 @@ const startServer = async () => {
     // Start Kafka
     await startKafka();
     
-    // Start HTTP server
-    app.listen(PORT, () => {
+    // Start HTTP + socket server
+    const server = http.createServer(app);
+    setupSocket(server);
+    server.listen(PORT, () => {
       console.log(`🚀 Devices Service running on port ${PORT}`);
     });
 

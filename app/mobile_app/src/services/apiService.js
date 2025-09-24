@@ -212,16 +212,6 @@ class ApiService {
     }
   }
 
-  // Device methods
-  async getDevices() {
-    try {
-      const response = await apiClient.get(CONFIG.ENDPOINTS.DEVICES);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch devices: ${error.message}`);
-    }
-  }
-
   async getDeviceDetail(deviceId) {
     try {
       const url = CONFIG.ENDPOINTS.DEVICE_DETAIL.replace(':deviceId', deviceId);

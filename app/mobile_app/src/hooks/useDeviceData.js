@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import apiService from '../services/apiService';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('useDeviceData');
-import CONFIG from '../constants/config';
+import environment from '../config/environment';
+import { io } from 'socket.io-client';
 
 export const useDeviceData = () => {
   const [deviceData, setDeviceData] = useState(null);
@@ -12,6 +13,7 @@ export const useDeviceData = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [deviceDetail, setDeviceDetail] = useState(null);
+  const socketRef = useRef(null);
 
   // Fetch device status
   const fetchDeviceStatus = useCallback(async (deviceId) => {
@@ -82,18 +84,91 @@ export const useDeviceData = () => {
     await fetchDeviceStatus(deviceId);
   }, [fetchDeviceStatus]);
 
-  // Auto refresh effect
+  // Initial load and socket subscription for real-time updates
   useEffect(() => {
     fetchDevices();
-    
-    const interval = setInterval(() => {
-      if (selectedDevice) {
-        fetchDeviceStatus(selectedDevice);
+
+    const devicesUrl = environment.getServiceUrl('DEVICES_SERVICE');
+    const socket = io(devicesUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      timeout: 10000,
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      log.info('socket connected to devices service');
+    });
+
+    socket.on('device.telemetry', ({ deviceId, payload }) => {
+      try {
+        if (!payload) return;
+        // If no device selected yet, do not auto-select here; fetchDevices already handles first selection
+        if (selectedDevice && deviceId !== selectedDevice) return;
+
+        const latestTelemetry = {
+          temp: payload.temp ?? null,
+          humid: payload.humid ?? null,
+          smoke: payload.smoke ?? null,
+          gas_ppm: payload.gas_ppm ?? null,
+          mq2_v: payload.mq2_v ?? null,
+          flame: payload.flame ?? null,
+          o: {
+            o1: payload.o?.o1 ?? null,
+            o2: payload.o?.o2 ?? null,
+            o3: payload.o?.o3 ?? null,
+            o4: payload.o?.o4 ?? null,
+            o5: payload.o?.o5 ?? null,
+          },
+          ts: Date.now(),
+        };
+
+        setDeviceData((prev) => ({
+          ...(prev || {}),
+          deviceId: deviceId || prev?.deviceId,
+          latestTelemetry,
+          lastUpdate: new Date().toISOString(),
+        }));
+      } catch (e) {
+        log.error('sensorData handler error', e?.message || e);
       }
-    }, CONFIG.AUTO_REFRESH_INTERVAL);
-    
-    return () => clearInterval(interval);
-  }, [fetchDevices, selectedDevice, fetchDeviceStatus]);
+    });
+
+    socket.on('device.outlet', ({ deviceId: dId, outletId, status }) => {
+      if (selectedDevice && dId !== selectedDevice) return;
+      setDeviceData((prev) => {
+        if (!prev) return prev;
+        const o = { ...(prev.latestTelemetry?.o || {}) };
+        if (outletId) o[outletId] = status;
+        return {
+          ...prev,
+          latestTelemetry: { ...(prev.latestTelemetry || {}), o },
+          lastUpdate: new Date().toISOString(),
+        };
+      });
+    });
+
+    socket.on('ack', () => {
+      // Optional: could set lastUpdate timestamp to indicate activity
+      setDeviceData((prev) => (prev ? { ...prev, lastUpdate: new Date().toISOString() } : prev));
+    });
+
+    socket.on('disconnect', () => {
+      log.warn('socket disconnected from devices service');
+    });
+
+    return () => {
+      try {
+        socket.removeAllListeners();
+        socket.disconnect();
+      } catch {}
+      socketRef.current = null;
+    };
+  }, [fetchDevices, selectedDevice]);
 
   return {
     deviceData,
