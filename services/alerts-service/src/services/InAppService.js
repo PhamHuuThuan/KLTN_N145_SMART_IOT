@@ -30,6 +30,20 @@ class InAppService {
         this._sendViaWebSocket(connection, notification);
       }
 
+      // Send via Socket.IO if available
+      if (global.io) {
+        console.log(`🔌 Sending notification via Socket.IO to user_${userId}:`, notification);
+        global.io.to(`user_${userId}`).emit('notification', notification);
+        logger.info('In-app notification sent via Socket.IO', { 
+          userId, 
+          title, 
+          notificationId: notification.id 
+        });
+        console.log(`✅ Socket.IO notification sent to user_${userId}`);
+      } else {
+        console.log('❌ Socket.IO not available (global.io is null)');
+      }
+
       // Store in database (this will be handled by the main notification service)
       logger.info('In-app notification created', { 
         userId, 

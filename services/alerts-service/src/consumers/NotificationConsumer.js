@@ -37,13 +37,17 @@ class NotificationConsumer {
         return;
       }
       
+      // Determine effective category/priority (prefer message overrides)
+      const effectiveCategory = message.category || (['gas_ppm', 'smoke'].includes(sensorType) ? 'security' : 'sensor');
+      const effectivePriority = message.priority || this._getAlertPriority(alertType, sensorType, sensorValue, threshold);
+
       const notificationData = {
         userId,
         title: this._getAlertTitle(alertType, sensorType),
         message: this._getAlertMessage(alertType, sensorType, sensorValue, threshold),
-        type: 'device_alert',
-        category: 'sensor',
-        priority: this._getAlertPriority(alertType),
+        type: effectiveCategory === 'security' ? 'security_alert' : 'device_alert',
+        category: effectiveCategory,
+        priority: effectivePriority,
         metadata: {
           deviceId,
           deviceName,
@@ -54,6 +58,9 @@ class NotificationConsumer {
         }
       };
 
+      console.log(`🚨 Device alert notification data:`, notificationData);
+      console.log(`🚨 Emergency check: category=${effectiveCategory}, priority=${effectivePriority}, type=${effectiveCategory === 'security' ? 'security_alert' : 'device_alert'}`);
+      
       await this.notificationService.sendNotification(notificationData);
       
       logger.notification('Device alert notification sent', {
@@ -155,25 +162,13 @@ class NotificationConsumer {
       
       let notificationData;
       
-      // Handle outlet toggle specifically
+      // Handle outlet toggle specifically - DISABLED
       if (action === 'outlet_toggled') {
-        console.log(`🔌 Outlet toggle: ${outletName} -> ${status} -> ${action}`);
-        notificationData = {
-          userId,
-          title: 'Outlet Control',
-          message: `[${deviceName??deviceId}] - Đã ${status ? 'bật' : 'tắt'} ${outletName}`,
-          type: 'system_notification',
-          category: 'outlet',
-          priority: 'low',
-          metadata: {
-            deviceId,
-            deviceName,
-            action,
-            outletId,
-            status,
-            result
-          }
-        };
+        console.log(`🔌 Outlet toggle: ${outletName} -> ${status} -> ${action} - NOTIFICATION DISABLED`);
+        
+        // Skip outlet notifications completely
+        console.log(`⏭️ Skipping outlet notification - disabled by user request`);
+        return;
       } else if (action === 'emergency_mode_activated') {
         notificationData = {
           userId,
@@ -239,7 +234,9 @@ class NotificationConsumer {
       }
   
       console.log(`📤 Sending notification for action: ${action}`, notificationData);
+      console.log(`📤 About to call notificationService.sendNotification for userId: ${userId}`);
       await this.notificationService.sendNotification(notificationData);
+      console.log(`📤 notificationService.sendNotification completed for userId: ${userId}`);
       
       logger.notification('User action notification sent', {
         userId,
@@ -360,13 +357,27 @@ class NotificationConsumer {
    * Get alert priority based on alert type
    * @private
    */
-  _getAlertPriority(alertType) {
+  _getAlertPriority(alertType, sensorType, sensorValue, threshold) {
+    // Elevate to urgent for dangerous sensors or severe breaches
+    if (alertType === 'threshold_exceeded') {
+      if (sensorType === 'smoke' || sensorType === 'gas_ppm') {
+        return 'urgent';
+      }
+      if (sensorType === 'temperature') {
+        const val = Number(sensorValue);
+        const thr = Number(threshold);
+        if (!Number.isNaN(val)) {
+          if (val >= 80) return 'urgent';
+          if (!Number.isNaN(thr) && val >= thr + 10) return 'high';
+        }
+        return 'medium';
+      }
+      return 'medium';
+    }
     switch (alertType) {
       case 'sensor_failure':
       case 'sensor_offline':
         return 'high';
-      case 'threshold_exceeded':
-        return 'medium';
       case 'threshold_below':
         return 'low';
       default:

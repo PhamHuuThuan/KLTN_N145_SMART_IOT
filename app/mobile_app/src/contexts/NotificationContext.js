@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, DeviceEventEmitter } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { notificationService } from '../services/notificationService';
 import { useAuth } from './AuthContext';
+import { io } from 'socket.io-client';
 
 const NotificationContext = createContext();
 
@@ -123,22 +124,159 @@ export const NotificationProvider = ({ children }) => {
     // Set notification handler for foreground
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
       console.log('🔔 Notification received in foreground:', notification);
+      console.log('🔔 Notification data:', notification.request.content.data);
+      
+      const data = notification.request.content.data || {};
+      const title = notification.request.content.title || data.title || 'Notification';
+      const body = notification.request.content.body || data.body || '';
+      
+      const notificationData = {
+        id: notification.request.identifier,
+        title,
+        body,
+        data,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        type: data.type || 'system_notification',
+        priority: data.priority || 'low',
+        category: data.category || 'system'
+      };
+      
+      console.log('🔔 Processing Expo notification:', notificationData);
+      
       // Add to local state immediately
       dispatch({
         type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
-        payload: {
-          id: notification.request.identifier,
-          title: notification.request.content.title || 'Notification',
-          body: notification.request.content.body || '',
-          data: notification.request.content.data || {},
-          isRead: false,
-          createdAt: new Date().toISOString(),
-          type: notification.request.content.data?.type || 'system_notification',
-          priority: notification.request.content.data?.priority || 'low',
-          category: notification.request.content.data?.category || 'system'
-        }
+        payload: notificationData
       });
+      
+      // Update badge count
+      const newBadgeCount = state.notifications.length + 1;
+      console.log('🔔 Setting badge count to:', newBadgeCount);
+      Notifications.setBadgeCountAsync(newBadgeCount);
     });
+
+    // Handle FCM data-only messages (when app is in foreground)
+    const handleFCMDataMessage = (message) => {
+      console.log('📱 FCM data message received:', message);
+      console.log('📱 Message structure:', JSON.stringify(message, null, 2));
+      
+      const data = message.data || {};
+      const title = data.title || message.title || 'Thông báo mới';
+      const body = data.message || data.body || message.body || 'Bạn có thông báo mới';
+      
+      const notificationData = {
+        id: `fcm_${Date.now()}`,
+        title,
+        body,
+        data,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        type: data.type || 'system_notification',
+        priority: data.priority || 'low',
+        category: data.category || 'system'
+      };
+      
+      console.log('📱 Processing FCM message:', notificationData);
+      
+      // Add to local state
+      dispatch({
+        type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
+        payload: notificationData
+      });
+      
+      // Update badge count
+      const newBadgeCount = state.notifications.length + 1;
+      console.log('🔔 Setting badge count to:', newBadgeCount);
+      Notifications.setBadgeCountAsync(newBadgeCount);
+    };
+
+    // Listen for FCM data messages from Android native code
+    const fcmDataListener = DeviceEventEmitter.addListener('FCMDataMessage', (message) => {
+      console.log('📱 Received FCMDataMessage from native:', message);
+      console.log('📱 FCMDataMessage listener is working!');
+      handleFCMDataMessage(message);
+    });
+
+    // WebSocket connection for real-time notifications
+    let socket = null;
+    if (isAuthenticated && user?.id) {
+      try {
+        console.log('🔌 Attempting WebSocket connection for user:', user.id);
+        console.log('🔌 Connecting to ws://localhost:3004');
+        
+        socket = io('http://localhost:3004', { // Use http instead of ws
+          auth: {
+            userId: user.id
+          },
+          transports: ['websocket']
+        });
+
+        socket.on('connect', () => {
+          console.log('🔌 WebSocket connected for notifications');
+          console.log('🔌 Socket ID:', socket.id);
+          // Send authentication
+          socket.emit('authenticate', { userId: user.id });
+        });
+
+        socket.on('notification', (notification) => {
+          console.log('📱 WebSocket notification received:', notification);
+          console.log('📱 Current state notifications count:', state.notifications.length);
+          
+          const notificationData = {
+            id: notification.id || `ws_${Date.now()}`,
+            title: notification.title || 'Notification',
+            body: notification.message || notification.body || '',
+            data: notification.metadata || {},
+            isRead: false,
+            createdAt: notification.timestamp || new Date().toISOString(),
+            type: notification.type || 'system_notification',
+            priority: notification.priority || 'low',
+            category: notification.category || 'system'
+          };
+          
+          console.log('📱 Processing WebSocket notification:', notificationData);
+          
+          // Add to local state
+          dispatch({
+            type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
+            payload: notificationData
+          });
+          
+          // Update badge count
+          const newBadgeCount = state.notifications.length + 1;
+          console.log('🔔 Setting badge count to:', newBadgeCount);
+          Notifications.setBadgeCountAsync(newBadgeCount);
+        });
+
+        socket.on('disconnect', () => {
+          console.log('🔌 WebSocket disconnected');
+        });
+
+        socket.on('error', (error) => {
+          console.error('🔌 WebSocket error:', error);
+        });
+
+        socket.on('connect_error', (error) => {
+          console.error('🔌 WebSocket connection error:', error);
+        });
+
+        // Test connection after 2 seconds
+        setTimeout(() => {
+          if (socket && socket.connected) {
+            console.log('✅ WebSocket connection test successful');
+          } else {
+            console.log('❌ WebSocket connection test failed');
+          }
+        }, 2000);
+
+      } catch (error) {
+        console.error('🔌 WebSocket connection failed:', error);
+      }
+    } else {
+      console.log('🔌 WebSocket not connected - user not authenticated or no user ID');
+      console.log('🔌 isAuthenticated:', isAuthenticated, 'user.id:', user?.id);
+    }
 
     // Set response handler for user interactions
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
@@ -155,6 +293,11 @@ export const NotificationProvider = ({ children }) => {
     return () => {
       notificationListener.remove();
       responseListener.remove();
+      fcmDataListener.remove();
+      if (socket) {
+        socket.disconnect();
+        console.log('🔌 WebSocket disconnected on cleanup');
+      }
     };
   }, []);
 
@@ -429,4 +572,3 @@ export const useNotificationContext = () => {
   }
   return context;
 };
-

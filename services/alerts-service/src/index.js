@@ -8,6 +8,8 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import connectDatabase from './config/database.js';
 import { connectKafka, consumeMessages, TOPICS } from './config/kafka.js';
 import notificationRoutes from './routes/notificationRoutes.js';
@@ -15,6 +17,13 @@ import NotificationConsumer from './consumers/NotificationConsumer.js';
 import logger from './utils/logger.js';
 
 const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = process.env.PORT || 3004;
 
 // Middleware
@@ -39,6 +48,27 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/notifications', notificationRoutes);
+
+// WebSocket connection handling
+io.on('connection', (socket) => {
+  console.log('🔌 WebSocket client connected:', socket.id);
+  
+  // Handle user authentication
+  socket.on('authenticate', (data) => {
+    if (data.userId) {
+      socket.userId = data.userId;
+      socket.join(`user_${data.userId}`);
+      console.log(`🔌 User ${data.userId} joined WebSocket room`);
+    }
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('🔌 WebSocket client disconnected:', socket.id);
+  });
+});
+
+// Make io available globally for sending notifications
+global.io = io;
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -123,12 +153,13 @@ const startServer = async () => {
   try {
     await initializeServices();
     
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
     logger.info('🎉 Alerts service started successfully', {
       port: PORT,
       environment: process.env.NODE_ENV || 'development',
       nodeVersion: process.version
     });
+    logger.info(`🔌 WebSocket server running on ws://localhost:${PORT}`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

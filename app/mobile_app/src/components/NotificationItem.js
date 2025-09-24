@@ -150,7 +150,7 @@ const NotificationItem = ({ notification, onPress }) => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.message}>{notification.message}</Text>
+        <Text style={styles.message}>{notification.message || notification.body || 'No message'}</Text>
 
         {notification.metadata && Object.keys(notification.metadata).length > 0 && (
           <View style={styles.metadata}>

@@ -12,6 +12,8 @@ import { useNotificationContext } from '../contexts/NotificationContext';
 const NotificationIcon = ({ onPress, size = 24, color = '#2C3E50' }) => {
   const { unreadCount } = useNotificationContext();
   const [scaleAnim] = useState(new Animated.Value(1));
+  
+  console.log('🔔 NotificationIcon - unreadCount:', unreadCount);
 
   useEffect(() => {
     if (unreadCount > 0) {
