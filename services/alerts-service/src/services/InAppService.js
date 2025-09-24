@@ -12,7 +12,7 @@ class InAppService {
    * @param {string} message - Notification message
    * @param {Object} metadata - Additional metadata
    */
-  async send(userId, title, message, metadata = {}) {
+  async send(userId, title, message, metadata = {}, type = undefined, category = undefined, priority = undefined) {
     try {
       const notification = {
         id: this._generateId(),
@@ -21,7 +21,10 @@ class InAppService {
         message,
         metadata,
         timestamp: new Date().toISOString(),
-        type: 'in_app'
+        // Preserve semantic fields so client can render consistently
+        ...(type ? { type } : {}),
+        ...(category ? { category } : {}),
+        ...(priority ? { priority } : {})
       };
 
       // Send via WebSocket if user is connected

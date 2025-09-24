@@ -146,7 +146,16 @@ class NotificationService {
     switch (channel) {
       case 'inApp':
         console.log(`📱 Calling inAppService.send for userId: ${userId}`);
-        result = await this.inAppService.send(userId, title, message, metadata);
+        // Pass type/category/priority to ensure socket payload is fully enriched
+        result = await this.inAppService.send(
+          userId,
+          title,
+          message,
+          metadata,
+          notification.type,
+          notification.category,
+          notification.priority
+        );
         console.log(`📱 inAppService.send result:`, result);
         break;
       case 'email':

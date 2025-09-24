@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { notificationService } from '../services/notificationService';
 import { useAuth } from './AuthContext';
 import { io } from 'socket.io-client';
+import ENV from '../config/environment';
 
 const NotificationContext = createContext();
 
@@ -112,6 +113,14 @@ export const NotificationProvider = ({ children }) => {
 
   // Configure notification behavior
   useEffect(() => {
+    // Small in-memory window to prevent duplicates between Socket and FCM
+    const recentKeys = new Set();
+    let lastSocketAt = 0;
+    const pushRecentKey = (key) => {
+      if (!key) return;
+      recentKeys.add(key);
+      setTimeout(() => recentKeys.delete(key), 3000);
+    };
     // Configure how notifications are handled when app is in foreground
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -123,72 +132,30 @@ export const NotificationProvider = ({ children }) => {
 
     // Set notification handler for foreground
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('🔔 Notification received in foreground:', notification);
-      console.log('🔔 Notification data:', notification.request.content.data);
-      
-      const data = notification.request.content.data || {};
-      const title = notification.request.content.title || data.title || 'Notification';
-      const body = notification.request.content.body || data.body || '';
-      
-      const notificationData = {
-        id: notification.request.identifier,
-        title,
-        body,
-        data,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        type: data.type || 'system_notification',
-        priority: data.priority || 'low',
-        category: data.category || 'system'
-      };
-      
-      console.log('🔔 Processing Expo notification:', notificationData);
-      
-      // Add to local state immediately
-      dispatch({
-        type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
-        payload: notificationData
-      });
-      
-      // Update badge count
-      const newBadgeCount = state.notifications.length + 1;
-      console.log('🔔 Setting badge count to:', newBadgeCount);
-      Notifications.setBadgeCountAsync(newBadgeCount);
+      // Do NOT update list/unread via FCM. Only use FCM to drive full-screen emergency UI.
+      const data = notification?.request?.content?.data || {};
+      const isEmergency = (data.priority || '').toLowerCase() === 'urgent' ||
+                          (data.category || '').toLowerCase() === 'security' ||
+                          (data.type || '').toLowerCase() === 'security_alert';
+      if (!isEmergency) {
+        console.log('🔕 Ignoring non-emergency FCM (socket handles list/unread)');
+        return;
+      }
+      console.log('🚨 Emergency FCM received (handled natively for full screen). Skipping list/unread.');
     });
 
     // Handle FCM data-only messages (when app is in foreground)
     const handleFCMDataMessage = (message) => {
-      console.log('📱 FCM data message received:', message);
-      console.log('📱 Message structure:', JSON.stringify(message, null, 2));
-      
-      const data = message.data || {};
-      const title = data.title || message.title || 'Thông báo mới';
-      const body = data.message || data.body || message.body || 'Bạn có thông báo mới';
-      
-      const notificationData = {
-        id: `fcm_${Date.now()}`,
-        title,
-        body,
-        data,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        type: data.type || 'system_notification',
-        priority: data.priority || 'low',
-        category: data.category || 'system'
-      };
-      
-      console.log('📱 Processing FCM message:', notificationData);
-      
-      // Add to local state
-      dispatch({
-        type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
-        payload: notificationData
-      });
-      
-      // Update badge count
-      const newBadgeCount = state.notifications.length + 1;
-      console.log('🔔 Setting badge count to:', newBadgeCount);
-      Notifications.setBadgeCountAsync(newBadgeCount);
+      // Ignore FCM data messages for list/unread. Socket is the single source of truth.
+      const data = (message && message.data) || {};
+      const isEmergency = (data.priority || '').toLowerCase() === 'urgent' ||
+                          (data.category || '').toLowerCase() === 'security' ||
+                          (data.type || '').toLowerCase() === 'security_alert';
+      if (!isEmergency) {
+        console.log('🔕 Ignoring non-emergency FCM data (socket handles list/unread)');
+        return;
+      }
+      console.log('🚨 Emergency FCM data received — native layer will handle full screen.');
     };
 
     // Listen for FCM data messages from Android native code
@@ -203,13 +170,14 @@ export const NotificationProvider = ({ children }) => {
     if (isAuthenticated && user?.id) {
       try {
         console.log('🔌 Attempting WebSocket connection for user:', user.id);
-        console.log('🔌 Connecting to ws://localhost:3004');
+        const alertsUrl = ENV.getServiceUrl('ALERTS_SERVICE');
+        console.log('🔌 Connecting to', alertsUrl);
         
-        socket = io('http://localhost:3004', { // Use http instead of ws
+        socket = io(alertsUrl, {
           auth: {
             userId: user.id
           },
-          transports: ['websocket']
+          transports: ['polling']
         });
 
         socket.on('connect', () => {
@@ -223,19 +191,35 @@ export const NotificationProvider = ({ children }) => {
           console.log('📱 WebSocket notification received:', notification);
           console.log('📱 Current state notifications count:', state.notifications.length);
           
+          // Map WebSocket notification to match API structure
           const notificationData = {
             id: notification.id || `ws_${Date.now()}`,
             title: notification.title || 'Notification',
             body: notification.message || notification.body || '',
+            message: notification.message || notification.body || '', // Add message field for compatibility
             data: notification.metadata || {},
+            metadata: notification.metadata || {}, // Add metadata field for compatibility
             isRead: false,
             createdAt: notification.timestamp || new Date().toISOString(),
             type: notification.type || 'system_notification',
             priority: notification.priority || 'low',
-            category: notification.category || 'system'
+            category: notification.category || 'system',
+            // Add additional fields that might be missing
+            deviceId: notification.metadata?.deviceId,
+            deviceName: notification.metadata?.deviceName,
+            sensorType: notification.metadata?.sensorType,
+            sensorValue: notification.metadata?.sensorValue,
+            threshold: notification.metadata?.threshold,
+            alertType: notification.metadata?.alertType
           };
           
+          // Dedupe: record this key so upcoming FCM for same event is skipped
+          const dedupeKey = `${notificationData.type}|${notificationData.title}|${notificationData.body}|${notificationData.deviceId || ''}|${notificationData.sensorType || ''}`;
+          pushRecentKey(dedupeKey);
+          lastSocketAt = Date.now();
+
           console.log('📱 Processing WebSocket notification:', notificationData);
+          console.log('📱 WebSocket notification structure:', JSON.stringify(notificationData, null, 2));
           
           // Add to local state
           dispatch({
