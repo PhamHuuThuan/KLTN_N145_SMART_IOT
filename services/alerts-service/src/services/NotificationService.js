@@ -146,7 +146,16 @@ class NotificationService {
     switch (channel) {
       case 'inApp':
         console.log(`📱 Calling inAppService.send for userId: ${userId}`);
-        result = await this.inAppService.send(userId, title, message, metadata);
+        // Pass type/category/priority to ensure socket payload is fully enriched
+        result = await this.inAppService.send(
+          userId,
+          title,
+          message,
+          metadata,
+          notification.type,
+          notification.category,
+          notification.priority
+        );
         console.log(`📱 inAppService.send result:`, result);
         break;
       case 'email':
@@ -172,14 +181,34 @@ class NotificationService {
         break;
       case 'fcm':
         if (preferences.fcm.tokens.length > 0) {
-          console.log(`🔥 Calling fcmService.send to ${preferences.fcm.tokens.length} tokens`);
-          result = await this.fcmService.send(
-            preferences.fcm.tokens,
-            title,
-            message,
-            metadata
-          );
-          console.log(`🔥 fcmService.send result:`, result);
+          console.log(`🔥 Calling fcmService for ${preferences.fcm.tokens.length} tokens`);
+          
+          // Use sendEmergency for urgent/security notifications
+          if (notification.priority === 'urgent' || notification.category === 'security' || notification.type === 'security_alert') {
+            console.log(`🚨 Sending emergency FCM notification`);
+            result = await this.fcmService.sendEmergency(
+              preferences.fcm.tokens,
+              title,
+              message,
+              {
+                ...metadata,
+                deviceId: metadata.deviceId,
+                deviceName: metadata.deviceName,
+                sensorType: metadata.sensorType,
+                sensorValue: metadata.sensorValue,
+                threshold: metadata.threshold
+              }
+            );
+          } else {
+            console.log(`📱 Sending regular FCM notification`);
+            result = await this.fcmService.send(
+              preferences.fcm.tokens,
+              title,
+              message,
+              metadata
+            );
+          }
+          console.log(`🔥 fcmService result:`, result);
         }
         break;
     }

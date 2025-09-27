@@ -385,13 +385,18 @@ class RuleEvaluationService {
         }
       }
 
+      // Determine risk level
+      const isDangerousSensor = sensorType === 'smoke' || sensorType === 'gas_ppm';
+      const tempHigh = sensorType === 'temperature' && Number(sensorValue) >= 80;
+      const elevateSecurity = isDangerousSensor || tempHigh;
+
       const message = {
-        userId: rule.ownerId.toString(), // Convert ObjectId to string
+        userId: rule.ownerId.toString(),
         title: `Cảnh báo ${sensorType}`,
         message: detailedMessage,
-        type: 'device_alert',
-        category: 'rule',
-        priority: action.priority || 'medium',
+        type: elevateSecurity ? 'security_alert' : 'device_alert',
+        category: elevateSecurity ? 'security' : 'rule',
+        priority: elevateSecurity ? 'urgent' : (action.priority || 'medium'),
         metadata: {
           ruleId: rule._id.toString(),
           ruleName: rule.name,
@@ -436,13 +441,23 @@ class RuleEvaluationService {
    * @param {Object} sensorData - Dữ liệu sensor
    */
   async sendAlertAction(action, rule, sensorData) {
+    // Infer severity from sensor data
+    const sensorType = this.getTriggeredSensorType(rule.conditions, sensorData);
+    const sensorValue = this.getTriggeredSensorValue(rule.conditions, sensorData);
+    const threshold = this.getTriggeredThreshold(rule.conditions);
+    const isDangerousSensor = sensorType === 'smoke' || sensorType === 'gas_ppm';
+    const tempHigh = sensorType === 'temperature' && Number(sensorValue) >= 80;
+    const elevateSecurity = isDangerousSensor || tempHigh;
+
     const message = {
       deviceId: rule.deviceId,
       deviceName: `Device ${rule.deviceId}`,
-      sensorType: this.getTriggeredSensorType(rule.conditions, sensorData),
-      sensorValue: this.getTriggeredSensorValue(rule.conditions, sensorData),
-      threshold: this.getTriggeredThreshold(rule.conditions),
+      sensorType,
+      sensorValue,
+      threshold,
       alertType: 'threshold_exceeded',
+      category: elevateSecurity ? 'security' : 'sensor',
+      priority: elevateSecurity ? 'urgent' : 'medium',
       userId: rule.ownerId,
       ruleId: rule._id.toString(),
       ruleName: rule.name,

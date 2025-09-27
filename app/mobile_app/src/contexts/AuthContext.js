@@ -3,6 +3,9 @@ import authService from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { setAuthToken, clearAuthToken } from '../services/apiService';
 import * as Notifications from 'expo-notifications';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('Auth');
 
 const AuthContext = createContext();
 
@@ -49,7 +52,7 @@ export const AuthProvider = ({ children }) => {
         notificationService.clearAuthToken();
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      log.error('Error checking auth status', error?.message || error);
       setUser(null);
       setIsAuthenticated(false);
       setToken(null);
@@ -76,7 +79,7 @@ export const AuthProvider = ({ children }) => {
         try {
           await registerFCMToken(result.user.id);
         } catch (fcmError) {
-          console.warn('FCM token registration failed during login:', fcmError);
+          log.warn('FCM token registration failed during login', fcmError?.message || fcmError);
           // Don't fail login if FCM registration fails
         }
         
@@ -109,7 +112,7 @@ export const AuthProvider = ({ children }) => {
         try {
           await registerFCMToken(result.user.id);
         } catch (fcmError) {
-          console.warn('FCM token registration failed during registration:', fcmError);
+          log.warn('FCM token registration failed during registration', fcmError?.message || fcmError);
           // Don't fail registration if FCM registration fails
         }
         
@@ -189,7 +192,7 @@ export const AuthProvider = ({ children }) => {
   const registerFCMToken = async (userId) => {
     try {
       if (!userId) {
-        console.warn('No userId provided for FCM token registration');
+        log.warn('No userId provided for FCM token registration');
         return;
       }
 
@@ -202,20 +205,20 @@ export const AuthProvider = ({ children }) => {
           projectId: '5ea86a56-b10e-4a1b-88a7-6692b50872ed'
         });
 
-        console.log('🔔 Expo push token acquired:', token.data);
-        console.log('📱 Full token object:', token);
+        log.info('Expo push token acquired', token?.data);
+        log.debug('Full token object', token);
         
         // Check if it's a real FCM token or Expo push token
         if (token.data.startsWith('ExponentPushToken[')) {
-          console.warn('⚠️ Got Expo push token instead of FCM token - skipping registration');
+          log.warn('Got Expo push token instead of FCM token - skipping registration');
           // Don't register Expo push token, only register real FCM tokens
           return;
         } else {
-          console.log('✅ Got real FCM token');
+          log.info('Got real FCM token');
           fcmToken = token.data;
         }
       } catch (error) {
-        console.error('Error getting Expo push token:', error);
+        log.error('Error getting Expo push token', error?.message || error);
         throw error;
       }
 
@@ -224,17 +227,17 @@ export const AuthProvider = ({ children }) => {
         const result = await notificationService.addFCMToken(userId, fcmToken, 'android');
         
         if (result.success) {
-          console.log('✅ FCM token registered successfully for user:', userId);
-          console.log('📊 Token count:', result.data?.tokenCount);
+          log.info('FCM token registered successfully for user', userId);
+          log.debug('Token count', result.data?.tokenCount);
         } else {
-          console.warn('⚠️ FCM token registration failed:', result.message);
+          log.warn('FCM token registration failed', result.message);
           throw new Error(result.message || 'FCM token registration failed');
         }
       } else {
-        console.warn('❌ No FCM token available - token:', token);
+        log.warn('No FCM token available');
       }
     } catch (error) {
-      console.error('Error registering FCM token:', error);
+      log.error('Error registering FCM token', error?.message || error);
       throw error;
     }
   };

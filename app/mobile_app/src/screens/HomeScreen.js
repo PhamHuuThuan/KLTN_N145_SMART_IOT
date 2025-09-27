@@ -17,6 +17,9 @@ import OutletGrid from '../components/OutletGrid';
 import DeviceInfoModal from '../components/DeviceInfoModal';
 import ActionFeedback from '../components/ActionFeedback';
 import apiService from '../services/apiService';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('Home');
 import CONFIG from '../constants/config';
 
 const HomeScreen = ({ navigation }) => {
@@ -77,11 +80,11 @@ const HomeScreen = ({ navigation }) => {
           onUpdateOutletSettings={async (outletId, settings) => {
             try {
               const response = await apiService.updateOutletSettings(selectedDevice, outletId, settings);
-              console.log('Outlet settings updated:', response);
+              log.info('Outlet settings updated');
               // Refresh device data
               await fetchDeviceStatus(selectedDevice);
             } catch (error) {
-              console.error('Error updating outlet settings:', error);
+              log.error('Error updating outlet settings', error?.message || error);
               setFeedback({ visible: true, type: 'error', message: error.message || 'Failed to update outlet settings' });
             }
           }}

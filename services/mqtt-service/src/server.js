@@ -89,7 +89,6 @@ function createServer() {
       const response = { success: true, data: devices, count: devices.length };
       res.json(response);
     } catch (error) {
-      console.error('❌ Error fetching devices:', error.message);
       res.status(500).json({ error: 'Failed to fetch devices' });
     }
   });
@@ -107,7 +106,6 @@ function createServer() {
         res.status(404).json({ success: false, error: 'Device not found' });
       }
     } catch (error) {
-      console.error('❌ Error fetching device:', error.message);
       res.status(500).json({ error: 'Failed to fetch device' });
     }
   });

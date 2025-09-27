@@ -85,12 +85,15 @@ class FCMService {
         data: {
           ...sanitizedData,
           timestamp: Date.now().toString(),
-          type: String((data && data.type) || 'notification')
+          type: String((data && data.type) || 'notification'),
+          title: title,
+          body: body,
+          category: data.category || 'system',
+          priority: data.priority || 'low'
         },
         android: {
           priority: 'high',
           notification: {
-            // Small icon must be an app resource. Configure in app.json; do not set remote URL here
             color: '#2C3E50',
             sound: 'default',
             clickAction: 'FLUTTER_NOTIFICATION_CLICK',
@@ -142,6 +145,84 @@ class FCMService {
       return { successCount, failureCount, totalTokens: flatTokens.length };
     } catch (error) {
       logger.error('Error sending FCM notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send high-priority emergency alert with full-screen notification
+   * @param {Array} tokens - FCM tokens
+   * @param {string} title - Title (for fallback)
+   * @param {string} body - Body (for fallback)
+   * @param {Object} data - Must include type/category/priority and metadata
+   */
+  async sendEmergency(tokens, title, body, data = {}) {
+    try {
+      if (!this.initialized) {
+        logger.warn('FCM service not initialized, skipping emergency send');
+        return null;
+      }
+
+      const flatTokens = tokens.map(t => t.token || t).filter(Boolean);
+      let successCount = 0;
+      let failureCount = 0;
+
+      // Normalize emergency data payload (strings only)
+      const baseData = Object.fromEntries(
+        Object.entries({
+          type: 'security_alert',
+          category: 'security',
+          priority: 'urgent',
+          title: String(title || 'Cảnh báo khẩn cấp'),
+          body: String(body || 'Phát hiện sự cố an toàn. Mở ngay.'),
+          ...data,
+        }).map(([k, v]) => [k, typeof v === 'string' ? v : String(v)])
+      );
+
+      for (const t of flatTokens) {
+        try {
+          // Send both notification and data for better compatibility
+          await admin.messaging().send({
+            token: t,
+            data: {
+              ...baseData,
+              timestamp: Date.now().toString(),
+              type: String(baseData.type || 'security_alert'),
+              title: baseData.title,
+              body: baseData.body,
+              category: baseData.category || 'security',
+              priority: baseData.priority || 'urgent'
+            },
+            android: {
+              priority: 'high',
+              ttl: 0,
+            },
+            apns: {
+              payload: {
+                aps: {
+                  sound: 'default',
+                  badge: 1,
+                  alert: {
+                    title: baseData.title,
+                    body: baseData.body
+                  },
+                  'content-available': 1,
+                  'mutable-content': 1
+                }
+              }
+            }
+          });
+          successCount++;
+        } catch (e) {
+          failureCount++;
+          logger.error('Emergency FCM send failed', { token: t, error: e?.message });
+        }
+      }
+
+      logger.info('Emergency notification sent', { successCount, failureCount, totalTokens: flatTokens.length });
+      return { successCount, failureCount, totalTokens: flatTokens.length };
+    } catch (error) {
+      logger.error('Error sending emergency notification:', error);
       throw error;
     }
   }

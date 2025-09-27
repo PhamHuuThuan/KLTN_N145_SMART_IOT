@@ -1,5 +1,8 @@
 import axios from 'axios';
 import environment from '../config/environment';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('Notifications');
 
 class NotificationService {
   constructor() {
@@ -8,22 +11,22 @@ class NotificationService {
     this.authToken = null;
     this.client = null; // Cache axios client
     
-    // Log configuration on initialization
-    console.log('🔔 NotificationService initialized:', this.baseUrl);
+    // Minimal init log
+    log.info('Initialized', this.baseUrl);
   }
 
   // Set auth token (should be called from AuthContext)
   setAuthToken(token) {
     this.authToken = token;
     this.client = null; // Reset client to recreate with new token
-    console.log('🔔 Auth token set');
+    log.debug('Auth token set');
   }
 
   // Clear auth token
   clearAuthToken() {
     this.authToken = null;
     this.client = null; // Reset client
-    console.log('🔔 Auth token cleared');
+    log.debug('Auth token cleared');
   }
 
   getApiClient() {
@@ -32,7 +35,7 @@ class NotificationService {
       return this.client;
     }
     
-    // console.log('🔔 Creating axios client with baseURL:', this.baseUrl);
+    // Create axios client
     
     this.client = axios.create({
       baseURL: this.baseUrl,
@@ -46,11 +49,11 @@ class NotificationService {
     // Add request interceptor for logging
     this.client.interceptors.request.use(
       (config) => {
-        console.log(`🔔 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+        log.info(`${(config.method || 'GET').toUpperCase()} ${config.baseURL}${config.url}`);
         return config;
       },
       (error) => {
-        console.error('❌ NotificationService Request Error:', error);
+        log.error('Request error', error?.message || error);
         return Promise.reject(error);
       }
     );
@@ -58,11 +61,13 @@ class NotificationService {
     // Add response interceptor for logging
     this.client.interceptors.response.use(
       (response) => {
-        console.log(`✅ ${response.status} ${response.config.url}`);
+        log.info(`${response.status} ${response.config.url}`);
         return response;
       },
       (error) => {
-        console.error(`❌ ${error.response?.status || 'ERROR'} ${error.config?.url} - ${error.message}`);
+        const status = error?.response?.status;
+        const url = error?.config?.url;
+        log.error('Response error', status ? `${status} ${url}` : error?.message || String(error));
         return Promise.reject(error);
       }
     );
@@ -90,7 +95,7 @@ class NotificationService {
       
       return null;
     } catch (error) {
-      console.warn('Could not get auth token:', error);
+      log.warn('Could not get auth token', error?.message || error);
       return null;
     }
   }
@@ -111,7 +116,7 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      log.error('getNotifications error', error?.message || error);
       return {
         success: false,
         message: error.message,
@@ -130,7 +135,7 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      log.error('markAsRead error', error?.message || error);
       return {
         success: false,
         message: error.message,
@@ -149,7 +154,7 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      log.error('markAllAsRead error', error?.message || error);
       return {
         success: false,
         message: error.message,
@@ -169,7 +174,7 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      log.error('deleteNotification error', error?.message || error);
       return {
         success: false,
         message: error.message,
@@ -189,7 +194,7 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error getting notification stats:', error);
+      log.error('getNotificationStats error', error?.message || error);
       return {
         success: false,
         message: error.message,
@@ -209,7 +214,7 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error getting notification preferences:', error);
+      log.error('getPreferences error', error?.message || error);
       return {
         success: false,
         message: error.message,
@@ -229,7 +234,7 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error updating notification preferences:', error);
+      log.error('updatePreferences error', error?.message || error);
       return {
         success: false,
         message: error.message,
@@ -249,7 +254,7 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error adding FCM token:', error);
+      log.error('addFCMToken error', error?.message || error);
       return {
         success: false,
         message: error.message,
@@ -269,7 +274,7 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error removing FCM token:', error);
+      log.error('removeFCMToken error', error?.message || error);
       return {
         success: false,
         message: error.message,
@@ -290,40 +295,11 @@ class NotificationService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error sending test notification:', error);
+      log.error('testNotification error', error?.message || error);
       return {
         success: false,
         message: error.message,
         data: null
-      };
-    }
-  }
-
-  // Test API connection
-  async testConnection() {
-    try {
-      // Test with health endpoint first
-      const healthResponse = await this.getApiClient().get('/health');
-      console.log('✅ Health endpoint successful');
-      
-      // Try to get user preferences as a simple test
-      const testUserId = 'test-user-id';
-      const url = `/user/${testUserId}/preferences`;
-      
-      const response = await this.getApiClient().get(url);
-      console.log('✅ API connection successful');
-      return {
-        success: true,
-        message: 'API connection successful',
-        status: response.status
-      };
-    } catch (error) {
-      console.error('❌ API connection failed:', error);
-      return {
-        success: false,
-        message: error.message,
-        status: error.response?.status,
-        error: error.response?.data
       };
     }
   }

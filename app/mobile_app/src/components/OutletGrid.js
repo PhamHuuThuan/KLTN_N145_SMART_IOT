@@ -5,6 +5,9 @@ import ActionFeedback from './ActionFeedback';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OutletDetail from './OutletDetail';
 import CONFIG from '../constants/config';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('OutletGrid');
 
 const OutletGrid = ({ 
   selectedDevice, 
@@ -43,18 +46,18 @@ const OutletGrid = ({
   };
 
   const handleOutletControl = async (action, deviceId, outletId) => {
-    console.log(`🔌 OutletGrid handleOutletControl: ${action}, deviceId: ${deviceId}, outletId: ${outletId}`);
-    console.log(`📋 OutletGrid props: onControlOutlet=${typeof onControlOutlet}, selectedDevice=${selectedDevice}`);
+    log.debug('handleOutletControl', action, deviceId, outletId);
+    log.debug('props', { hasOnControlOutlet: typeof onControlOutlet, selectedDevice });
     
     const targetDeviceId = deviceId || selectedDevice;
     if (!targetDeviceId) {
-      console.error(`❌ No device ID provided`);
+      log.error('No device ID provided');
       return false;
     }
 
     const outletIndex = outlets.findIndex(outlet => outlet.id === outletId);
     if (outletIndex === -1) {
-      console.error(`❌ Outlet not found: ${outletId}`);
+      log.error('Outlet not found', outletId);
       return false;
     }
 
@@ -72,11 +75,11 @@ const OutletGrid = ({
       }),
     ]).start();
 
-    console.log(`📤 Calling onControlOutlet: ${action}, ${targetDeviceId}, ${outletId}`);
+    log.debug('Calling onControlOutlet', action, targetDeviceId, outletId);
     setShowLoader(true);
     const success = await onControlOutlet(action, targetDeviceId, outletId);
     setShowLoader(false);
-    console.log(`📊 OutletGrid result: ${success}`);
+    log.debug('result', success);
     if (success) {
       setFeedback({ visible: true, type: 'success', message: `Outlet ${action}` });
     } else {
@@ -91,7 +94,7 @@ const OutletGrid = ({
     const success = await handleOutletControl(action, selectedDevice, outletId);
     
     if (success) {
-      console.log(`✅ Quick toggle ${action} for outlet ${outletId}`);
+      log.info('Quick toggle', action, outletId);
       // Refresh device data after successful toggle
       if (onRefreshDeviceData) {
         setTimeout(() => {
@@ -99,7 +102,7 @@ const OutletGrid = ({
         }, 500);
       }
     } else {
-      console.error(`❌ Failed to toggle outlet ${outletId}`);
+      log.error('Failed to toggle outlet', outletId);
     }
   };
 

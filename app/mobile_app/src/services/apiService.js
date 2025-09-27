@@ -1,6 +1,9 @@
 import axios from 'axios';
 import CONFIG from '../constants/config';
 import environment from '../config/environment';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('API');
 
 // Create axios instance with base configuration
 const apiClient = axios.create({
@@ -37,11 +40,11 @@ export const clearAuthToken = () => {
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
-    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${environment.API_BASE_URL}${config.url}`);
+    log.info(`${(config.method || 'GET').toUpperCase()} ${environment.API_BASE_URL}${config.url}`);
     return config;
   },
   (error) => {
-    console.error('❌ API Request Error:', error);
+    log.error('Request error', error?.message || error);
     return Promise.reject(error);
   }
 );
@@ -49,11 +52,14 @@ apiClient.interceptors.request.use(
 // Response interceptor
 apiClient.interceptors.response.use(
   (response) => {
-    console.log(`✅ API Response: ${response.status} ${response.config.url}`);
+    // Keep response log concise at info level
+    log.info(`${response.status} ${response.config.url}`);
     return response;
   },
   (error) => {
-    console.error('❌ API Response Error:', error.response?.status, error.message);
+    const status = error?.response?.status;
+    const url = error?.config?.url;
+    log.error('Response error', status ? `${status} ${url}` : error?.message || String(error));
     return Promise.reject(error);
   }
 );
@@ -154,12 +160,11 @@ class ApiService {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
-      console.log(`🔌 API toggleOutlet: ${url}`);
+      log.debug('toggleOutlet', url);
       const response = await apiClient.put(url);
-      console.log(`✅ API toggleOutlet response:`, response.data);
       return response.data;
     } catch (error) {
-      console.error(`❌ API toggleOutlet error:`, error);
+      log.error('toggleOutlet error', error?.message || error);
       throw new Error(`Failed to toggle outlet: ${error.message}`);
     }
   }
@@ -170,12 +175,11 @@ class ApiService {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
-      console.log(`🔌 API turnOnOutlet: ${url}`, { status: true });
+      log.debug('turnOnOutlet', url);
       const response = await apiClient.put(url, { status: true });
-      console.log(`✅ API turnOnOutlet response:`, response.data);
       return response.data;
     } catch (error) {
-      console.error(`❌ API turnOnOutlet error:`, error);
+      log.error('turnOnOutlet error', error?.message || error);
       throw new Error(`Failed to turn on outlet: ${error.message}`);
     }
   }
@@ -186,12 +190,11 @@ class ApiService {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
-      console.log(`🔌 API turnOffOutlet: ${url}`, { status: false });
+      log.debug('turnOffOutlet', url);
       const response = await apiClient.put(url, { status: false });
-      console.log(`✅ API turnOffOutlet response:`, response.data);
       return response.data;
     } catch (error) {
-      console.error(`❌ API turnOffOutlet error:`, error);
+      log.error('turnOffOutlet error', error?.message || error);
       throw new Error(`Failed to turn off outlet: ${error.message}`);
     }
   }
@@ -206,16 +209,6 @@ class ApiService {
       return response.data;
     } catch (error) {
       throw new Error(`Failed to update outlet settings: ${error.message}`);
-    }
-  }
-
-  // Device methods
-  async getDevices() {
-    try {
-      const response = await apiClient.get(CONFIG.ENDPOINTS.DEVICES);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch devices: ${error.message}`);
     }
   }
 

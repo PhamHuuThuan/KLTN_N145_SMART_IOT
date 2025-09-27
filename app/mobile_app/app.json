@@ -23,7 +23,13 @@
       "edgeToEdgeEnabled": true,
       "useNextNotificationsApi": true,
       "googleServicesFile": "./google-services.json",
-      "package": "com.technooo.smartkitchen"
+      "package": "com.technooo.smartkitchen",
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "WAKE_LOCK",
+        "USE_FULL_SCREEN_INTENT",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/logo_app.png",

@@ -12,7 +12,7 @@ class InAppService {
    * @param {string} message - Notification message
    * @param {Object} metadata - Additional metadata
    */
-  async send(userId, title, message, metadata = {}) {
+  async send(userId, title, message, metadata = {}, type = undefined, category = undefined, priority = undefined) {
     try {
       const notification = {
         id: this._generateId(),
@@ -21,13 +21,30 @@ class InAppService {
         message,
         metadata,
         timestamp: new Date().toISOString(),
-        type: 'in_app'
+        // Preserve semantic fields so client can render consistently
+        ...(type ? { type } : {}),
+        ...(category ? { category } : {}),
+        ...(priority ? { priority } : {})
       };
 
       // Send via WebSocket if user is connected
       if (this.activeConnections.has(userId)) {
         const connection = this.activeConnections.get(userId);
         this._sendViaWebSocket(connection, notification);
+      }
+
+      // Send via Socket.IO if available
+      if (global.io) {
+        console.log(`🔌 Sending notification via Socket.IO to user_${userId}:`, notification);
+        global.io.to(`user_${userId}`).emit('notification', notification);
+        logger.info('In-app notification sent via Socket.IO', { 
+          userId, 
+          title, 
+          notificationId: notification.id 
+        });
+        console.log(`✅ Socket.IO notification sent to user_${userId}`);
+      } else {
+        console.log('❌ Socket.IO not available (global.io is null)');
       }
 
       // Store in database (this will be handled by the main notification service)

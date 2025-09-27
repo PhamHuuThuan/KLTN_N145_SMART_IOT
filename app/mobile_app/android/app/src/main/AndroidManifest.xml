@@ -5,6 +5,12 @@
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+  <uses-permission android:name="android.permission.DISABLE_KEYGUARD"/>
+  <uses-permission android:name="android.permission.SHOW_WHEN_LOCKED"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -26,5 +32,28 @@
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
     </activity>
+
+    <activity
+      android:name=".EmergencyActivity"
+      android:showWhenLocked="true"
+      android:turnScreenOn="true"
+      android:excludeFromRecents="true"
+      android:launchMode="singleTask"
+      android:exported="false"
+      android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+      android:screenOrientation="portrait" />
+
+    <service
+      android:name=".MyFirebaseMessagingService"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+      </intent-filter>
+    </service>
+
+    <service
+      android:name=".EmergencySoundService"
+      android:exported="false"
+      android:foregroundServiceType="mediaPlayback" />
   </application>
 </manifest>

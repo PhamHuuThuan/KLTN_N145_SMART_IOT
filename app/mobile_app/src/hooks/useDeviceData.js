@@ -1,6 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import apiService from '../services/apiService';
-import CONFIG from '../constants/config';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('useDeviceData');
+import environment from '../config/environment';
+import { io } from 'socket.io-client';
 
 export const useDeviceData = () => {
   const [deviceData, setDeviceData] = useState(null);
@@ -9,15 +13,16 @@ export const useDeviceData = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [deviceDetail, setDeviceDetail] = useState(null);
+  const socketRef = useRef(null);
 
   // Fetch device status
   const fetchDeviceStatus = useCallback(async (deviceId) => {
     if (!deviceId) return;
     
     try {
-      console.log('📱 Fetching status for device:', deviceId);
+      log.debug('fetch status', deviceId);
       const response = await apiService.getDeviceStatus(deviceId);
-      console.log('📱 Device status received:', response);
+      log.debug('status received');
       // apiService returns already-unwrapped data; ensure safe defaults
       const data = response?.data || response || {};
       setDeviceData({
@@ -27,7 +32,7 @@ export const useDeviceData = () => {
         ...data,
       });
     } catch (err) {
-      console.error('Error fetching device status:', err);
+      log.error('fetchDeviceStatus error', err?.message || err);
       setError(err.message);
     }
   }, []);
@@ -41,7 +46,7 @@ export const useDeviceData = () => {
       const response = await apiService.getDevices();
       const devices = response.data || [];
       
-      console.log('📱 Devices received:', devices);
+      log.info('devices loaded', devices.length);
       
       // Map devices to get deviceId, guard against bad entries
       const deviceIds = devices.map(device => device?.deviceId).filter(Boolean);
@@ -50,12 +55,12 @@ export const useDeviceData = () => {
       // Only auto-select first device if nothing selected yet
       if (!selectedDevice && deviceIds.length > 0) {
         const firstDevice = deviceIds[0];
-        console.log('📱 Auto-selected device:', firstDevice);
+        log.info('auto-selected device', firstDevice);
         setSelectedDevice(firstDevice);
         await fetchDeviceStatus(firstDevice);
       }
     } catch (err) {
-      console.error('Error fetching devices:', err);
+      log.error('fetchDevices error', err?.message || err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -69,7 +74,7 @@ export const useDeviceData = () => {
       const response = await apiService.getDeviceDetail(deviceId);
       setDeviceDetail(response.data || response);
     } catch (err) {
-      console.error('Error fetching device detail:', err);
+      log.error('fetchDeviceDetail error', err?.message || err);
     }
   }, []);
 
@@ -79,18 +84,91 @@ export const useDeviceData = () => {
     await fetchDeviceStatus(deviceId);
   }, [fetchDeviceStatus]);
 
-  // Auto refresh effect
+  // Initial load and socket subscription for real-time updates
   useEffect(() => {
     fetchDevices();
-    
-    const interval = setInterval(() => {
-      if (selectedDevice) {
-        fetchDeviceStatus(selectedDevice);
+
+    const devicesUrl = environment.getServiceUrl('DEVICES_SERVICE');
+    const socket = io(devicesUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      timeout: 10000,
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      log.info('socket connected to devices service');
+    });
+
+    socket.on('device.telemetry', ({ deviceId, payload }) => {
+      try {
+        if (!payload) return;
+        // If no device selected yet, do not auto-select here; fetchDevices already handles first selection
+        if (selectedDevice && deviceId !== selectedDevice) return;
+
+        const latestTelemetry = {
+          temp: payload.temp ?? null,
+          humid: payload.humid ?? null,
+          smoke: payload.smoke ?? null,
+          gas_ppm: payload.gas_ppm ?? null,
+          mq2_v: payload.mq2_v ?? null,
+          flame: payload.flame ?? null,
+          o: {
+            o1: payload.o?.o1 ?? null,
+            o2: payload.o?.o2 ?? null,
+            o3: payload.o?.o3 ?? null,
+            o4: payload.o?.o4 ?? null,
+            o5: payload.o?.o5 ?? null,
+          },
+          ts: Date.now(),
+        };
+
+        setDeviceData((prev) => ({
+          ...(prev || {}),
+          deviceId: deviceId || prev?.deviceId,
+          latestTelemetry,
+          lastUpdate: new Date().toISOString(),
+        }));
+      } catch (e) {
+        log.error('sensorData handler error', e?.message || e);
       }
-    }, CONFIG.AUTO_REFRESH_INTERVAL);
-    
-    return () => clearInterval(interval);
-  }, [fetchDevices, selectedDevice, fetchDeviceStatus]);
+    });
+
+    socket.on('device.outlet', ({ deviceId: dId, outletId, status }) => {
+      if (selectedDevice && dId !== selectedDevice) return;
+      setDeviceData((prev) => {
+        if (!prev) return prev;
+        const o = { ...(prev.latestTelemetry?.o || {}) };
+        if (outletId) o[outletId] = status;
+        return {
+          ...prev,
+          latestTelemetry: { ...(prev.latestTelemetry || {}), o },
+          lastUpdate: new Date().toISOString(),
+        };
+      });
+    });
+
+    socket.on('ack', () => {
+      // Optional: could set lastUpdate timestamp to indicate activity
+      setDeviceData((prev) => (prev ? { ...prev, lastUpdate: new Date().toISOString() } : prev));
+    });
+
+    socket.on('disconnect', () => {
+      log.warn('socket disconnected from devices service');
+    });
+
+    return () => {
+      try {
+        socket.removeAllListeners();
+        socket.disconnect();
+      } catch {}
+      socketRef.current = null;
+    };
+  }, [fetchDevices, selectedDevice]);
 
   return {
     deviceData,
@@ -103,6 +181,6 @@ export const useDeviceData = () => {
     selectDevice,
     fetchDeviceStatus,
     fetchDeviceDetail,
-    refreshDevices: fetchDevices, // Alias for consistency
+    refreshDevices: fetchDevices,
   };
 };

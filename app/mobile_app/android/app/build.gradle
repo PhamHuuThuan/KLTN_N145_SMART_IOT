@@ -179,6 +179,10 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Firebase Messaging for FCM data-only handling
+    implementation platform('com.google.firebase:firebase-bom:33.3.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }
 
 apply plugin: 'com.google.gms.google-services'

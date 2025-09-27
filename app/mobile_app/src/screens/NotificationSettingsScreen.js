@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Switch, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Switch, TextInput, TouchableOpacity, Alert, ScrollView, Linking, Platform } from 'react-native';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as Application from 'expo-application';
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('NotifSettings');
 import { useAuth } from '../contexts/AuthContext';
 import { notificationService } from '../services/notificationService';
 import OverlayLoader from '../components/OverlayLoader';
@@ -33,26 +37,23 @@ const NotificationSettingsScreen = ({ navigation }) => {
   });
 
   const handleFCMToggle = async (enabled) => {
-    console.log('🔧 handleFCMToggle called with enabled:', enabled);
-    console.log('🔧 Current prefs.fcm:', prefs.fcm);
-    console.log('🔧 User ID:', user?.id);
+    log.debug('handleFCMToggle', enabled, 'prefs.fcm', prefs.fcm, 'userId', user?.id);
     
     setPrefs({ ...prefs, fcm: { enabled } });
     
     // If enabling FCM, register the token
     if (enabled && user?.id) {
       try {
-        console.log('🔄 Registering FCM token for user:', user.id);
+        log.info('Registering FCM token for user', user.id);
         await registerFCMToken(user.id);
-        console.log('✅ FCM token registered after enabling push notifications');
+        log.info('FCM token registered after enabling push notifications');
         
         // Don't call save() here because addFCMToken API already handles the token storage
         // and save() would overwrite the tokens array
         
         setFeedback({ visible: true, type: 'success', message: 'Push notifications enabled successfully!' });
       } catch (error) {
-        console.error('❌ Failed to register FCM token:', error);
-        console.error('❌ Error details:', error.response?.data);
+        log.error('Failed to register FCM token', error?.message || error);
         // Revert the toggle on error
         setPrefs({ ...prefs, fcm: { enabled: false } });
         // Show error feedback
@@ -63,10 +64,10 @@ const NotificationSettingsScreen = ({ navigation }) => {
         setFeedback({ visible: true, type: 'error', message: errorMessage });
       }
     } else {
-      console.log('🔧 FCM toggle to disabled or no user ID, skipping token registration');
+      log.debug('FCM toggle to disabled or no user ID, skipping token registration');
       // When disabling FCM, save preferences to update fcm.enabled = false
       if (user?.id) {
-        console.log('🔄 Saving preferences to database...');
+        log.info('Saving preferences to database...');
         await save();
       }
     }
@@ -172,6 +173,53 @@ const NotificationSettingsScreen = ({ navigation }) => {
     }
   };
 
+  // ---- Permissions launcher (OEM/Android settings) ----
+  const openSystemPermissionScreens = async () => {
+    const appId = Application.applicationId || 'com.technooo.smartkitchen';
+
+    const safeStart = async (action, params) => {
+      try {
+        console.log('Opening settings intent:', action, params);
+        await IntentLauncher.startActivityAsync(action, params);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (Platform.OS !== 'android') {
+      try { await Linking.openSettings(); } catch {}
+      return;
+    }
+
+    // 1) App notification settings (lock screen / heads-up)
+    const openedNotif =
+      await safeStart(IntentLauncher.ACTION_APP_NOTIFICATION_SETTINGS, {
+        extra: { 'android.provider.extra.APP_PACKAGE': appId, app_package: appId },
+      }) ||
+      await safeStart('android.settings.APP_NOTIFICATION_SETTINGS', {
+        extra: { 'android.provider.extra.APP_PACKAGE': appId, app_package: appId },
+      }) ||
+      await safeStart(IntentLauncher.ACTION_APPLICATION_DETAILS_SETTINGS, {
+        data: `package:${appId}`,
+      });
+
+    // 2) Overlay / pop-up permission
+    await safeStart(IntentLauncher.ACTION_MANAGE_OVERLAY_PERMISSION, { data: `package:${appId}` });
+
+    // 3) Ignore battery optimizations
+    await safeStart('android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', { data: `package:${appId}` }) ||
+    await safeStart(IntentLauncher.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+
+    // 4) App details as fallback
+    await safeStart(IntentLauncher.ACTION_APPLICATION_DETAILS_SETTINGS, { data: `package:${appId}` });
+
+    if (!openedNotif) {
+      // Final fallback: open general settings
+      try { await Linking.openSettings(); } catch {}
+    }
+  };
+
   useEffect(() => { 
     load(); 
   }, [user?.id]);
@@ -199,6 +247,18 @@ const NotificationSettingsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Allow Permissions</Text>
+          <Text style={styles.description}>
+            Enable lock-screen display, pop-up/overlay and battery optimization exceptions
+            so emergency alerts can always break through.
+          </Text>
+          <TouchableOpacity style={styles.permissionButton} onPress={openSystemPermissionScreens}>
+            <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" />
+            <Text style={styles.permissionButtonText}>Open System Notification Permissions</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Push Notifications</Text>
           <View style={styles.row}>
@@ -472,6 +532,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1C1C1E',
     fontWeight: '500'
+  },
+  permissionButton: {
+    marginTop: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  permissionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8
   }
 });
 

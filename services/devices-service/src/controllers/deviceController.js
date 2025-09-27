@@ -20,14 +20,14 @@ const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
 // Get all devices for the authenticated user
 export const getAllDevices = async (req, res) => {
   try {
-    const userId = req.user.sub || req.user.userId || req.user.id;
+    const userId = req.user.sub;
     const { status, limit = 50, page = 1 } = req.query;
     
     logger.info(`Getting devices for user ${userId}`);
     
     // Only get devices owned by the authenticated user (unless admin)
     let query = {};
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && req.user.role !== 'service') {
       query.ownerId = userId;
     } else if (req.query.ownerId) {
       // Admin can filter by ownerId
@@ -69,7 +69,7 @@ export const getAllDevices = async (req, res) => {
 export const getDeviceById = async (req, res) => {
   try {
     const { deviceId } = req.params;
-    const userId = req.user.sub || req.user.userId || req.user.id;
+    const userId = req.user.sub;
     
     logger.info(`Getting device ${deviceId} for user ${userId}`);
     
@@ -82,7 +82,7 @@ export const getDeviceById = async (req, res) => {
     }
     
     // Check ownership (unless admin)
-    if (req.user.role !== 'admin' && device.ownerId !== userId) {
+    if (req.user.role !== 'admin' && req.user.role !== 'service' && device.ownerId !== userId) {
       logger.warn(`Access denied: User ${userId} trying to access device ${deviceId} owned by ${device.ownerId}`);
       return res.status(403).json({
         success: false,
@@ -109,7 +109,7 @@ export const getDeviceById = async (req, res) => {
 // Create new device
 export const createDevice = async (req, res) => {
   try {
-    const userId = req.user.sub || req.user.userId || req.user.id;
+    const userId = req.user.sub;
     const {
       deviceId,
       name,
@@ -145,18 +145,21 @@ export const createDevice = async (req, res) => {
     
     await device.save();
     
-    // Publish device creation event to Kafka
-    await producer.send({
+    // Publish device creation event to Kafka (non-blocking)
+    producer.send({
       topic: 'device.created',
       messages: [{
         key: deviceId,
         value: JSON.stringify({
           deviceId,
-          ownerId,
+          ownerId: userId,
           action: 'created',
           timestamp: new Date()
         })
       }]
+    }).catch((kafkaError) => {
+      logger.error('Failed to publish device creation event to Kafka:', kafkaError);
+      // Don't throw error - device creation was successful
     });
     
     res.status(201).json({
@@ -165,6 +168,14 @@ export const createDevice = async (req, res) => {
       message: 'Device created successfully'
     });
   } catch (error) {
+    logger.error('Error creating device:', error);
+    logger.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      userId,
+      deviceId,
+      name
+    });
     res.status(500).json({
       success: false,
       message: 'Error creating device',
@@ -192,8 +203,8 @@ export const updateDevice = async (req, res) => {
       });
     }
     
-    // Publish device update event to Kafka
-    await producer.send({
+    // Publish device update event to Kafka (non-blocking)
+    producer.send({
       topic: 'device.updated',
       messages: [{
         key: deviceId,
@@ -203,6 +214,8 @@ export const updateDevice = async (req, res) => {
           timestamp: new Date()
         })
       }]
+    }).catch((kafkaError) => {
+      logger.error('Failed to publish device update event to Kafka:', kafkaError);
     });
     
     res.json({
@@ -223,7 +236,7 @@ export const updateDevice = async (req, res) => {
 export const deleteDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
-    const userId = req.user.sub || req.user.userId || req.user.id;
+    const userId = req.user.sub;
     const isAdmin = req.user.role === 'admin';
     
     logger.info(`Deleting device ${deviceId} for user ${userId}`);
@@ -245,8 +258,8 @@ export const deleteDevice = async (req, res) => {
       });
     }
     
-    // Publish device deletion event to Kafka
-    await producer.send({
+    // Publish device deletion event to Kafka (non-blocking)
+    producer.send({
       topic: 'device.deleted',
       messages: [{
         key: deviceId,
@@ -256,6 +269,8 @@ export const deleteDevice = async (req, res) => {
           timestamp: new Date()
         })
       }]
+    }).catch((kafkaError) => {
+      logger.error('Failed to publish device deletion event to Kafka:', kafkaError);
     });
     
     res.json({
@@ -404,8 +419,8 @@ export const enterEmergencyMode = async (req, res) => {
     device.enterEmergencyMode();
     await device.save();
     
-    // Publish emergency mode event to Kafka
-    await producer.send({
+    // Publish emergency mode event to Kafka (non-blocking)
+    producer.send({
       topic: 'user-actions',
       messages: [{
         key: deviceId,
@@ -419,6 +434,8 @@ export const enterEmergencyMode = async (req, res) => {
           reason: 'manual_activation'
         })
       }]
+    }).catch((kafkaError) => {
+      logger.error('Failed to publish emergency mode activation event to Kafka:', kafkaError);
     });
     
     res.json({
@@ -452,8 +469,8 @@ export const exitEmergencyMode = async (req, res) => {
     device.exitEmergencyMode();
     await device.save();
     
-    // Publish emergency mode exit event to Kafka
-    await producer.send({
+    // Publish emergency mode exit event to Kafka (non-blocking)
+    producer.send({
       topic: 'user-actions',
       messages: [{
         key: deviceId,
@@ -466,6 +483,8 @@ export const exitEmergencyMode = async (req, res) => {
           timestamp: new Date()
         })
       }]
+    }).catch((kafkaError) => {
+      logger.error('Failed to publish emergency mode deactivation event to Kafka:', kafkaError);
     });
     
     res.json({
@@ -551,8 +570,8 @@ export const updateOutletSettings = async (req, res) => {
     
     await device.save();
     
-    // Publish outlet settings update event to Kafka
-    await producer.send({
+    // Publish outlet settings update event to Kafka (non-blocking)
+    producer.send({
       topic: 'user-actions',
       messages: [{
         key: deviceId,
@@ -570,6 +589,8 @@ export const updateOutletSettings = async (req, res) => {
           timestamp: new Date()
         })
       }]
+    }).catch((kafkaError) => {
+      logger.error('Failed to publish outlet settings update event to Kafka:', kafkaError);
     });
     
     res.json({

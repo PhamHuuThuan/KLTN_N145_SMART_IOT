@@ -2,6 +2,10 @@ package com.technooo.smartkitchen
 
 import android.app.Application
 import android.content.res.Configuration
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.media.AudioAttributes
+import android.net.Uri
 
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
@@ -47,10 +51,34 @@ class MainApplication : Application(), ReactApplication {
     }
     loadReactNative(this)
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
+
+    // Create emergency notification channel
+    createEmergencyChannel()
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {
     super.onConfigurationChanged(newConfig)
     ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
+  }
+}
+
+private fun MainApplication.createEmergencyChannel() {
+  if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+    val channelId = "emergency"
+    val name = "Emergency Alerts"
+    val desc = "High-priority emergency alerts"
+    val importance = NotificationManager.IMPORTANCE_HIGH
+    val channel = NotificationChannel(channelId, name, importance)
+    channel.description = desc
+
+    val soundUri = Uri.parse("android.resource://" + packageName + "/" + R.raw.emergy_sound)
+    val audioAttributes = AudioAttributes.Builder()
+      .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+      .setUsage(AudioAttributes.USAGE_ALARM)
+      .build()
+    channel.setSound(soundUri, audioAttributes)
+
+    val nm = getSystemService(NotificationManager::class.java)
+    nm.createNotificationChannel(channel)
   }
 }

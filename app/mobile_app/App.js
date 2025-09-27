@@ -4,6 +4,8 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { NotificationProvider } from './src/contexts/NotificationContext';
+import { useNotificationContext } from './src/contexts/NotificationContext';
+import EmergencyScreen from './src/screens/EmergencyScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -18,6 +20,7 @@ import CONFIG from './src/constants/config';
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { emergency, markAllAsRead, loadNotifications, dispatch } = useNotificationContext?.() || {};
   const [activeTab, setActiveTab] = useState('Home');
   const [currentScreen, setCurrentScreen] = useState('Main');
 
@@ -75,6 +78,32 @@ function AppContent() {
     }
   };
 
+  const handleCheckNow = () => {
+    // Navigate user to Notifications or Home for quick inspection
+    setCurrentScreen('Main');
+    setActiveTab('Home');
+    // Clear emergency state if available
+    if (dispatch) {
+      dispatch({ type: 'SET_EMERGENCY', payload: null });
+    }
+  };
+
+  const handleActivateEmergency = () => {
+    // In a full implementation, call API to activate emergency mode on device
+    // For now just clear overlay and navigate to Home
+    setCurrentScreen('Main');
+    setActiveTab('Home');
+    if (dispatch) {
+      dispatch({ type: 'SET_EMERGENCY', payload: null });
+    }
+  };
+
+  const handleDismissEmergency = () => {
+    if (dispatch) {
+      dispatch({ type: 'SET_EMERGENCY', payload: null });
+    }
+  };
+
   const TabButton = ({ label, icon, isActive, onPress }) => (
     <TouchableOpacity style={styles.tabItem} onPress={onPress} activeOpacity={0.8}>
       <MaterialCommunityIcons
@@ -127,6 +156,17 @@ function AppContent() {
             icon="cog"
             isActive={activeTab === 'Settings'}
             onPress={() => setActiveTab('Settings')}
+          />
+        </View>
+      )}
+
+      {isAuthenticated && emergency && (
+        <View style={styles.overlay}>
+          <EmergencyScreen
+            emergency={emergency}
+            onCheckNow={handleCheckNow}
+            onActivateEmergency={handleActivateEmergency}
+            onDismiss={handleDismissEmergency}
           />
         </View>
       )}
