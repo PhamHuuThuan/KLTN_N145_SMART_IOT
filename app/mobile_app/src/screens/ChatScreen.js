@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import CONFIG from '../constants/config';
 import ChatMessageList from '../components/ChatMessageList';
 import ChatInput from '../components/ChatInput';
+import useSpeechToText from '../hooks/useSpeechToText';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('Chat');
@@ -20,6 +21,20 @@ const ChatScreen = () => {
     log.debug('send message', text);
   };
 
+  const { listening, transcript, toggle } = useSpeechToText({
+    locale: 'vi-VN',
+    onResult: undefined,
+  });
+
+  const [compose, setCompose] = useState('');
+  useEffect(() => {
+    // bind transcript to input when listening
+    if (transcript && transcript !== compose) {
+      setCompose(transcript);
+    }
+    log.info("Listening.transcript", transcript);
+  }, [transcript]);
+
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -34,7 +49,13 @@ const ChatScreen = () => {
           <View style={styles.messagesArea}>
             <ChatMessageList messages={messages} userId={myId} />
           </View>
-          <ChatInput onSend={handleSend} />
+          <ChatInput
+            onSend={(t) => { handleSend(t); setCompose(''); }}
+            onVoiceToggle={toggle}
+            listening={listening}
+            value={compose}
+            onChangeText={setCompose}
+          />
         </View>
       </KeyboardAvoidingView>
     </View>

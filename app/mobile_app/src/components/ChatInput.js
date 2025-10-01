@@ -3,8 +3,10 @@ import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 
-const ChatInput = ({ onSend, disabled = false, placeholder = 'Type a message' }) => {
-  const [text, setText] = useState('');
+const ChatInput = ({ onSend, onVoiceToggle, listening = false, value, onChangeText, disabled = false, placeholder = 'Type a message' }) => {
+  const [innerText, setInnerText] = useState('');
+  const text = value !== undefined ? value : innerText;
+  const setText = onChangeText || setInnerText;
 
   const handleSend = () => {
     const value = text.trim();
@@ -26,11 +28,17 @@ const ChatInput = ({ onSend, disabled = false, placeholder = 'Type a message' })
           multiline
         />
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.iconButton} disabled>
-            <Ionicons name="image" size={20} color={CONFIG.COLORS.gray} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} disabled>
-            <Ionicons name="mic" size={20} color={CONFIG.COLORS.gray} />
+          <TouchableOpacity
+            style={[styles.voiceButton, listening ? styles.voiceOn : styles.voiceOff]}
+            onPress={() => {
+              onVoiceToggle?.(!listening);
+            }}
+          >
+            <Ionicons
+              name={listening ? 'mic' : 'mic-outline'}
+              size={20}
+              color={listening ? CONFIG.THEME.primary : CONFIG.COLORS.gray}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -76,13 +84,19 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     paddingHorizontal: 6,
     paddingBottom: 6,
   },
-  iconButton: {
+  voiceButton: {
+    alignSelf: 'center',
     padding: 6,
-    borderRadius: 12,
+    borderRadius: 14,
+  },
+  voiceOn: {
+    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+  },
+  voiceOff: {
+    backgroundColor: 'transparent',
   },
 });
 
