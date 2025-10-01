@@ -212,6 +212,28 @@ class ApiService {
     }
   }
 
+  // Enter emergency mode on a device
+  async enterEmergencyMode(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.EMERGENCY_ENTER.replace(':deviceId', deviceId);
+      const response = await apiClient.put(url);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to enter emergency mode: ${error.message}`);
+    }
+  }
+
+  // Exit emergency mode on a device
+  async exitEmergencyMode(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.EMERGENCY_EXIT.replace(':deviceId', deviceId);
+      const response = await apiClient.put(url);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to exit emergency mode: ${error.message}`);
+    }
+  }
+
   async getDeviceDetail(deviceId) {
     try {
       const url = CONFIG.ENDPOINTS.DEVICE_DETAIL.replace(':deviceId', deviceId);

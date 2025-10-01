@@ -16,6 +16,8 @@ export const CONFIG = {
     DEVICE_DETAIL: '/api/devices/:deviceId',    // GET device by id (full info)
     OUTLET_TOGGLE: '/api/devices/:deviceId/outlets/:outletId/toggle', // PUT toggle outlet
     OUTLET_UPDATE: '/api/devices/:deviceId/outlets/:outletId', // PUT update outlet settings
+    EMERGENCY_ENTER: '/api/devices/:deviceId/emergency/enter', // PUT enter emergency mode
+    EMERGENCY_EXIT: '/api/devices/:deviceId/emergency/exit',   // PUT exit emergency mode
   },
   
   // UI Configuration

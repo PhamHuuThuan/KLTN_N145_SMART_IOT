@@ -129,11 +129,11 @@ export const createDevice = async (req, res) => {
     
     // Create default outlets if not provided
     const defaultOutlets = outlets || [
-      { id: 'o1', name: 'Kitchen Outlet 1' },
-      { id: 'o2', name: 'Kitchen Outlet 2' },
-      { id: 'o3', name: 'Kitchen Outlet 3' },
-      { id: 'o4', name: 'Safety Outlet 1' },
-      { id: 'o5', name: 'Safety Outlet 2' }
+      { id: 'o1', type: 'kitchen', name: 'Kitchen Outlet 1' },
+      { id: 'o2', type: 'kitchen', name: 'Kitchen Outlet 2' },
+      { id: 'o3', type: 'kitchen', name: 'Kitchen Outlet 3' },
+      { id: 'o4', type: 'safety',  name: 'Safety Outlet 1' },
+      { id: 'o5', type: 'safety',  name: 'Safety Outlet 2' }
     ];
     
     const device = new Device({
@@ -414,11 +414,50 @@ export const enterEmergencyMode = async (req, res) => {
         message: 'Device not found'
       });
     }
+
+    console.log('Device found:', device);
     
     // Enter emergency mode
     device.enterEmergencyMode();
     await device.save();
     
+  // Dispatch real device commands via Kafka so mqtt-service can act
+  try {
+    const timeoutMs = Number(process.env.KAFKA_SEND_TIMEOUT_MS || 1500);
+    const sendTasks = device.outlets.map((o) => {
+      const outletId = o.id;
+      const outletName = o.name;
+      const status = !!o.status; // true = ON, false = OFF
+      const sendPromise = producer.send({
+        topic: 'outlet.toggled',
+        messages: [{
+          key: deviceId,
+          value: JSON.stringify({
+            userId: device.ownerId,
+            deviceId,
+            deviceName: device.name,
+            outletId,
+            outletName,
+            status,
+            action: 'outlet_toggled',
+            result: 'success',
+            reason: 'emergency_mode',
+            timestamp: new Date()
+          })
+        }]
+      });
+      return Promise.race([
+        sendPromise,
+        new Promise((resolve) => setTimeout(() => resolve('timeout'), timeoutMs))
+      ]).catch((err) => {
+        console.error('❌ Kafka send error in emergency dispatch (non-fatal):', err?.message || err);
+      });
+    });
+    await Promise.all(sendTasks);
+  } catch (dispatchError) {
+    console.error('❌ Error dispatching emergency outlet toggles:', dispatchError);
+  }
+  
     // Publish emergency mode event to Kafka (non-blocking)
     producer.send({
       topic: 'user-actions',
@@ -547,6 +586,7 @@ export const updateOutletSettings = async (req, res) => {
   try {
     const { deviceId, outletId } = req.params;
     const { name } = req.body;
+    const { type } = req.body;
     
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -567,6 +607,7 @@ export const updateOutletSettings = async (req, res) => {
     
     // Update outlet settings
     if (name) outlet.name = name;
+    if (type) outlet.type = type;
     
     await device.save();
     
@@ -584,7 +625,8 @@ export const updateOutletSettings = async (req, res) => {
           action: 'outlet_settings_updated',
           result: 'success',
           metadata: {
-            name: outlet.name
+            name: outlet.name,
+            type: outlet.type
           },
           timestamp: new Date()
         })
