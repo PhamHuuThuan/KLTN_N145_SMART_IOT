@@ -245,6 +245,25 @@ const OutletDetail = ({
                       </Text>
                     </TouchableOpacity>
                   </View>
+          {/* Caution note to inform emergency behavior based on selected group */}
+          <View
+            style={[
+              styles.cautionBox,
+              outletGroup === 'kitchen' && { borderColor: CONFIG.COLORS.warning },
+              outletGroup === 'safety' && { borderColor: CONFIG.COLORS.danger }
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="alert-circle"
+              size={18}
+              color={outletGroup === 'safety' ? CONFIG.COLORS.danger : CONFIG.COLORS.warning}
+            />
+            <Text style={styles.cautionText}>
+              {outletGroup === 'safety'
+                ? 'Caution: In Emergency Mode, safety devices will automatically turn ON.'
+                : 'Caution: In Emergency Mode, kitchen devices will automatically turn OFF.'}
+            </Text>
+          </View>
                 </View>
               </View>
             )}
@@ -429,6 +448,22 @@ const styles = StyleSheet.create({
   groupButtons: {
     flexDirection: 'row',
     gap: 10,
+  },
+  cautionBox: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    backgroundColor: CONFIG.COLORS.light,
+    borderLeftWidth: 3,
+    borderColor: CONFIG.COLORS.warning,
+    borderRadius: 6,
+  },
+  cautionText: {
+    flex: 1,
+    color: CONFIG.COLORS.dark,
+    fontSize: 12,
   },
   groupButton: {
     flex: 1,
