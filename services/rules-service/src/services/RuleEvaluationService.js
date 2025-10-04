@@ -132,12 +132,6 @@ class RuleEvaluationService {
         return this.evaluateSensorCondition(condition, sensorData);
       case 'time':
         return this.evaluateTimeCondition(condition);
-      case 'device_status':
-        return this.evaluateDeviceStatusCondition(condition, sensorData);
-      case 'outlet_status':
-        return this.evaluateOutletStatusCondition(condition, sensorData);
-      case 'emergency':
-        return this.evaluateEmergencyCondition(sensorData);
       default:
         console.log(`⚠️ Unknown condition type: ${condition.type}`);
         return false;
@@ -250,45 +244,6 @@ class RuleEvaluationService {
     return true;
   }
 
-  /**
-   * Đánh giá device status condition
-   * @param {Object} condition - Device status condition
-   * @param {Object} sensorData - Dữ liệu sensor
-   * @returns {boolean}
-   */
-  evaluateDeviceStatusCondition(condition, sensorData) {
-    // Implement device status logic here
-    // For now, return true as placeholder
-    return true;
-  }
-
-  /**
-   * Đánh giá outlet status condition
-   * @param {Object} condition - Outlet status condition
-   * @param {Object} sensorData - Dữ liệu sensor
-   * @returns {boolean}
-   */
-  evaluateOutletStatusCondition(condition, sensorData) {
-    const { outletId } = condition;
-    if (!outletId) return false;
-
-    const outletStatus = sensorData.o?.[outletId] || sensorData.outlets?.[outletId];
-    return outletStatus !== undefined;
-  }
-
-  /**
-   * Đánh giá emergency condition
-   * @param {Object} sensorData - Dữ liệu sensor
-   * @returns {boolean}
-   */
-  evaluateEmergencyCondition(sensorData) {
-    // Kiểm tra các điều kiện khẩn cấp
-    const temp = sensorData.temp;
-    const smoke = sensorData.smoke;
-    const gasPpm = sensorData.gas_ppm;
-
-    return (temp > 60) || (smoke > 100) || (gasPpm > 1000);
-  }
 
   /**
    * Thực thi các actions của rule
@@ -332,15 +287,6 @@ class RuleEvaluationService {
         case 'send_alert':
           await this.sendAlertAction(action, rule, sensorData);
           break;
-        case 'toggle_outlet':
-          await this.toggleOutletAction(action, rule, sensorData);
-          break;
-        case 'activate_emergency':
-          await this.activateEmergencyAction(action, rule, sensorData);
-          break;
-        case 'log_event':
-          await this.logEventAction(action, rule, sensorData);
-          break;
         default:
           console.log(`⚠️ Unknown action type: ${action.type}`);
       }
@@ -359,10 +305,35 @@ class RuleEvaluationService {
   async sendNotificationAction(action, rule, sensorData) {
     try {
       // Tạo message chi tiết dựa trên sensor data
-      const sensorType = this.getTriggeredSensorType(rule.conditions, sensorData);
-      const sensorValue = this.getTriggeredSensorValue(rule.conditions, sensorData);
-      const threshold = this.getTriggeredThreshold(rule.conditions);
-      const operator = this.getTriggeredOperator(rule.conditions);
+      let sensorType = 'unknown';
+      let sensorValue = 0;
+      let threshold = 0;
+      let operator = '>';
+      
+      // Find sensor condition
+      for (const condition of rule.conditions) {
+        if (condition.type === 'sensor' && condition.sensor) {
+          sensorType = condition.sensor;
+          operator = condition.operator || '>';
+          threshold = condition.value || 0;
+          
+          switch (condition.sensor) {
+            case 'temperature':
+              sensorValue = sensorData.temp;
+              break;
+            case 'humidity':
+              sensorValue = sensorData.humid;
+              break;
+            case 'gas_ppm':
+              sensorValue = sensorData.gas_ppm;
+              break;
+            case 'smoke':
+              sensorValue = sensorData.smoke;
+              break;
+          }
+          break;
+        }
+      }
       
       let detailedMessage = action.message;
       if (!detailedMessage) {
@@ -442,9 +413,33 @@ class RuleEvaluationService {
    */
   async sendAlertAction(action, rule, sensorData) {
     // Infer severity from sensor data
-    const sensorType = this.getTriggeredSensorType(rule.conditions, sensorData);
-    const sensorValue = this.getTriggeredSensorValue(rule.conditions, sensorData);
-    const threshold = this.getTriggeredThreshold(rule.conditions);
+    let sensorType = 'unknown';
+    let sensorValue = 0;
+    let threshold = 0;
+    
+    // Find sensor condition
+    for (const condition of rule.conditions) {
+      if (condition.type === 'sensor' && condition.sensor) {
+        sensorType = condition.sensor;
+        threshold = condition.value || 0;
+        
+        switch (condition.sensor) {
+          case 'temperature':
+            sensorValue = sensorData.temp;
+            break;
+          case 'humidity':
+            sensorValue = sensorData.humid;
+            break;
+          case 'gas_ppm':
+            sensorValue = sensorData.gas_ppm;
+            break;
+          case 'smoke':
+            sensorValue = sensorData.smoke;
+            break;
+        }
+        break;
+      }
+    }
     const isDangerousSensor = sensorType === 'smoke' || sensorType === 'gas_ppm';
     const tempHigh = sensorType === 'temperature' && Number(sensorValue) >= 80;
     const elevateSecurity = isDangerousSensor || tempHigh;
@@ -475,90 +470,6 @@ class RuleEvaluationService {
     console.log(`🚨 Alert sent for rule: ${rule.name}`);
   }
 
-  /**
-   * Toggle outlet action
-   * @param {Object} action - Action object
-   * @param {Object} rule - Rule object
-   * @param {Object} sensorData - Dữ liệu sensor
-   */
-  async toggleOutletAction(action, rule, sensorData) {
-    const message = {
-      deviceId: rule.deviceId,
-      outletId: action.outletId,
-      status: action.status,
-      ruleId: rule._id.toString(),
-      ruleName: rule.name,
-      timestamp: new Date().toISOString()
-    };
-
-    await this.producer.send({
-      topic: 'outlet-control',
-      messages: [{
-        key: `${rule.deviceId}-${action.outletId}`,
-        value: JSON.stringify(message)
-      }]
-    });
-
-    console.log(`🔌 Outlet ${action.outletId} toggled for rule: ${rule.name}`);
-  }
-
-  /**
-   * Activate emergency action
-   * @param {Object} action - Action object
-   * @param {Object} rule - Rule object
-   * @param {Object} sensorData - Dữ liệu sensor
-   */
-  async activateEmergencyAction(action, rule, sensorData) {
-    const message = {
-      deviceId: rule.deviceId,
-      action: 'emergency_mode_activated',
-      reason: `Rule triggered: ${rule.name}`,
-      timestamp: new Date().toISOString(),
-      telemetry: sensorData,
-      ruleId: rule._id.toString()
-    };
-
-    await this.producer.send({
-      topic: 'device.emergency',
-      messages: [{
-        key: rule.deviceId,
-        value: JSON.stringify(message)
-      }]
-    });
-
-    console.log(`🚨 Emergency mode activated for rule: ${rule.name}`);
-  }
-
-  /**
-   * Log event action
-   * @param {Object} action - Action object
-   * @param {Object} rule - Rule object
-   * @param {Object} sensorData - Dữ liệu sensor
-   */
-  async logEventAction(action, rule, sensorData) {
-    const message = {
-      deviceId: rule.deviceId,
-      type: 'rule_event',
-      payload: {
-        ruleId: rule._id.toString(),
-        ruleName: rule.name,
-        action: action.type,
-        sensorData: sensorData,
-        timestamp: new Date().toISOString()
-      },
-      severity: action.priority || 'medium'
-    };
-
-    await this.producer.send({
-      topic: 'iot.events.logs',
-      messages: [{
-        key: rule.deviceId,
-        value: JSON.stringify(message)
-      }]
-    });
-
-    console.log(`📝 Event logged for rule: ${rule.name}`);
-  }
 
   /**
    * Kiểm tra cooldown period
@@ -626,72 +537,6 @@ class RuleEvaluationService {
     }
   }
 
-  /**
-   * Lấy loại sensor được trigger
-   * @param {Array} conditions - Rule conditions
-   * @param {Object} sensorData - Sensor data
-   * @returns {string}
-   */
-  getTriggeredSensorType(conditions, sensorData) {
-    for (const condition of conditions) {
-      if (condition.type === 'sensor' && condition.sensor) {
-        return condition.sensor;
-      }
-    }
-    return 'unknown';
-  }
-
-  /**
-   * Lấy giá trị sensor được trigger
-   * @param {Array} conditions - Rule conditions
-   * @param {Object} sensorData - Sensor data
-   * @returns {number}
-   */
-  getTriggeredSensorValue(conditions, sensorData) {
-    for (const condition of conditions) {
-      if (condition.type === 'sensor' && condition.sensor) {
-        switch (condition.sensor) {
-          case 'temperature':
-            return sensorData.temp;
-          case 'humidity':
-            return sensorData.humid;
-          case 'gas_ppm':
-            return sensorData.gas_ppm;
-          case 'smoke':
-            return sensorData.smoke;
-        }
-      }
-    }
-    return 0;
-  }
-
-  /**
-   * Lấy ngưỡng được trigger
-   * @param {Array} conditions - Rule conditions
-   * @returns {number}
-   */
-  getTriggeredThreshold(conditions) {
-    for (const condition of conditions) {
-      if (condition.type === 'sensor' && condition.value !== undefined) {
-        return condition.value;
-      }
-    }
-    return 0;
-  }
-
-  /**
-   * Lấy operator được trigger
-   * @param {Array} conditions - Rule conditions
-   * @returns {string}
-   */
-  getTriggeredOperator(conditions) {
-    for (const condition of conditions) {
-      if (condition.type === 'sensor' && condition.operator) {
-        return condition.operator;
-      }
-    }
-    return '>';
-  }
 }
 
 export default RuleEvaluationService;
