@@ -5,7 +5,7 @@ const conditionSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['sensor', 'time', 'device_status', 'outlet_status', 'emergency']
+    enum: ['sensor', 'time']
   },
   sensor: {
     type: String,
@@ -39,7 +39,7 @@ const actionSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['toggle_outlet', 'send_notification', 'activate_emergency', 'send_alert', 'log_event']
+    enum: ['send_notification', 'send_alert']
   },
   deviceId: String,
   outletId: {
