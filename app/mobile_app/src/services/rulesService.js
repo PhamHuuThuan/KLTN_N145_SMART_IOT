@@ -61,27 +61,6 @@ class RulesService {
     }
   }
 
-  // Get rule by ID
-  async getRuleById(ruleId) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching rule:', error);
-      throw error;
-    }
-  }
 
   // Create new rule
   async createRule(ruleData) {
@@ -194,135 +173,6 @@ class RulesService {
     }
   }
 
-  // Get rules for a specific device
-  async getDeviceRules(deviceId, isActive = true) {
-    try {
-      const queryParams = new URLSearchParams({
-        isActive: isActive.toString()
-      });
-      
-      const response = await fetch(`${this.baseURL}/api/rules/device/${deviceId}?${queryParams}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching device rules:', error);
-      throw error;
-    }
-  }
-
-  // Get rule execution history
-  async getRuleExecutions(ruleId, params = {}) {
-    try {
-      const queryParams = new URLSearchParams(params);
-      
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/executions?${queryParams}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching rule executions:', error);
-      throw error;
-    }
-  }
-
-  // Get rule statistics
-  async getRuleStats(ruleId, days = 7) {
-    try {
-      const queryParams = new URLSearchParams({
-        days: days.toString()
-      });
-      
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/stats?${queryParams}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching rule stats:', error);
-      throw error;
-    }
-  }
-
-  // Test rule conditions
-  async testRuleConditions(ruleId, sensorData, deviceData) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/test`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sensorData,
-          deviceData
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error testing rule conditions:', error);
-      throw error;
-    }
-  }
-
-  // Bulk update rules
-  async bulkUpdateRules(ruleIds, updateData) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/bulk/update`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ruleIds,
-          updateData
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error bulk updating rules:', error);
-      throw error;
-    }
-  }
 
   // Create rule from template
   async createRuleFromTemplate(templateId, ownerId, deviceId, customizations = {}) {
@@ -380,35 +230,6 @@ class RulesService {
     }
   }
 
-  // Get rules by category
-  async getRulesByCategory(ownerId, category) {
-    try {
-      return await this.getAllRules(ownerId, { category });
-    } catch (error) {
-      console.error('Error fetching rules by category:', error);
-      throw error;
-    }
-  }
-
-  // Get active rules only
-  async getActiveRules(ownerId) {
-    try {
-      return await this.getAllRules(ownerId, { isActive: true });
-    } catch (error) {
-      console.error('Error fetching active rules:', error);
-      throw error;
-    }
-  }
-
-  // Get inactive rules only
-  async getInactiveRules(ownerId) {
-    try {
-      return await this.getAllRules(ownerId, { isActive: false });
-    } catch (error) {
-      console.error('Error fetching inactive rules:', error);
-      throw error;
-    }
-  }
 }
 
 export default new RulesService();
