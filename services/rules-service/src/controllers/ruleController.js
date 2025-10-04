@@ -243,10 +243,6 @@ export const getRuleTemplates = async (req, res) => {
         ],
         actions: [
           {
-            type: 'activate_emergency',
-            priority: 'critical'
-          },
-          {
             type: 'send_alert',
             message: 'Gas leak detected! Emergency mode activated.',
             priority: 'critical'
@@ -268,10 +264,6 @@ export const getRuleTemplates = async (req, res) => {
         ],
         actions: [
           {
-            type: 'activate_emergency',
-            priority: 'critical'
-          },
-          {
             type: 'send_alert',
             message: 'Smoke detected! Emergency mode activated.',
             priority: 'critical'
@@ -281,7 +273,7 @@ export const getRuleTemplates = async (req, res) => {
       {
         id: 'auto_outlet_off',
         name: 'Auto Turn Off Outlets',
-        description: 'Automatically turn off kitchen outlets at night',
+        description: 'Send notification reminder to turn off kitchen outlets at night',
         category: 'energy_saving',
         conditions: [
           {
@@ -295,19 +287,9 @@ export const getRuleTemplates = async (req, res) => {
         ],
         actions: [
           {
-            type: 'toggle_outlet',
-            outletId: 'o1',
-            status: false
-          },
-          {
-            type: 'toggle_outlet',
-            outletId: 'o2',
-            status: false
-          },
-          {
-            type: 'toggle_outlet',
-            outletId: 'o3',
-            status: false
+            type: 'send_notification',
+            message: 'Reminder: Turn off kitchen outlets before bed.',
+            priority: 'medium'
           }
         ]
       }
