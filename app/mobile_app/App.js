@@ -54,6 +54,23 @@ function AppContent() {
   const handleActivateEmergencyFromNative = async (deviceId) => {
     try {
       await apiService.enterEmergencyMode(deviceId);
+      // Show success notification
+      if (dispatch) {
+        dispatch({ 
+          type: 'ADD_NOTIFICATION', 
+          payload: {
+            id: `emergency-activated-${Date.now()}`,
+            title: 'Chế độ khẩn cấp',
+            message: 'Đã bật chế độ khẩn cấp thành công',
+            type: 'system_notification',
+            category: 'system',
+            priority: 'normal',
+            isRead: false,
+            createdAt: new Date().toISOString(),
+            metadata: { deviceId, action: 'emergency_activated' }
+          }
+        });
+      }
     } catch (_) {
     } finally {
       if (dispatch) {
@@ -124,6 +141,23 @@ function AppContent() {
       const deviceId = emergency?.metadata?.deviceId;
       if (deviceId) {
         await apiService.enterEmergencyMode(deviceId);
+        // Show success notification
+        if (dispatch) {
+        dispatch({
+          type: 'ADD_NOTIFICATION',
+          payload: {
+            id: `emergency-activated-${Date.now()}`,
+            title: 'Chế độ khẩn cấp',
+            message: 'Đã bật chế độ khẩn cấp thành công',
+            type: 'system_notification',
+            category: 'system',
+            priority: 'normal',
+            isRead: false,
+            createdAt: new Date().toISOString(),
+            metadata: { deviceId, action: 'emergency_activated' }
+          }
+        });
+        }
       }
     } catch (e) {
       // Swallow error; UI will still return to app

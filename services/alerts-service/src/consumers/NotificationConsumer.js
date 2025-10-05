@@ -174,9 +174,9 @@ class NotificationConsumer {
           userId,
           title: 'Emergency Mode Activated',
           message: `Emergency mode has been activated for device ${deviceName}`,
-          type: 'security_alert',
+          type: 'system_notification',
           category: 'system',
-          priority: 'urgent',
+          priority: 'normal',
           metadata: {
             deviceId,
             deviceName,
