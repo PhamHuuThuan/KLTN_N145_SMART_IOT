@@ -130,6 +130,18 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setIsLoading(true);
+      
+      // Remove FCM token before logout
+      if (user?.id) {
+        try {
+          await removeFCMToken(user.id);
+          log.info('FCM token removed successfully during logout');
+        } catch (fcmError) {
+          log.warn('Failed to remove FCM token during logout', fcmError?.message || fcmError);
+          // Don't fail logout if FCM token removal fails
+        }
+      }
+      
       await authService.logout();
       setUser(null);
       setIsAuthenticated(false);
@@ -238,6 +250,64 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       log.error('Error registering FCM token', error?.message || error);
+      throw error;
+    }
+  };
+
+  const removeFCMToken = async (userId) => {
+    try {
+      if (!userId) {
+        log.warn('No userId provided for FCM token removal');
+        return;
+      }
+
+      // Try to get the current FCM token to remove it
+      let fcmToken = null;
+      
+      try {
+        // Try to get device push token (preferred method)
+        const devicePushToken = await Notifications.getDevicePushTokenAsync();
+        fcmToken = devicePushToken?.data;
+        log.debug('Getting device push token for removal', fcmToken?.substring(0, 20) + '...');
+      } catch (deviceError) {
+        log.warn('Device push token not available, trying Expo push token', deviceError.message);
+        
+        try {
+          // Fallback to Expo push token
+          const token = await Notifications.getExpoPushTokenAsync({
+            projectId: '5ea86a56-b10e-4a1b-88a7-6692b50872ed'
+          });
+
+          log.debug('Getting Expo push token for removal', token?.data?.substring(0, 20) + '...');
+          
+          // Check if it's a real FCM token or Expo push token
+          if (token.data.startsWith('ExponentPushToken[')) {
+            log.warn('Got Expo push token instead of FCM token - skipping removal');
+            return;
+          } else {
+            fcmToken = token.data;
+          }
+        } catch (expoError) {
+          log.warn('Error getting Expo push token for removal', expoError?.message || expoError);
+          fcmToken = null;
+        }
+      }
+
+      // Remove token from notification service
+      if (fcmToken) {
+        const result = await notificationService.removeFCMToken(userId, fcmToken);
+        
+        if (result.success) {
+          log.info('FCM token removed successfully for user', userId);
+        } else {
+          log.warn('FCM token removal failed', result.message);
+          throw new Error(result.message || 'FCM token removal failed');
+        }
+      } else {
+        log.info('No FCM token to remove for user', userId);
+      }
+    } catch (error) {
+      log.error('Error removing FCM token', error?.message || error);
       throw error;
     }
   };

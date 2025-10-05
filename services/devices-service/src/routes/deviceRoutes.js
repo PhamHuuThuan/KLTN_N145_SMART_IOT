@@ -9,7 +9,8 @@ import {
   updateOutletSettings,
   enterEmergencyMode,
   exitEmergencyMode,
-  getDeviceStatus
+  getDeviceStatus,
+  removeDeviceOwnership
 } from '../controllers/deviceController.js';
 import { authenticateToken, checkDeviceOwnership } from '../middleware/auth.js';
 
@@ -29,5 +30,8 @@ router.put('/:deviceId/outlets/:outletId/toggle', authenticateToken, checkDevice
 router.put('/:deviceId/outlets/:outletId', authenticateToken, checkDeviceOwnership, updateOutletSettings);
 router.put('/:deviceId/emergency/enter', authenticateToken, checkDeviceOwnership, enterEmergencyMode);
 router.put('/:deviceId/emergency/exit', authenticateToken, checkDeviceOwnership, exitEmergencyMode);
+
+// Device ownership management
+router.delete('/:deviceId/ownership', authenticateToken, removeDeviceOwnership);
 
 export default router;

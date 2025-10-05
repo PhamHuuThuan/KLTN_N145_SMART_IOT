@@ -121,9 +121,39 @@ export const createDevice = async (req, res) => {
     // Check if device already exists
     const existingDevice = await Device.findOne({ deviceId });
     if (existingDevice) {
-      return res.status(400).json({
-        success: false,
-        message: 'Device with this ID already exists'
+      // If device exists and already has an owner
+      if (existingDevice.ownerId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Device is already assigned to another user'
+        });
+      }
+      
+      // If device exists but has no owner, assign it to current user
+      existingDevice.ownerId = userId;
+      existingDevice.name = name || existingDevice.name;
+      await existingDevice.save();
+      
+      // Publish device assignment event to Kafka
+      producer.send({
+        topic: 'device.assigned',
+        messages: [{
+          key: deviceId,
+          value: JSON.stringify({
+            deviceId,
+            ownerId: userId,
+            action: 'assigned',
+            timestamp: new Date()
+          })
+        }]
+      }).catch((kafkaError) => {
+        logger.error('Failed to publish device assignment event to Kafka:', kafkaError);
+      });
+      
+      return res.status(200).json({
+        success: true,
+        data: existingDevice,
+        message: 'Device assigned successfully'
       });
     }
     
@@ -576,6 +606,65 @@ export const getDeviceStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching device status',
+      error: error.message
+    });
+  }
+};
+
+// Remove device ownership (unassign device from user)
+export const removeDeviceOwnership = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.sub;
+    
+    logger.info(`Removing ownership of device ${deviceId} from user ${userId}`);
+    
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message === 'Device not found' ? 404 : 403).json({
+        success: false,
+        message: ownershipCheck.message
+      });
+    }
+    
+    const device = ownershipCheck.device;
+    
+    // Clear ownerId
+    device.ownerId = null;
+    await device.save();
+    
+    // Publish device unassignment event to Kafka
+    producer.send({
+      topic: 'device.unassigned',
+      messages: [{
+        key: deviceId,
+        value: JSON.stringify({
+          deviceId,
+          previousOwnerId: userId,
+          action: 'unassigned',
+          timestamp: new Date()
+        })
+      }]
+    }).catch((kafkaError) => {
+      logger.error('Failed to publish device unassignment event to Kafka:', kafkaError);
+    });
+    
+    logger.info(`Device ${deviceId} ownership removed from user ${userId}`);
+    
+    res.json({
+      success: true,
+      message: 'Device ownership removed successfully',
+      data: {
+        deviceId: device.deviceId,
+        name: device.name,
+        ownerId: null
+      }
+    });
+  } catch (error) {
+    logger.error('Error removing device ownership:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error removing device ownership',
       error: error.message
     });
   }

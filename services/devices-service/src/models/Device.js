@@ -35,8 +35,9 @@ const deviceSchema = new mongoose.Schema({
   },
   ownerId: {
     type: String,
-    required: true,
-    trim: true
+    required: false,
+    trim: true,
+    default: null
   },
   name: {
     type: String,

@@ -199,6 +199,19 @@ class ApiService {
     }
   }
 
+  // Remove device ownership (unassign device from user)
+  async removeDeviceOwnership(deviceId) {
+    try {
+      const url = `/api/devices/${deviceId}/ownership`;
+      log.debug('removeDeviceOwnership', url);
+      const response = await apiClient.delete(url);
+      return response.data;
+    } catch (error) {
+      log.error('removeDeviceOwnership error', error?.message || error);
+      throw new Error(`Failed to remove device ownership: ${error.message}`);
+    }
+  }
+
   // Update outlet settings
   async updateOutletSettings(deviceId, outletId, settings) {
     try {
