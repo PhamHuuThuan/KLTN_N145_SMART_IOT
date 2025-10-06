@@ -2,6 +2,7 @@ import { Kafka } from 'kafkajs';
 import Device from '../models/Device.js';
 import config from '../config/database.js';
 
+const VERBOSE = process.env.LOG_VERBOSE === 'true';
 const kafka = new Kafka({
   clientId: 'devices-status-consumer',
   brokers: (process.env.KAFKA_BROKERS || 'localhost:29092').split(','),
@@ -36,17 +37,17 @@ async function startDeviceStatusConsumer() {
       autoCommitInterval: 5000,
       eachMessage: async ({ topic, partition, message }) => {
         try {
-          console.log(`📨 DeviceStatusConsumer received message from topic: ${topic}`);
+          if (VERBOSE) console.log(`📨 DeviceStatusConsumer received message from topic: ${topic}`);
           const messageData = JSON.parse(message.value.toString());
-          console.log(`📋 Message data:`, JSON.stringify(messageData, null, 2));
+          if (VERBOSE) console.log(`📋 Message data`);
 
           switch (topic) {
             case 'device.status.updated':
-              console.log(`🔄 Handling device status update`);
+              if (VERBOSE) console.log(`🔄 Handling device status update`);
               await handleDeviceStatusUpdate(messageData);
               break;
             default:
-              console.log(`⚠️ Unknown topic: ${topic}`);
+              if (VERBOSE) console.log(`⚠️ Unknown topic: ${topic}`);
           }
         } catch (error) {
           console.error('❌ Error processing device status message:', error);
@@ -59,7 +60,7 @@ async function startDeviceStatusConsumer() {
           });
           
           // Don't throw error to prevent consumer from stopping
-          console.log(`⚠️ Continuing to process next message...`);
+          if (VERBOSE) console.log(`⚠️ Continuing to process next message...`);
           
           // Mark message as processed even if failed to prevent infinite retry
           try {
@@ -85,7 +86,7 @@ async function handleDeviceStatusUpdate(data) {
   try {
     const { deviceId, outletId, status, action } = data;
     
-    console.log(`🔄 Processing device status update: ${deviceId}/${outletId} -> ${status}`);
+  if (VERBOSE) console.log(`🔄 Processing device status update: ${deviceId}/${outletId} -> ${status}`);
 
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -132,7 +133,7 @@ async function handleOutletToggle(data) {
       outlet.status = status;
       outlet.lastToggleAt = new Date();
       await device.save();
-      console.log(`✅ Outlet toggle processed: ${outletId} ${oldStatus} -> ${status}`);
+      if (VERBOSE) console.log(`✅ Outlet toggle processed: ${outletId} ${oldStatus} -> ${status}`);
     } else {
       console.error(`❌ Outlet not found: ${outletId}`);
     }

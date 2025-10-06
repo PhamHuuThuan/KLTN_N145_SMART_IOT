@@ -5,6 +5,7 @@ import { emitDeviceTelemetry } from '../realtime/socket.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
+const VERBOSE = process.env.LOG_VERBOSE === 'true';
 
 const kafka = new Kafka({
   clientId: 'devices-service',
@@ -26,23 +27,20 @@ const consumer = kafka.consumer({
 async function updateDeviceStatus(data) {
   try {
     const { deviceId, payload, type } = data;
-    
-    console.log(`🔍 Processing ${type} data for device: ${deviceId}`);
-    console.log(`📋 Payload:`, JSON.stringify(payload, null, 2));
+    if (VERBOSE) console.log(`🔍 Processing ${type} data for device: ${deviceId}`);
     
     if (!deviceId || !payload) {
       console.log(`⚠️ Missing deviceId or payload:`, { deviceId, payload });
       return;
     }
     
-    console.log(`🔍 Looking for device: ${deviceId}`);
+    // if (VERBOSE) console.log(`🔍 Looking for device: ${deviceId}`);
     const device = await Device.findOne({ deviceId });
     if (!device) {
-      console.log(`⚠️ Device not found: ${deviceId}`);
+      if (VERBOSE) console.log(`⚠️ Device not found: ${deviceId}`);
       return;
     }
-    
-    console.log(`📱 Found device: ${device.name}`);
+    // if (VERBOSE) console.log(`📱 Found device: ${device.name}`);
     
     // Update device online status
     device.lastSeenAt = new Date();
@@ -51,7 +49,7 @@ async function updateDeviceStatus(data) {
     
     // Update outlet statuses if provided
     if (payload.o && typeof payload.o === 'object') {
-      console.log(`🔌 Updating outlet statuses from payload.o:`, payload.o);
+      // if (VERBOSE) console.log(`🔌 Updating outlet statuses from payload.o:`, payload.o);
       Object.keys(payload.o).forEach(outletId => {
         const outlet = device.outlets.find(o => o.id === outletId);
         if (outlet) {
@@ -62,14 +60,14 @@ async function updateDeviceStatus(data) {
           const oldStatus = outlet.status;
           outlet.status = newVal;
           outlet.lastToggleAt = new Date();
-          console.log(`🔌 Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
+          // if (VERBOSE) console.log(`🔌 Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
         } else {
-          console.log(`⚠️ Outlet not found: ${outletId}`);
+          if (VERBOSE) console.log(`⚠️ Outlet not found: ${outletId}`);
         }
       });
     } else if (payload.outlets && typeof payload.outlets === 'object') {
       // Fallback for outlets object
-      console.log(`🔌 Updating outlet statuses from payload.outlets:`, payload.outlets);
+      if (VERBOSE) console.log(`🔌 Updating outlet statuses from payload.outlets:`, payload.outlets);
       Object.keys(payload.outlets).forEach(outletId => {
         const outlet = device.outlets.find(o => o.id === outletId);
         if (outlet) {
@@ -80,13 +78,13 @@ async function updateDeviceStatus(data) {
           const oldStatus = outlet.status;
           outlet.status = newVal;
           outlet.lastToggleAt = new Date();
-          console.log(`🔌 Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
+          if (VERBOSE) console.log(`🔌 Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
         } else {
-          console.log(`⚠️ Outlet not found: ${outletId}`);
+          if (VERBOSE) console.log(`⚠️ Outlet not found: ${outletId}`);
         }
       });
     } else {
-      console.log(`⚠️ No outlet data found in payload for ${type} log`);
+      if (VERBOSE) console.log(`⚠️ No outlet data found in payload for ${type} log`);
     }
     
     // Update latest telemetry (only set provided fields; do not default to 0)
@@ -100,7 +98,7 @@ async function updateDeviceStatus(data) {
         gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : prev.gas_ppm,
         o: (payload.o || payload.outlets || prev.o || {})
       };
-      console.log(`🌡️ Updated latest telemetry:`, device.latestTelemetry);
+      if (VERBOSE) console.log(`🌡️ Updated latest telemetry:`);
       // Emit to socket clients
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else if (type === 'event' && (payload.o || payload.outlets)) {
@@ -110,27 +108,27 @@ async function updateDeviceStatus(data) {
       }
       device.latestTelemetry.o = payload.o || payload.outlets || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();
-      console.log(`🔌 Updated outlet status in latestTelemetry:`, device.latestTelemetry.o);
+      if (VERBOSE) console.log(`🔌 Updated outlet status in latestTelemetry`);
       // Emit to socket clients
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else if (type === 'event' && payload.ack) {
       // For ack events, only update timestamp and keep existing telemetry
-      console.log(`✅ ACK event received for device ${deviceId}`);
+      if (VERBOSE) console.log(`✅ ACK event received for device ${deviceId}`);
       if (!device.latestTelemetry) {
         device.latestTelemetry = { ts: Date.now(), o: {} };
       } else {
         // Only update timestamp, preserve existing sensor values
         device.latestTelemetry.ts = payload.ts || Date.now();
       }
-      console.log(`📅 Updated timestamp for ACK event:`, device.latestTelemetry.ts);
+      if (VERBOSE) console.log(`📅 Updated timestamp for ACK event`);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else {
-      console.log(`⚠️ No sensor data found in ${type} log, keeping existing telemetry`);
+      if (VERBOSE) console.log(`⚠️ No sensor data found in ${type} log, keeping existing telemetry`);
     }
     
-    console.log(`💾 Saving device to database...`);
+    if (VERBOSE) console.log(`💾 Saving device to database...`);
     await device.save();
-    console.log(`✅ Device status updated successfully: ${deviceId}`);
+    if (VERBOSE) console.log(`✅ Device status updated successfully: ${deviceId}`);
     
   } catch (error) {
     console.error(`❌ Error updating device status:`, error);
@@ -167,19 +165,19 @@ async function startLogConsumer() {
       autoCommitInterval: 5000,
       eachMessage: async ({ topic, partition, message }) => {
         try {
-          console.log(`📨 Received message from topic: ${topic}, partition: ${partition}`);
+          if (VERBOSE) console.log(`📨 Received message from topic: ${topic}, partition: ${partition}`);
           
           const logData = JSON.parse(message.value.toString());
-          console.log(`📋 Log data:`, JSON.stringify(logData, null, 2));
+          // if (VERBOSE) console.log(`📋 Log data:`, JSON.stringify(logData, null, 2));
           
           // Create and save device log
           const deviceLog = new DeviceLog(logData);
           await deviceLog.save();
-          console.log(`✅ Device log saved successfully for ${logData.type} event`);
+          // if (VERBOSE) console.log(`✅ Device log saved successfully for ${logData.type} event`);
           
           // Update device status if it's telemetry or event data
           if ((logData.type === 'telemetry' || logData.type === 'event') && logData.deviceId) {
-            console.log(`🔄 Updating device status for: ${logData.deviceId} (${logData.type})`);
+            // if (VERBOSE) console.log(`🔄 Updating device status for: ${logData.deviceId} (${logData.type})`);
             await updateDeviceStatus(logData);
           }
           
@@ -187,7 +185,7 @@ async function startLogConsumer() {
           if (logData.type === 'telemetry') {
             const emergencyCheck = deviceLog.checkEmergencyConditions();
             if (emergencyCheck.emergency) {
-              console.log(`🚨 EMERGENCY: ${emergencyCheck.reason} - ${logData.deviceId}`);
+              console.log(`🚨 EMERGENCY detected for device ${logData.deviceId}`);
               // TODO: Send emergency notification
             }
           }
@@ -195,7 +193,7 @@ async function startLogConsumer() {
           // Mark log as processed
           deviceLog.markAsProcessed();
           await deviceLog.save();
-          console.log(`✅ Device log marked as processed`);
+          if (VERBOSE) console.log(`✅ Device log marked as processed`);
 
         } catch (error) {
           console.error(`❌ Error processing message from ${topic}:`, error);
@@ -208,7 +206,7 @@ async function startLogConsumer() {
           });
           
           // Don't throw error to prevent consumer from stopping
-          console.log(`⚠️ Continuing to process next message...`);
+          if (VERBOSE) console.log(`⚠️ Continuing to process next message...`);
           
           // Mark message as processed even if failed to prevent infinite retry
           try {

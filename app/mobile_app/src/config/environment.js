@@ -1,9 +1,23 @@
 // Environment configuration for Smart IoT Kitchen Mobile App
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-// Get local IP address
+// Get local IP address (better defaults for emulators)
 const getLocalIP = () => {
-  // For development, use the same IP as the server
+  // Prefer explicit config from app.json → extra.apiHost or extra.apiUrl
+  const extra = Constants.expoConfig?.extra || {};
+  if (extra.apiUrl) {
+    try {
+      const url = new URL(extra.apiUrl);
+      return url.hostname;
+    } catch {}
+  }
+  if (extra.apiHost) {
+    return String(extra.apiHost);
+  }
+  // Emulator defaults
+  if (Platform.OS === 'android') return '10.0.2.2';
+  if (Platform.OS === 'ios') return '127.0.0.1';
   return '127.0.0.1';
 };
 

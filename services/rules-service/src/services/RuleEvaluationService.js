@@ -354,6 +354,8 @@ class RuleEvaluationService {
           default:
             detailedMessage = `Rule "${rule.name}" has been triggered. Sensor: ${sensorType}, Value: ${sensorValue}, Threshold: ${threshold}`;
         }
+      } else {
+        detailedMessage = this.replacePlaceholders(detailedMessage, sensorData, sensorType, sensorValue, threshold, operator);
       }
 
       // Determine risk level
@@ -361,9 +363,31 @@ class RuleEvaluationService {
       const tempHigh = sensorType === 'temperature' && Number(sensorValue) >= 80;
       const elevateSecurity = isDangerousSensor || tempHigh;
 
+      // Tạo title với placeholder replacement
+      let title = action.title;
+      if (!title) {
+        switch (sensorType) {
+          case 'temperature':
+            title = `Cảnh báo nhiệt độ`;
+            break;
+          case 'humidity':
+            title = `Cảnh báo độ ẩm`;
+            break;
+          case 'gas_ppm':
+            title = `Cảnh báo khí gas`;
+            break;
+          case 'smoke':
+            title = `Cảnh báo khói`;
+            break;
+          default:
+            title = `Cảnh báo ${sensorType}`;
+        }
+      }
+      title = this.replacePlaceholders(title, sensorData, sensorType, sensorValue, threshold, operator);
+
       const message = {
         userId: rule.ownerId.toString(),
-        title: `Cảnh báo ${sensorType}`,
+        title: title,
         message: detailedMessage,
         type: elevateSecurity ? 'security_alert' : 'device_alert',
         category: elevateSecurity ? 'security' : 'rule',
@@ -537,6 +561,120 @@ class RuleEvaluationService {
     }
   }
 
+  /**
+   * Lấy loại sensor được trigger
+   * @param {Array} conditions - Rule conditions
+   * @param {Object} sensorData - Sensor data
+   * @returns {string}
+   */
+  getTriggeredSensorType(conditions, sensorData) {
+    for (const condition of conditions) {
+      if (condition.type === 'sensor' && condition.sensor) {
+        return condition.sensor;
+      }
+    }
+    return 'unknown';
+  }
+
+  /**
+   * Lấy giá trị sensor được trigger
+   * @param {Array} conditions - Rule conditions
+   * @param {Object} sensorData - Sensor data
+   * @returns {number}
+   */
+  getTriggeredSensorValue(conditions, sensorData) {
+    for (const condition of conditions) {
+      if (condition.type === 'sensor' && condition.sensor) {
+        switch (condition.sensor) {
+          case 'temperature':
+            return sensorData.temp !== undefined ? sensorData.temp : 0;
+          case 'humidity':
+            return sensorData.humid !== undefined ? sensorData.humid : 0;
+          case 'gas_ppm':
+            return sensorData.gas_ppm !== undefined ? sensorData.gas_ppm : 0;
+          case 'smoke':
+            return sensorData.smoke !== undefined ? sensorData.smoke : 0;
+        }
+      }
+    }
+    return 0;
+  }
+
+  /**
+   * Lấy ngưỡng được trigger
+   * @param {Array} conditions - Rule conditions
+   * @returns {number}
+   */
+  getTriggeredThreshold(conditions) {
+    for (const condition of conditions) {
+      if (condition.type === 'sensor' && condition.value !== undefined) {
+        return condition.value;
+      }
+    }
+    return 0;
+  }
+
+  /**
+   * Lấy operator được trigger
+   * @param {Array} conditions - Rule conditions
+   * @returns {string}
+   */
+  getTriggeredOperator(conditions) {
+    for (const condition of conditions) {
+      if (condition.type === 'sensor' && condition.operator) {
+        return condition.operator;
+      }
+    }
+    return '>';
+  }
+
+  /**
+   * Thay thế các placeholder trong message với giá trị thực tế
+   * @param {string} message - Message template
+   * @param {Object} sensorData - Sensor data
+   * @param {string} sensorType - Type of sensor
+   * @param {number} sensorValue - Current sensor value
+   * @param {number} threshold - Threshold value
+   * @param {string} operator - Comparison operator
+   * @returns {string}
+   */
+  replacePlaceholders(message, sensorData, sensorType, sensorValue, threshold, operator) {
+    if (!message) return message;
+
+    // Ensure we have valid sensor data
+    const temp = sensorData.temp !== undefined && sensorData.temp !== null ? sensorData.temp : 'N/A';
+    const humid = sensorData.humid !== undefined && sensorData.humid !== null ? sensorData.humid : 'N/A';
+    const smoke = sensorData.smoke !== undefined && sensorData.smoke !== null ? sensorData.smoke : 'N/A';
+    const gasPpm = sensorData.gas_ppm !== undefined && sensorData.gas_ppm !== null ? sensorData.gas_ppm : 'N/A';
+
+    // Replace common placeholders
+    let result = message
+      .replace(/\{temperature\}/g, temp)
+      .replace(/\{humidity\}/g, humid)
+      .replace(/\{smoke\}/g, smoke)
+      .replace(/\{gas_ppm\}/g, gasPpm)
+      .replace(/\{sensorValue\}/g, sensorValue !== undefined ? sensorValue : 'N/A')
+      .replace(/\{threshold\}/g, threshold !== undefined ? threshold : 'N/A')
+      .replace(/\{operator\}/g, operator || '>')
+      .replace(/\{sensorType\}/g, sensorType || 'unknown');
+
+    // Replace sensor-specific placeholders
+    switch (sensorType) {
+      case 'temperature':
+        result = result.replace(/\{temp\}/g, temp);
+        break;
+      case 'humidity':
+        result = result.replace(/\{humid\}/g, humid);
+        break;
+      case 'smoke':
+        result = result.replace(/\{smoke_value\}/g, smoke);
+        break;
+      case 'gas_ppm':
+        result = result.replace(/\{gas_value\}/g, gasPpm);
+        break;
+    }
+    return result;
+  }
 }
 
 export default RuleEvaluationService;

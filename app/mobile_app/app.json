@@ -28,7 +28,8 @@
         "POST_NOTIFICATIONS",
         "WAKE_LOCK",
         "USE_FULL_SCREEN_INTENT",
-        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+        "RECORD_AUDIO"
       ]
     },
     "web": {

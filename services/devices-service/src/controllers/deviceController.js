@@ -121,19 +121,49 @@ export const createDevice = async (req, res) => {
     // Check if device already exists
     const existingDevice = await Device.findOne({ deviceId });
     if (existingDevice) {
-      return res.status(400).json({
-        success: false,
-        message: 'Device with this ID already exists'
+      // If device exists and already has an owner
+      if (existingDevice.ownerId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Device is already assigned to another user'
+        });
+      }
+      
+      // If device exists but has no owner, assign it to current user
+      existingDevice.ownerId = userId;
+      existingDevice.name = name || existingDevice.name;
+      await existingDevice.save();
+      
+      // Publish device assignment event to Kafka
+      producer.send({
+        topic: 'device.assigned',
+        messages: [{
+          key: deviceId,
+          value: JSON.stringify({
+            deviceId,
+            ownerId: userId,
+            action: 'assigned',
+            timestamp: new Date()
+          })
+        }]
+      }).catch((kafkaError) => {
+        logger.error('Failed to publish device assignment event to Kafka:', kafkaError);
+      });
+      
+      return res.status(200).json({
+        success: true,
+        data: existingDevice,
+        message: 'Device assigned successfully'
       });
     }
     
     // Create default outlets if not provided
     const defaultOutlets = outlets || [
-      { id: 'o1', name: 'Kitchen Outlet 1' },
-      { id: 'o2', name: 'Kitchen Outlet 2' },
-      { id: 'o3', name: 'Kitchen Outlet 3' },
-      { id: 'o4', name: 'Safety Outlet 1' },
-      { id: 'o5', name: 'Safety Outlet 2' }
+      { id: 'o1', type: 'kitchen', name: 'Kitchen Outlet 1' },
+      { id: 'o2', type: 'kitchen', name: 'Kitchen Outlet 2' },
+      { id: 'o3', type: 'kitchen', name: 'Kitchen Outlet 3' },
+      { id: 'o4', type: 'safety',  name: 'Safety Outlet 1' },
+      { id: 'o5', type: 'safety',  name: 'Safety Outlet 2' }
     ];
     
     const device = new Device({
@@ -414,11 +444,50 @@ export const enterEmergencyMode = async (req, res) => {
         message: 'Device not found'
       });
     }
+
+    console.log('Device found:', device);
     
     // Enter emergency mode
     device.enterEmergencyMode();
     await device.save();
     
+  // Dispatch real device commands via Kafka so mqtt-service can act
+  try {
+    const timeoutMs = Number(process.env.KAFKA_SEND_TIMEOUT_MS || 1500);
+    const sendTasks = device.outlets.map((o) => {
+      const outletId = o.id;
+      const outletName = o.name;
+      const status = !!o.status; // true = ON, false = OFF
+      const sendPromise = producer.send({
+        topic: 'outlet.toggled',
+        messages: [{
+          key: deviceId,
+          value: JSON.stringify({
+            userId: device.ownerId,
+            deviceId,
+            deviceName: device.name,
+            outletId,
+            outletName,
+            status,
+            action: 'outlet_toggled',
+            result: 'success',
+            reason: 'emergency_mode',
+            timestamp: new Date()
+          })
+        }]
+      });
+      return Promise.race([
+        sendPromise,
+        new Promise((resolve) => setTimeout(() => resolve('timeout'), timeoutMs))
+      ]).catch((err) => {
+        console.error('❌ Kafka send error in emergency dispatch (non-fatal):', err?.message || err);
+      });
+    });
+    await Promise.all(sendTasks);
+  } catch (dispatchError) {
+    console.error('❌ Error dispatching emergency outlet toggles:', dispatchError);
+  }
+  
     // Publish emergency mode event to Kafka (non-blocking)
     producer.send({
       topic: 'user-actions',
@@ -542,11 +611,71 @@ export const getDeviceStatus = async (req, res) => {
   }
 };
 
+// Remove device ownership (unassign device from user)
+export const removeDeviceOwnership = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.sub;
+    
+    logger.info(`Removing ownership of device ${deviceId} from user ${userId}`);
+    
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message === 'Device not found' ? 404 : 403).json({
+        success: false,
+        message: ownershipCheck.message
+      });
+    }
+    
+    const device = ownershipCheck.device;
+    
+    // Clear ownerId
+    device.ownerId = null;
+    await device.save();
+    
+    // Publish device unassignment event to Kafka
+    producer.send({
+      topic: 'device.unassigned',
+      messages: [{
+        key: deviceId,
+        value: JSON.stringify({
+          deviceId,
+          previousOwnerId: userId,
+          action: 'unassigned',
+          timestamp: new Date()
+        })
+      }]
+    }).catch((kafkaError) => {
+      logger.error('Failed to publish device unassignment event to Kafka:', kafkaError);
+    });
+    
+    logger.info(`Device ${deviceId} ownership removed from user ${userId}`);
+    
+    res.json({
+      success: true,
+      message: 'Device ownership removed successfully',
+      data: {
+        deviceId: device.deviceId,
+        name: device.name,
+        ownerId: null
+      }
+    });
+  } catch (error) {
+    logger.error('Error removing device ownership:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error removing device ownership',
+      error: error.message
+    });
+  }
+};
+
 // Update outlet settings
 export const updateOutletSettings = async (req, res) => {
   try {
     const { deviceId, outletId } = req.params;
     const { name } = req.body;
+    const { type } = req.body;
     
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -567,6 +696,7 @@ export const updateOutletSettings = async (req, res) => {
     
     // Update outlet settings
     if (name) outlet.name = name;
+    if (type) outlet.type = type;
     
     await device.save();
     
@@ -584,7 +714,8 @@ export const updateOutletSettings = async (req, res) => {
           action: 'outlet_settings_updated',
           result: 'success',
           metadata: {
-            name: outlet.name
+            name: outlet.name,
+            type: outlet.type
           },
           timestamp: new Date()
         })

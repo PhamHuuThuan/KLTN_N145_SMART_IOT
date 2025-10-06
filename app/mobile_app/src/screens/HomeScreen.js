@@ -69,6 +69,23 @@ const HomeScreen = ({ navigation }) => {
             // Refresh devices list when a new device is added
             await fetchDevices();
           }}
+          onDeviceRemoved={async (deviceId, newSelectedDevice = null) => {
+            // Refresh devices list when a device is removed
+            await fetchDevices();
+            
+            // If the removed device was selected, auto-select another device
+            if (selectedDevice === deviceId) {
+              if (newSelectedDevice) {
+                // Auto-select the new device
+                await selectDevice(newSelectedDevice);
+                await fetchDeviceDetail(newSelectedDevice);
+              } else {
+                // No devices left, clear selection
+                setSelectedDevice(null);
+                setDeviceData(null);
+              }
+            }
+          }}
         />
 
         <SensorGrid deviceData={deviceData} />
