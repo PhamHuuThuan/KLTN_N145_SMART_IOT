@@ -199,6 +199,19 @@ class ApiService {
     }
   }
 
+  // Remove device ownership (unassign device from user)
+  async removeDeviceOwnership(deviceId) {
+    try {
+      const url = `/api/devices/${deviceId}/ownership`;
+      log.debug('removeDeviceOwnership', url);
+      const response = await apiClient.delete(url);
+      return response.data;
+    } catch (error) {
+      log.error('removeDeviceOwnership error', error?.message || error);
+      throw new Error(`Failed to remove device ownership: ${error.message}`);
+    }
+  }
+
   // Update outlet settings
   async updateOutletSettings(deviceId, outletId, settings) {
     try {
@@ -209,6 +222,28 @@ class ApiService {
       return response.data;
     } catch (error) {
       throw new Error(`Failed to update outlet settings: ${error.message}`);
+    }
+  }
+
+  // Enter emergency mode on a device
+  async enterEmergencyMode(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.EMERGENCY_ENTER.replace(':deviceId', deviceId);
+      const response = await apiClient.put(url);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to enter emergency mode: ${error.message}`);
+    }
+  }
+
+  // Exit emergency mode on a device
+  async exitEmergencyMode(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.EMERGENCY_EXIT.replace(':deviceId', deviceId);
+      const response = await apiClient.put(url);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to exit emergency mode: ${error.message}`);
     }
   }
 

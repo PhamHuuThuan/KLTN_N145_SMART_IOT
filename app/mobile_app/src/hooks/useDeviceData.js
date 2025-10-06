@@ -170,6 +170,23 @@ export const useDeviceData = () => {
     };
   }, [fetchDevices, selectedDevice]);
 
+  // Remove device from list (when device ownership is removed)
+  const removeDevice = useCallback((deviceId, newSelectedDevice = null) => {
+    setDevicesList(prev => prev.filter(id => id !== deviceId));
+    if (selectedDevice === deviceId) {
+      if (newSelectedDevice) {
+        // Auto-select the new device
+        setSelectedDevice(newSelectedDevice);
+        fetchDeviceStatus(newSelectedDevice);
+      } else {
+        // No devices left, clear selection
+        setSelectedDevice(null);
+        setDeviceData(null);
+        setDeviceDetail(null);
+      }
+    }
+  }, [selectedDevice, fetchDeviceStatus]);
+
   return {
     deviceData,
     deviceDetail,
@@ -182,5 +199,6 @@ export const useDeviceData = () => {
     fetchDeviceStatus,
     fetchDeviceDetail,
     refreshDevices: fetchDevices,
+    removeDevice,
   };
 };

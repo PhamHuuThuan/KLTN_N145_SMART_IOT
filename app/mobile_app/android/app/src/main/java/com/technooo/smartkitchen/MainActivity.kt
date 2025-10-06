@@ -2,11 +2,14 @@ package com.technooo.smartkitchen
 
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.modules.core.DeviceEventManagerModule
 
 import expo.modules.ReactActivityDelegateWrapper
 
@@ -17,6 +20,8 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+    // Forward any launch intent extras to JS
+    try { sendIntentToJS(intent) } catch (_: Exception) {}
   }
 
   /**
@@ -57,5 +62,28 @@ class MainActivity : ReactActivity() {
       // Use the default back button implementation on Android S
       // because it's doing more than [Activity.moveTaskToBack] in fact.
       super.invokeDefaultOnBackPressed()
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    try { sendIntentToJS(intent) } catch (_: Exception) {}
+  }
+
+  private fun sendIntentToJS(intent: Intent?) {
+    val reactContext = this.reactInstanceManager?.currentReactContext ?: return
+    val extras = intent?.extras ?: return
+    val map = Arguments.createMap()
+    if (extras.containsKey("emergencyAction")) {
+      map.putString("emergencyAction", extras.getString("emergencyAction"))
+    }
+    if (extras.containsKey("deviceId")) {
+      map.putString("deviceId", extras.getString("deviceId"))
+    }
+    if (extras.containsKey("deviceName")) {
+      map.putString("deviceName", extras.getString("deviceName"))
+    }
+    reactContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      .emit("EmergencyIntent", map)
   }
 }

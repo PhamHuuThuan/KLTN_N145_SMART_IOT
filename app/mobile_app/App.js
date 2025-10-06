@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, DeviceEventEmitter } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
@@ -17,12 +17,14 @@ import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import NotificationScreen from './src/screens/NotificationScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import CONFIG from './src/constants/config';
+import apiService from './src/services/apiService';
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const { emergency, markAllAsRead, loadNotifications, dispatch } = useNotificationContext?.() || {};
   const [activeTab, setActiveTab] = useState('Home');
   const [currentScreen, setCurrentScreen] = useState('Main');
+  const [nativeEmergency, setNativeEmergency] = useState(null);
 
   // Reset to Home tab when user becomes authenticated (login success)
   useEffect(() => {
@@ -30,6 +32,52 @@ function AppContent() {
       setActiveTab('Home');
     }
   }, [isAuthenticated, currentScreen]);
+
+  // Listen to native EmergencyActivity intent events
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('EmergencyIntent', (data) => {
+      const action = data?.emergencyAction;
+      const deviceId = data?.deviceId;
+      const deviceName = data?.deviceName;
+      if (action === 'activate_emergency' && deviceId) {
+        setNativeEmergency({ deviceId, deviceName });
+        // Trigger the same flow as overlay
+        handleActivateEmergencyFromNative(deviceId);
+      } else if (action === 'inspect_device') {
+        setCurrentScreen('Main');
+        setActiveTab('Home');
+      }
+    });
+    return () => { try { sub.remove(); } catch {} };
+  }, []);
+
+  const handleActivateEmergencyFromNative = async (deviceId) => {
+    try {
+      await apiService.enterEmergencyMode(deviceId);
+      // Show success notification
+      if (dispatch) {
+        dispatch({ 
+          type: 'ADD_NOTIFICATION', 
+          payload: {
+            id: `emergency-activated-${Date.now()}`,
+            title: 'Chế độ khẩn cấp',
+            message: 'Đã bật chế độ khẩn cấp thành công',
+            type: 'system_notification',
+            category: 'system',
+            priority: 'normal',
+            isRead: false,
+            createdAt: new Date().toISOString(),
+            metadata: { deviceId, action: 'emergency_activated' }
+          }
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (dispatch) {
+        dispatch({ type: 'SET_EMERGENCY', payload: null });
+      }
+    }
+  };
 
   const renderScreen = () => {
     if (!isAuthenticated) {
@@ -88,13 +136,37 @@ function AppContent() {
     }
   };
 
-  const handleActivateEmergency = () => {
-    // In a full implementation, call API to activate emergency mode on device
-    // For now just clear overlay and navigate to Home
-    setCurrentScreen('Main');
-    setActiveTab('Home');
-    if (dispatch) {
-      dispatch({ type: 'SET_EMERGENCY', payload: null });
+  const handleActivateEmergency = async () => {
+    try {
+      const deviceId = emergency?.metadata?.deviceId;
+      if (deviceId) {
+        await apiService.enterEmergencyMode(deviceId);
+        // Show success notification
+        if (dispatch) {
+        dispatch({
+          type: 'ADD_NOTIFICATION',
+          payload: {
+            id: `emergency-activated-${Date.now()}`,
+            title: 'Chế độ khẩn cấp',
+            message: 'Đã bật chế độ khẩn cấp thành công',
+            type: 'system_notification',
+            category: 'system',
+            priority: 'normal',
+            isRead: false,
+            createdAt: new Date().toISOString(),
+            metadata: { deviceId, action: 'emergency_activated' }
+          }
+        });
+        }
+      }
+    } catch (e) {
+      // Swallow error; UI will still return to app
+    } finally {
+      setCurrentScreen('Main');
+      setActiveTab('Home');
+      if (dispatch) {
+        dispatch({ type: 'SET_EMERGENCY', payload: null });
+      }
     }
   };
 

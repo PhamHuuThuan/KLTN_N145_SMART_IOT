@@ -41,6 +41,9 @@ class EmergencyActivity : Activity() {
       android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
     )
 
+    // Start emergency sound service
+    startEmergencySoundService()
+    
     // Create emergency UI
     createEmergencyUI()
   }
@@ -147,6 +150,15 @@ class EmergencyActivity : Activity() {
       setPadding(40, 22, 40, 22)
       setOnClickListener {
         unlockIfNeededThen {
+          // Show immediate feedback toast
+          Toast.makeText(this@EmergencyActivity, "Đang bật chế độ khẩn cấp...", Toast.LENGTH_SHORT).show()
+          // Set suppression window so urgent notification won't reopen UI immediately
+          try {
+            val prefs = getSharedPreferences("emergency_prefs", MODE_PRIVATE)
+            prefs.edit()
+              .putLong("last_emergency_activation_ts", System.currentTimeMillis())
+              .apply()
+          } catch (_: Exception) {}
           startMainWithAction("activate_emergency", deviceId, deviceName)
         }
       }
@@ -185,6 +197,13 @@ class EmergencyActivity : Activity() {
     layout.addView(buttonLayout, cardParams)
 
     setContentView(layout)
+  }
+
+  private fun startEmergencySoundService() {
+    try {
+      val intent = Intent(this, EmergencySoundService::class.java)
+      startService(intent)
+    } catch (_: Exception) {}
   }
 
   private fun startMainWithAction(action: String, deviceId: String?, deviceName: String?) {

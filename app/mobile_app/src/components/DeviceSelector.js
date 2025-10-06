@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
 
-const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetails, onDeviceAdded }) => {
+const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetails, onDeviceAdded, onDeviceRemoved }) => {
   const [showPicker, setShowPicker] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newDeviceId, setNewDeviceId] = useState('');
@@ -79,21 +79,81 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
             </View>
             <ScrollView style={{ maxHeight: 260 }}>
               {devices.map((deviceId) => (
-                <TouchableOpacity
-                  key={deviceId}
-                  style={[
-                    styles.modalItem,
-                    selectedDevice === deviceId && styles.modalItemActive
-                  ]}
-                  onPress={() => {
-                    setShowPicker(false);
-                    onSelectDevice && onSelectDevice(deviceId);
-                  }}
-                >
-                  <Text style={[styles.modalItemText, selectedDevice === deviceId && styles.modalItemTextActive]}>
-                    {deviceId}
-                  </Text>
-                </TouchableOpacity>
+                <View key={deviceId} style={styles.deviceItemContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.modalItem,
+                      selectedDevice === deviceId && styles.modalItemActive
+                    ]}
+                    onPress={() => {
+                      setShowPicker(false);
+                      onSelectDevice && onSelectDevice(deviceId);
+                    }}
+                  >
+                    <Text style={[styles.modalItemText, selectedDevice === deviceId && styles.modalItemTextActive]}>
+                      {deviceId}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                      Alert.alert(
+                        'Remove Device',
+                        `Are you sure you want to remove "${deviceId}" from your account? This will unassign the device but keep it in the system.`,
+                        [
+                          {
+                            text: 'Cancel',
+                            style: 'cancel'
+                          },
+                          {
+                            text: 'Remove',
+                            style: 'destructive',
+                            onPress: async () => {
+                              try {
+                                setShowLoader(true);
+                                const result = await apiService.removeDeviceOwnership(deviceId);
+                                
+                                if (result.success) {
+                                  setFeedback({
+                                    visible: true,
+                                    type: 'success',
+                                    message: 'Device removed successfully'
+                                  });
+                                  setShowPicker(false);
+                                  
+                                  // Call onDeviceRemoved callback and auto-select another device
+                                  if (onDeviceRemoved) {
+                                    const remainingDevices = devices.filter(d => d !== deviceId);
+                                    const newSelectedDevice = remainingDevices.length > 0 ? remainingDevices[0] : null;
+                                    await onDeviceRemoved(deviceId, newSelectedDevice);
+                                  }
+                                } else {
+                                  setFeedback({
+                                    visible: true,
+                                    type: 'error',
+                                    message: result.message || 'Failed to remove device'
+                                  });
+                                }
+                              } catch (error) {
+                                console.error('Remove device error:', error);
+                                setFeedback({
+                                  visible: true,
+                                  type: 'error',
+                                  message: error.message || 'Failed to remove device'
+                                });
+                              } finally {
+                                setShowLoader(false);
+                              }
+                            }
+                          }
+                        ]
+                      );
+                    }}
+                  >
+                    <MaterialCommunityIcons name="delete-outline" size={18} color={CONFIG.THEME.danger} />
+                  </TouchableOpacity>
+                  </TouchableOpacity>
+                </View>
               ))}
             </ScrollView>
           </View>
@@ -416,9 +476,13 @@ const styles = StyleSheet.create({
     color: CONFIG.COLORS.primary,
   },
   modalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 10,
     borderRadius: 8,
+    flex: 1,
   },
   modalItemActive: {
     backgroundColor: CONFIG.COLORS.light,
@@ -426,9 +490,28 @@ const styles = StyleSheet.create({
   modalItemText: {
     fontSize: 14,
     color: CONFIG.COLORS.dark,
+    flex: 1,
   },
   modalItemTextActive: {
     fontWeight: '700',
+  },
+  deviceItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  removeButton: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: CONFIG.COLORS.light,
+    borderWidth: 1,
+    borderColor: CONFIG.THEME.danger + '30', // 30% opacity
+    shadowColor: CONFIG.THEME.danger,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+    marginLeft: 8,
   },
 });
 

@@ -6,6 +6,11 @@ const outletSchema = new mongoose.Schema({
     required: true,
     enum: ['o1', 'o2', 'o3', 'o4', 'o5']
   },
+  type: {
+    type: String,
+    enum: ['kitchen', 'safety'],
+    default: 'kitchen'
+  },
   name: {
     type: String,
     required: true
@@ -30,8 +35,9 @@ const deviceSchema = new mongoose.Schema({
   },
   ownerId: {
     type: String,
-    required: true,
-    trim: true
+    required: false,
+    trim: true,
+    default: null
   },
   name: {
     type: String,
@@ -92,12 +98,15 @@ deviceSchema.methods.toggleOutlet = function(outletId, status) {
 
 // Method to enter emergency mode
 deviceSchema.methods.enterEmergencyMode = function() {
-  this.emergencyMode = true;
-  this.lastEmergencyAt = new Date();
   
-  // Turn off all outlets
+  // Emergency rule: kitchen -> OFF, safety -> ON
   this.outlets.forEach(outlet => {
-    outlet.status = false;
+    const outletType = (outlet.type || '').toLowerCase();
+    // Backward compatibility: infer by id if type missing
+    const inferredSafety = !outletType && (outlet.id === 'o4' || outlet.id === 'o5');
+    const isSafety = outletType === 'safety' || inferredSafety;
+    outlet.status = isSafety; // safety ON, kitchen OFF
+    outlet.lastToggleAt = new Date();
   });
   
   return this;

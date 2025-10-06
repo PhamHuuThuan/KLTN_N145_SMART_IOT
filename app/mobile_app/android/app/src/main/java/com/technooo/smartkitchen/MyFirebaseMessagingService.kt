@@ -78,16 +78,59 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     val priority = data["priority"]?.lowercase()
     val category = data["category"]?.lowercase()
     val type = data["type"]?.lowercase()
-    val isEmergency = priority == "urgent" || category == "security" || type == "security_alert"
+    val action = data["action"]?.lowercase()
+    val title = notification?.title ?: data["title"] ?: ""
+    val metadata = data["metadata"]?.let { json ->
+      try {
+        // Simple JSON parsing to check if it's an emergency activation notification
+        json.contains("\"action\":\"emergency_activated\"") || json.contains("emergency_activated")
+      } catch (_: Exception) {
+        false
+      }
+    } ?: false
+    
+    // Check if this is an emergency activation notification (not a real emergency alert)
+    val isEmergencyActivation = action == "emergency_activated" || 
+                               action == "emergency_mode_activated" ||
+                               metadata || 
+                               title.contains("emergency mode activated", ignoreCase = true) ||
+                               title.contains("chế độ khẩn cấp", ignoreCase = true)
+    
+    // Only treat as emergency if it's urgent/security AND not an activation notification AND not system category
+    val isEmergency = (priority == "urgent" || category == "security" || type == "security_alert") && 
+                      !isEmergencyActivation && 
+                      category != "system"
+
+    // Read suppression window (5 seconds) to prevent re-opening UI after manual activation
+    var suppressFullScreen = false
+    try {
+      val prefs = getSharedPreferences("emergency_prefs", MODE_PRIVATE)
+      val lastTs = prefs.getLong("last_emergency_activation_ts", 0L)
+      if (lastTs > 0 && (System.currentTimeMillis() - lastTs) < 5000L) {
+        suppressFullScreen = true
+      }
+    } catch (_: Exception) {}
 
     if (isEmergency) {
-      handleEmergencyNotification(data, notification)
+      // Start emergency sound service for real emergencies
+      startEmergencySoundService()
+      handleEmergencyNotification(data, notification, suppressFullScreen)
     } else {
       handleNormalNotification(data, notification)
     }
   }
 
-  private fun handleEmergencyNotification(data: Map<String, String>, notification: RemoteMessage.Notification?) {
+  private fun startEmergencySoundService() {
+    try {
+      val intent = Intent(this, EmergencySoundService::class.java)
+      startService(intent)
+      android.util.Log.d("FCMService", "Started EmergencySoundService for real emergency")
+    } catch (e: Exception) {
+      android.util.Log.e("FCMService", "Failed to start EmergencySoundService", e)
+    }
+  }
+
+  private fun handleEmergencyNotification(data: Map<String, String>, notification: RemoteMessage.Notification?, suppressFullScreen: Boolean = false) {
     val title = notification?.title ?: data["title"] ?: "Cảnh báo khẩn cấp"
     val body = notification?.body ?: data["body"] ?: "Phát hiện sự cố an toàn. Mở ngay."
 
@@ -111,8 +154,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    // Create notification with full-screen intent that shows immediately
-    val builder = NotificationCompat.Builder(this, EMERGENCY_CHANNEL_ID)
+    val channelId = EMERGENCY_CHANNEL_ID
+    val builder = NotificationCompat.Builder(this, channelId)
       .setSmallIcon(R.mipmap.ic_launcher)
       .setContentTitle(title)
       .setContentText(body)
@@ -121,60 +164,20 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
       .setOngoing(true)
       .setAutoCancel(true)
       .setSound(Uri.parse("android.resource://" + packageName + "/" + R.raw.emergy_sound))
-      .setFullScreenIntent(fullScreenPendingIntent, true)
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
       .setColor(0xFFD90429.toInt())
       .setLights(0xFFD90429.toInt(), 1000, 1000)
-      .setVibrate(longArrayOf(0, 1000, 500, 1000))
-      .setDefaults(NotificationCompat.DEFAULT_ALL)
-      .setTimeoutAfter(30000) // Auto dismiss after 30 seconds
 
-    // Proactively wake the screen and vibrate
-    try {
-      val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-      @Suppress("DEPRECATION")
-      val wakeLock = pm.newWakeLock(
-        PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-        "smartkitchen:emergencyWake"
-      )
-      wakeLock.acquire(5000)
-
-      val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 1000, 500, 1000), -1))
-      } else {
-        @Suppress("DEPRECATION")
-        vibrator.vibrate(longArrayOf(0, 1000, 500, 1000), -1)
-      }
-    } catch (e: Exception) {
-      android.util.Log.w("FCMService", "Wake/vibrate setup failed: ${e.message}")
+    // Only attach full-screen intent if not suppressed
+    if (!suppressFullScreen) {
+      builder.setFullScreenIntent(fullScreenPendingIntent, true)
+    } else {
+      // If suppressed, attach normal content intent so it won't pop full-screen again
+      builder.setContentIntent(fullScreenPendingIntent)
     }
 
-    // Show notification immediately and trigger full-screen intent
-    val notificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
-    NotificationManagerCompat.from(this).notify(notificationId, builder.build())
-    
-    // Immediately start the emergency activity
-    try {
-      // Add additional flags for lock screen
-      fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-      fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-      fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-      startActivity(fullScreenIntent)
-      android.util.Log.d("FCMService", "Emergency activity started successfully")
-    } catch (e: Exception) {
-      // If starting activity fails, the full-screen intent will still work
-      android.util.Log.e("FCMService", "Failed to start emergency activity directly", e)
-    }
-
-    // Start foreground sound/vibration service for continuous alert
-    try {
-      val svc = Intent(this, EmergencySoundService::class.java)
-      androidx.core.content.ContextCompat.startForegroundService(this, svc)
-      android.util.Log.d("FCMService", "EmergencySoundService started")
-    } catch (e: Exception) {
-      android.util.Log.e("FCMService", "Failed to start EmergencySoundService", e)
-    }
+    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
   }
 
   private fun handleNormalNotification(data: Map<String, String>, notification: RemoteMessage.Notification?) {

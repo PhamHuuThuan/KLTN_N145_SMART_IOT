@@ -1,13 +1,51 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar, SafeAreaView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
+import apiService from '../services/apiService';
+import ActionFeedback from '../components/ActionFeedback';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('EmergencyScreen');
 
 const EmergencyScreen = ({ navigation, emergency, onCheckNow, onActivateEmergency, onDismiss }) => {
+  const [activating, setActivating] = useState(false);
+  const [showSuccessFeedback, setShowSuccessFeedback] = useState(false);
   const deviceName = emergency?.metadata?.deviceName || emergency?.metadata?.deviceId || 'Thiết bị';
   const sensorType = emergency?.metadata?.sensorType || emergency?.type || 'sensor';
   const value = emergency?.metadata?.sensorValue;
   const threshold = emergency?.metadata?.threshold;
+
+  const handleActivateEmergency = async () => {
+    if (typeof onActivateEmergency === 'function') {
+      // Allow container to also call API (from native intent flow)
+      try {
+        await onActivateEmergency();
+      } catch (_) {}
+      return;
+    }
+    try {
+      const deviceId = emergency?.metadata?.deviceId;
+      if (!deviceId) {
+        log.error('Missing deviceId in emergency payload');
+        return;
+      }
+      setActivating(true);
+      // Let server handle emergency logic (turn off kitchen, turn on safety)
+      await apiService.enterEmergencyMode(deviceId);
+      log.info('Entered emergency mode', deviceId);
+      
+      // Show success feedback
+      setShowSuccessFeedback(true);
+      setTimeout(() => setShowSuccessFeedback(false), 3000);
+      
+      // Optionally refresh device status here if needed by caller
+    } catch (error) {
+      log.error('Failed to activate emergency mode', error?.message || String(error));
+    } finally {
+      setActivating(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -33,9 +71,9 @@ const EmergencyScreen = ({ navigation, emergency, onCheckNow, onActivateEmergenc
             <Text style={styles.buttonText}>Kiểm tra ngay</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.button, styles.emergencyButton]} onPress={onActivateEmergency} activeOpacity={0.9}>
+          <TouchableOpacity style={[styles.button, styles.emergencyButton]} onPress={handleActivateEmergency} activeOpacity={0.9} disabled={activating}>
             <MaterialCommunityIcons name="shield-alert" size={24} color="#FFFFFF" />
-            <Text style={styles.buttonText}>Bật chế độ khẩn cấp</Text>
+            <Text style={styles.buttonText}>{activating ? 'Đang kích hoạt...' : 'Bật chế độ khẩn cấp'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -43,6 +81,14 @@ const EmergencyScreen = ({ navigation, emergency, onCheckNow, onActivateEmergenc
           <Text style={styles.dismissText}>Bỏ qua</Text>
         </TouchableOpacity>
       </View>
+
+      <ActionFeedback
+        visible={showSuccessFeedback}
+        type="success"
+        message="Đã bật chế độ khẩn cấp thành công"
+        duration={3000}
+        onHide={() => setShowSuccessFeedback(false)}
+      />
     </SafeAreaView>
   );
 };
