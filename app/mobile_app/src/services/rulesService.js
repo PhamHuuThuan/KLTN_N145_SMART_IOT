@@ -1,9 +1,23 @@
 import environment from '../config/environment';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class RulesService {
   constructor() {
     // Route rules API via API Gateway
     this.baseURL = environment.getApiUrl('GATEWAY');
+  }
+
+  async getAuthHeaders(extra = {}) {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      return {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...extra
+      };
+    } catch (_) {
+      return { 'Content-Type': 'application/json', ...extra };
+    }
   }
 
   // Get all rules for a user
@@ -18,9 +32,7 @@ class RulesService {
       
       const response = await fetch(`${this.baseURL}/api/rules?${queryParams}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
       });
 
       console.log('Rules API response status:', response.status);
@@ -45,9 +57,7 @@ class RulesService {
     try {
       const response = await fetch(`${this.baseURL}/api/rules/templates`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -67,9 +77,7 @@ class RulesService {
     try {
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -92,9 +100,7 @@ class RulesService {
       
       const response = await fetch(`${this.baseURL}/api/rules`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
         body: JSON.stringify(ruleData),
       });
 
@@ -129,9 +135,7 @@ class RulesService {
     try {
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -153,9 +157,7 @@ class RulesService {
     try {
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -176,9 +178,7 @@ class RulesService {
     try {
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/status`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
         body: JSON.stringify({ isActive }),
       });
 
@@ -204,9 +204,7 @@ class RulesService {
       
       const response = await fetch(`${this.baseURL}/api/rules/device/${deviceId}?${queryParams}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -228,9 +226,7 @@ class RulesService {
       
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/executions?${queryParams}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -254,9 +250,7 @@ class RulesService {
       
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/stats?${queryParams}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -276,9 +270,7 @@ class RulesService {
     try {
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/test`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
         body: JSON.stringify({
           sensorData,
           deviceData
@@ -303,9 +295,7 @@ class RulesService {
     try {
       const response = await fetch(`${this.baseURL}/api/rules/bulk/update`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getAuthHeaders(),
         body: JSON.stringify({
           ruleIds,
           updateData
