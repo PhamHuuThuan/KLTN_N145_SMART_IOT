@@ -87,6 +87,8 @@ async function updateDeviceStatus(data) {
       if (VERBOSE) console.log(`⚠️ No outlet data found in payload for ${type} log`);
     }
     
+    let shouldPersist = true;
+
     // Update latest telemetry (only set provided fields; do not default to 0)
     if (payload.temp !== undefined || payload.humid !== undefined || payload.smoke !== undefined || payload.gas_ppm !== undefined || payload.o || payload.outlets) {
       const prev = device.latestTelemetry || { ts: Date.now(), o: {} };
@@ -122,13 +124,19 @@ async function updateDeviceStatus(data) {
       }
       if (VERBOSE) console.log(`📅 Updated timestamp for ACK event`);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
+      // Do NOT persist ack-only updates to avoid DB write amplification
+      shouldPersist = false;
     } else {
       if (VERBOSE) console.log(`⚠️ No sensor data found in ${type} log, keeping existing telemetry`);
     }
     
-    if (VERBOSE) console.log(`💾 Saving device to database...`);
-    await device.save();
-    if (VERBOSE) console.log(`✅ Device status updated successfully: ${deviceId}`);
+    if (shouldPersist) {
+      if (VERBOSE) console.log(`💾 Saving device to database...`);
+      await device.save();
+      if (VERBOSE) console.log(`✅ Device status updated successfully: ${deviceId}`);
+    } else if (VERBOSE) {
+      console.log(`🧭 Skipped DB save for ACK-only update: ${deviceId}`);
+    }
     
   } catch (error) {
     console.error(`❌ Error updating device status:`, error);
@@ -170,9 +178,13 @@ async function startLogConsumer() {
           const logData = JSON.parse(message.value.toString());
           // if (VERBOSE) console.log(`📋 Log data:`, JSON.stringify(logData, null, 2));
           
-          // Create and save device log
-          const deviceLog = new DeviceLog(logData);
-          await deviceLog.save();
+          // Create and save device log EXCEPT for high-frequency ACK events
+          let savedLog = null;
+          if (!(logData.type === 'event' && logData.payload?.ack === true)) {
+            const deviceLog = new DeviceLog(logData);
+            await deviceLog.save();
+            savedLog = deviceLog;
+          }
           // if (VERBOSE) console.log(`✅ Device log saved successfully for ${logData.type} event`);
           
           // Update device status if it's telemetry or event data
@@ -181,19 +193,12 @@ async function startLogConsumer() {
             await updateDeviceStatus(logData);
           }
           
-          // Check for emergency conditions
-          if (logData.type === 'telemetry') {
-            const emergencyCheck = deviceLog.checkEmergencyConditions();
-            if (emergencyCheck.emergency) {
-              console.log(`🚨 EMERGENCY detected for device ${logData.deviceId}`);
-              // TODO: Send emergency notification
-            }
+          // Mark log as processed when we created one
+          if (savedLog) {
+            savedLog.markAsProcessed();
+            await savedLog.save();
+            if (VERBOSE) console.log(`✅ Device log marked as processed`);
           }
-          
-          // Mark log as processed
-          deviceLog.markAsProcessed();
-          await deviceLog.save();
-          if (VERBOSE) console.log(`✅ Device log marked as processed`);
 
         } catch (error) {
           console.error(`❌ Error processing message from ${topic}:`, error);

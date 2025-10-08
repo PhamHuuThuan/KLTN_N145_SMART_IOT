@@ -2,7 +2,8 @@ import environment from '../config/environment';
 
 class RulesService {
   constructor() {
-    this.baseURL = environment.getApiUrl('RULES_SERVICE');
+    // Route rules API via API Gateway
+    this.baseURL = environment.getApiUrl('GATEWAY');
   }
 
   // Get all rules for a user

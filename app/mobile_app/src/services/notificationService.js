@@ -6,8 +6,8 @@ const log = createLogger('Notifications');
 
 class NotificationService {
   constructor() {
-    const serviceUrl = environment.getServiceUrl('ALERTS_SERVICE');
-    this.baseUrl = `${serviceUrl}/api/notifications`;
+    const gatewayUrl = environment.getApiUrl('GATEWAY');
+    this.baseUrl = `${gatewayUrl}/api/notifications`;
     this.authToken = null;
     this.client = null; // Cache axios client
     
