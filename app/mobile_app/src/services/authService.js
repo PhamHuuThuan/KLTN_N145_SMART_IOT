@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import environment from '../config/environment';
 
 const authClient = axios.create({
-  baseURL: environment.getServiceUrl('AUTH_SERVICE') || 'http://127.0.0.1:3005',
+  // Route auth via API Gateway as well
+  baseURL: environment.getApiUrl('GATEWAY') || 'http://127.0.0.1:3000',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

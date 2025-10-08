@@ -37,7 +37,7 @@
       "bundler": "metro"
     },
     "extra": {
-      "apiUrl": "http://127.0.0.1:3002",
+      "apiUrl": "http://127.0.0.1:3000",
       "eas": {
         "projectId": "5ea86a56-b10e-4a1b-88a7-6692b50872ed"
       }

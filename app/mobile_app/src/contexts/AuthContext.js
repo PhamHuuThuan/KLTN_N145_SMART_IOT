@@ -208,49 +208,35 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // Get FCM token - try to get the actual FCM token first
+      // Prefer native device push token (FCM/APNs); avoid Expo token to prevent network dependency
       let fcmToken = null;
-      
-      try {
-        // Try to get the actual FCM token from Expo
-        const token = await Notifications.getExpoPushTokenAsync({
-          projectId: '5ea86a56-b10e-4a1b-88a7-6692b50872ed'
-        });
+      let platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
 
-        log.info('Expo push token acquired', token?.data);
-        log.debug('Full token object', token);
-        
-        // Check if it's a real FCM token or Expo push token
-        if (token.data.startsWith('ExponentPushToken[')) {
-          log.warn('Got Expo push token instead of FCM token - skipping registration');
-          // Don't register Expo push token, only register real FCM tokens
-          return;
-        } else {
-          log.info('Got real FCM token');
-          fcmToken = token.data;
-        }
-      } catch (error) {
-        log.error('Error getting Expo push token', error?.message || error);
-        throw error;
+      try {
+        const devicePushToken = await Notifications.getDevicePushTokenAsync();
+        fcmToken = devicePushToken?.data;
+        log.info('Native push token acquired', fcmToken ? fcmToken.substring(0, 20) + '...' : null);
+      } catch (nativeErr) {
+        log.warn('Native device token not available. Skipping FCM registration.', nativeErr?.message || nativeErr);
+        return; // do not throw to avoid UI errors
       }
 
-      if (fcmToken) {
-        // Register token with notification service
-        const result = await notificationService.addFCMToken(userId, fcmToken, 'android');
-        
-        if (result.success) {
-          log.info('FCM token registered successfully for user', userId);
-          log.debug('Token count', result.data?.tokenCount);
-        } else {
-          log.warn('FCM token registration failed', result.message);
-          throw new Error(result.message || 'FCM token registration failed');
-        }
-      } else {
+      if (!fcmToken) {
         log.warn('No FCM token available');
+        return;
+      }
+
+      // Register token with notification service via gateway
+      const result = await notificationService.addFCMToken(userId, fcmToken, platform);
+      if (result?.success) {
+        log.info('FCM token registered successfully for user', userId);
+        log.debug('Token count', result.data?.tokenCount);
+      } else {
+        log.warn('FCM token registration failed', result?.message);
       }
     } catch (error) {
-      log.error('Error registering FCM token', error?.message || error);
-      throw error;
+      // Do not propagate failures to UI; just warn
+      log.warn('Error registering FCM token (non-fatal)', error?.message || String(error));
     }
   };
 

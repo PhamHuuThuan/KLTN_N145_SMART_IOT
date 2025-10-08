@@ -88,8 +88,9 @@ export const useDeviceData = () => {
   useEffect(() => {
     fetchDevices();
 
-    const devicesUrl = environment.getServiceUrl('DEVICES_SERVICE');
-    const socket = io(devicesUrl, {
+    const gatewayUrl = environment.getApiUrl('GATEWAY');
+    const socket = io(gatewayUrl, {
+      path: '/ws/devices',
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -101,7 +102,7 @@ export const useDeviceData = () => {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      log.info('socket connected to devices service');
+      log.info('socket connected via gateway');
     });
 
     socket.on('device.telemetry', ({ deviceId, payload }) => {
@@ -158,7 +159,7 @@ export const useDeviceData = () => {
     });
 
     socket.on('disconnect', () => {
-      log.warn('socket disconnected from devices service');
+      log.warn('socket disconnected');
     });
 
     return () => {

@@ -16,45 +16,21 @@ const getLocalIP = () => {
     return String(extra.apiHost);
   }
   // Emulator defaults
-  if (Platform.OS === 'android') return '10.0.2.2';
+  if (Platform.OS === 'android') return '127.0.0.1';
   if (Platform.OS === 'ios') return '127.0.0.1';
   return '127.0.0.1';
 };
 
 const ENV = {
-  // Server URLs
-  DEVICES_SERVICE: {
-    HTTP: `http://${getLocalIP()}:3002`,
-    HTTPS: `https://${getLocalIP()}:3002`,
-    LOCAL: 'http://127.0.0.1:3002',
-  },
-  
-  MQTT_SERVICE: {
-    HTTP: `http://${getLocalIP()}:3001`,
-    HTTPS: `https://${getLocalIP()}:3001`,
-    LOCAL: 'http://127.0.0.1:3001',
-  },
-  
-  RULES_SERVICE: {
-    HTTP: `http://${getLocalIP()}:3003`,
-    HTTPS: `https://${getLocalIP()}:3003`,
-    LOCAL: 'http://127.0.0.1:3003',
-  },
-  
-  ALERTS_SERVICE: {
-    HTTP: `http://${getLocalIP()}:3004`,
-    HTTPS: `https://${getLocalIP()}:3004`,
-    LOCAL: 'http://127.0.0.1:3004',
+  // Server URLs (only expose API Gateway to clients)
+  GATEWAY: {
+    HTTP: `http://${getLocalIP()}:3000`,
+    HTTPS: `https://${getLocalIP()}:3000`,
+    LOCAL: 'http://127.0.0.1:3000',
   },
 
-  AUTH_SERVICE: {
-    HTTP: `http://${getLocalIP()}:3005`,
-    HTTPS: `https://${getLocalIP()}:3005`,
-    LOCAL: 'http://127.0.0.1:3005',
-  },
-  
-  // Current API Configuration (devices-service)
-  API_BASE_URL: Constants.expoConfig?.extra?.apiUrl || `http://${getLocalIP()}:3002`,
+  // Current API Configuration → route everything via API Gateway
+  API_BASE_URL: Constants.expoConfig?.extra?.apiUrl || `http://${getLocalIP()}:3000`,
   
   // Network Configuration
   USE_HTTPS: false,
@@ -79,7 +55,7 @@ const isTunnelMode = () => {
 };
 
 // Get appropriate API URL based on environment
-const getApiUrl = (service = 'DEVICES_SERVICE') => {
+const getApiUrl = (service = 'GATEWAY') => {
   const tunnelMode = isTunnelMode();
   
   if (tunnelMode) {
@@ -91,19 +67,8 @@ const getApiUrl = (service = 'DEVICES_SERVICE') => {
   return ENV[service].HTTP;
 };
 
-// Get service URL
-const getServiceUrl = (service, useHttps = false) => {
-  const serviceConfig = ENV[service];
-  if (!serviceConfig) {
-    throw new Error(`Service ${service} not found`);
-  }
-  
-  return useHttps ? serviceConfig.HTTPS : serviceConfig.HTTP;
-};
-
 export default {
   ...ENV,
   isTunnelMode,
   getApiUrl,
-  getServiceUrl,
 };
