@@ -171,9 +171,10 @@ export const NotificationProvider = ({ children }) => {
     let socket = null;
     const connectSocket = () => {
       try {
-        const alertsUrl = ENV.getServiceUrl('ALERTS_SERVICE');
+        const gatewayUrl = ENV.getApiUrl('GATEWAY');
         
-        socket = io(alertsUrl, {
+        socket = io(gatewayUrl, {
+          path: '/ws/notifications',
           auth: user?.id ? { userId: user.id } : undefined,
           transports: ['websocket', 'polling'],
           reconnection: true,
