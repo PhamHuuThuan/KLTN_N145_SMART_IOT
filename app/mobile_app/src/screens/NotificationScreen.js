@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../contexts/ThemeContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationItem from '../components/NotificationItem';
@@ -20,6 +21,7 @@ import { notificationService } from '../services/notificationService';
 
 const NotificationScreen = ({ navigation }) => {
   const { t } = useTranslation();
+  const { colors } = useTheme();
   const {
     notifications,
     unreadCount,
@@ -138,30 +140,30 @@ const NotificationScreen = ({ navigation }) => {
   };
 
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
       <View style={styles.headerLeft}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('notifications.title')}</Text>
       </View>
       <View style={styles.headerRight}>
         {unreadCount > 0 && (
           <TouchableOpacity
-            style={styles.markAllButton}
+            style={[styles.markAllButton, { backgroundColor: colors.primary }]}
             onPress={handleMarkAllAsRead}
           >
-            <Text style={styles.markAllText}>{t('notifications.markAllAsRead')}</Text>
+            <Text style={[styles.markAllText, { color: colors.white }]}>{t('notifications.markAllAsRead')}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
-          style={styles.testButton}
+          style={[styles.testButton, { backgroundColor: colors.backgroundSecondary }]}
           onPress={() => navigation.navigate('NotificationSettingsFromNotifications')}
         >
-          <Ionicons name="settings-outline" size={20} color="#007AFF" />
+          <Ionicons name="settings-outline" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -169,9 +171,9 @@ const NotificationScreen = ({ navigation }) => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="notifications-outline" size={64} color="#C7C7CC" />
-      <Text style={styles.emptyTitle}>{t('notifications.noNotifications')}</Text>
-      <Text style={styles.emptyMessage}>
+      <Ionicons name="notifications-outline" size={64} color={colors.gray} />
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('notifications.noNotifications')}</Text>
+      <Text style={[styles.emptyMessage, { color: colors.textSecondary }]}>
         {t('notifications.emptyMessage')}
       </Text>
       
@@ -189,33 +191,33 @@ const NotificationScreen = ({ navigation }) => {
     if (!loadingMore) return null;
     return (
       <View style={styles.loadingMore}>
-        <ActivityIndicator size="small" color="#007AFF" />
-        <Text style={styles.loadingMoreText}>{t('common.loadingMore')}</Text>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text style={[styles.loadingMoreText, { color: colors.textSecondary }]}>{t('common.loadingMore')}</Text>
       </View>
     );
   };
 
   if (loading && notifications.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>{t('notifications.loading')}</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('notifications.loading')}</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {renderHeader()}
       
       {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-            <Text style={styles.retryText}>{t('common.retry')}</Text>
+        <View style={[styles.errorContainer, { backgroundColor: colors.danger }]}>
+          <Text style={[styles.errorText, { color: colors.white }]}>{error}</Text>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]} onPress={handleRefresh}>
+            <Text style={[styles.retryText, { color: colors.white }]}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -230,8 +232,8 @@ const NotificationScreen = ({ navigation }) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={['#007AFF']}
-            tintColor="#007AFF"
+            colors={[colors.primary]}
+            tintColor={colors.primary}
           />
         }
         onEndReached={handleLoadMore}
@@ -257,7 +259,6 @@ const NotificationScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
   },
   header: {
     flexDirection: 'row',
@@ -265,9 +266,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -280,7 +279,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1C1C1E',
   },
   headerRight: {
     flexDirection: 'row',
@@ -290,18 +288,15 @@ const styles = StyleSheet.create({
   markAllButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#007AFF',
     borderRadius: 16,
   },
   markAllText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
   testButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#F2F2F7',
   },
   testButtonLarge: {
     flexDirection: 'row',
@@ -315,7 +310,7 @@ const styles = StyleSheet.create({
   testButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    // color handled by theme
     marginLeft: 8,
   },
   listContainer: {
@@ -331,13 +326,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1C1C1E',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyMessage: {
     fontSize: 16,
-    color: '#8E8E93',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -348,7 +341,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#8E8E93',
     marginTop: 12,
   },
   loadingMore: {
@@ -359,11 +351,9 @@ const styles = StyleSheet.create({
   },
   loadingMoreText: {
     fontSize: 14,
-    color: '#8E8E93',
     marginLeft: 8,
   },
   errorContainer: {
-    backgroundColor: '#FF3B30',
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -372,19 +362,16 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#FFFFFF',
     flex: 1,
   },
   retryButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
   },
   retryText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
 });
 

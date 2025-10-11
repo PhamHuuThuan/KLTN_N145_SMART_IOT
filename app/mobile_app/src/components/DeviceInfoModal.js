@@ -3,10 +3,12 @@ import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
+import { useTheme } from '../contexts/ThemeContext';
 import DeviceInfo from './DeviceInfo';
 
 const DeviceInfoModal = ({ visible, onClose, deviceData }) => {
   const { t } = useTranslation();
+  const { colors } = useTheme();
   
   return (
     <Modal
@@ -16,11 +18,11 @@ const DeviceInfoModal = ({ visible, onClose, deviceData }) => {
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>{t('devices.deviceInformation')}</Text>
+            <Text style={[styles.title, { color: colors.primary }]}>{t('devices.deviceInformation')}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <MaterialCommunityIcons name="close" size={22} color={CONFIG.COLORS.gray} />
+              <MaterialCommunityIcons name="close" size={22} color={colors.gray} />
             </TouchableOpacity>
           </View>
 
@@ -38,14 +40,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: CONFIG.THEME.surface,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingTop: 10,
     paddingHorizontal: 10,
     paddingBottom: 20,
     borderTopWidth: 1,
-    borderColor: CONFIG.THEME.border,
   },
   header: {
     flexDirection: 'row',
@@ -57,7 +57,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '700',
-    color: CONFIG.COLORS.primary,
   },
   closeBtn: {
     padding: 6,

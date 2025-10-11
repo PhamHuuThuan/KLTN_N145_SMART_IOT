@@ -4,6 +4,7 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import * as Application from 'expo-application';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../contexts/ThemeContext';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('NotifSettings');
@@ -15,6 +16,7 @@ import TimePicker from '../components/TimePicker';
 
 const NotificationSettingsScreen = ({ navigation }) => {
   const { t } = useTranslation();
+  const { colors } = useTheme();
   const { user, registerFCMToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -238,102 +240,104 @@ const NotificationSettingsScreen = ({ navigation }) => {
   }, [user?.email, user?.phone]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('settings.notificationSettings')}</Text>
-        <TouchableOpacity style={styles.saveIconButton} onPress={save} disabled={saving || loading}>
-          <Ionicons name="save-outline" size={22} color="#FFFFFF" />
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('settings.notificationSettings')}</Text>
+        <TouchableOpacity style={[styles.saveIconButton, { backgroundColor: colors.primary }]} onPress={save} disabled={saving || loading}>
+          <Ionicons name="save-outline" size={22} color={colors.white} />
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.allowPermissions')}</Text>
-          <Text style={styles.description}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.allowPermissions')}</Text>
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
             {t('settings.permissionsDescription')}
           </Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={openSystemPermissionScreens}>
-            <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" />
-            <Text style={styles.permissionButtonText}>{t('settings.openSystemPermissions')}</Text>
+          <TouchableOpacity style={[styles.permissionButton, { backgroundColor: colors.primary }]} onPress={openSystemPermissionScreens}>
+            <Ionicons name="shield-checkmark" size={18} color={colors.white} />
+            <Text style={[styles.permissionButtonText, { color: colors.white }]}>{t('settings.openSystemPermissions')}</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.pushNotifications')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.pushNotifications')}</Text>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>{t('settings.inAppNotifications')}</Text>
-              <Text style={styles.description}>{t('settings.inAppDescription')}</Text>
+              <Text style={[styles.label, { color: colors.text }]}>{t('settings.inAppNotifications')}</Text>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>{t('settings.inAppDescription')}</Text>
             </View>
             <Switch value={true} onValueChange={() => {}} disabled />
           </View>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>{t('settings.pushNotifications')}</Text>
-              <Text style={styles.description}>{t('settings.pushDescription')}</Text>
+              <Text style={[styles.label, { color: colors.text }]}>{t('settings.pushNotifications')}</Text>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>{t('settings.pushDescription')}</Text>
             </View>
             <Switch value={prefs.fcm.enabled} onValueChange={handleFCMToggle} />
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.emailNotifications')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.emailNotifications')}</Text>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>{t('settings.emailAlerts')}</Text>
-              <Text style={styles.description}>{t('settings.emailDescription')}</Text>
+              <Text style={[styles.label, { color: colors.text }]}>{t('settings.emailAlerts')}</Text>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>{t('settings.emailDescription')}</Text>
             </View>
             <Switch value={prefs.email.enabled} onValueChange={(v) => setPrefs({ ...prefs, email: { ...prefs.email, enabled: v } })} />
           </View>
           {prefs.email.enabled && (
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>{t('settings.emailAddress')}</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('settings.emailAddress')}</Text>
               <TextInput
-                style={[styles.input, !prefs.email.address && styles.inputError]}
+                style={[styles.input, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }, !prefs.email.address && styles.inputError]}
                 placeholder={t('settings.enterEmailAddress')}
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={prefs.email.address}
                 onChangeText={(t) => setPrefs({ ...prefs, email: { ...prefs.email, address: t } })}
               />
-              {!prefs.email.address && <Text style={styles.errorText}>{t('settings.emailRequired')}</Text>}
+              {!prefs.email.address && <Text style={[styles.errorText, { color: colors.danger }]}>{t('settings.emailRequired')}</Text>}
             </View>
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.smsNotifications')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.smsNotifications')}</Text>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>{t('settings.smsAlerts')}</Text>
-              <Text style={styles.description}>{t('settings.smsDescription')}</Text>
+              <Text style={[styles.label, { color: colors.text }]}>{t('settings.smsAlerts')}</Text>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>{t('settings.smsDescription')}</Text>
             </View>
             <Switch value={prefs.sms.enabled} onValueChange={(v) => setPrefs({ ...prefs, sms: { ...prefs.sms, enabled: v } })} />
           </View>
           {prefs.sms.enabled && (
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>{t('settings.phoneNumber')}</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('settings.phoneNumber')}</Text>
               <TextInput
-                style={[styles.input, !prefs.sms.phoneNumber && styles.inputError]}
+                style={[styles.input, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }, !prefs.sms.phoneNumber && styles.inputError]}
                 placeholder={t('settings.enterPhoneNumber')}
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="phone-pad"
                 value={prefs.sms.phoneNumber}
                 onChangeText={(t) => setPrefs({ ...prefs, sms: { ...prefs.sms, phoneNumber: t } })}
               />
-              {!prefs.sms.phoneNumber && <Text style={styles.errorText}>{t('settings.phoneRequired')}</Text>}
+              {!prefs.sms.phoneNumber && <Text style={[styles.errorText, { color: colors.danger }]}>{t('settings.phoneRequired')}</Text>}
             </View>
           )}
         </View>
 
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.quietHours')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.quietHours')}</Text>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>{t('settings.enableQuietHours')}</Text>
-              <Text style={styles.description}>{t('settings.quietHoursDescription')}</Text>
+              <Text style={[styles.label, { color: colors.text }]}>{t('settings.enableQuietHours')}</Text>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>{t('settings.quietHoursDescription')}</Text>
             </View>
             <Switch 
               value={prefs.quietHours.enabled} 
@@ -347,7 +351,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
             <View style={styles.quietHoursContainer}>
               <View style={styles.timeRow}>
                 <View style={styles.timeInputContainer}>
-                  <Text style={styles.inputLabel}>{t('settings.startTime')}</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>{t('settings.startTime')}</Text>
                   <TimePicker
                     value={prefs.quietHours.startTime}
                     onTimeChange={(startTime) => setPrefs({
@@ -358,7 +362,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
                   />
                 </View>
                 <View style={styles.timeInputContainer}>
-                  <Text style={styles.inputLabel}>{t('settings.endTime')}</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>{t('settings.endTime')}</Text>
                   <TimePicker
                     value={prefs.quietHours.endTime}
                     onTimeChange={(endTime) => setPrefs({
@@ -370,7 +374,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
                 </View>
               </View>
               <View style={styles.exceptionsContainer}>
-                <Text style={styles.inputLabel}>{t('settings.exceptions')}</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t('settings.exceptions')}</Text>
                 {prefs.quietHours.exceptions.map((exception, index) => {
                   const exceptionLabels = {
                     urgent: t('notifications.priorities.urgent'),
@@ -387,10 +391,10 @@ const NotificationSettingsScreen = ({ navigation }) => {
                             exception.type === 'security' ? 'shield-checkmark' : 'settings'
                           } 
                           size={16} 
-                          color="#007AFF" 
+                          color={colors.primary} 
                           style={styles.exceptionIcon}
                         />
-                        <Text style={styles.exceptionLabel}>
+                        <Text style={[styles.exceptionLabel, { color: colors.text }]}>
                           {exceptionLabels[exception.type] || exception.type}
                         </Text>
                       </View>
@@ -415,11 +419,11 @@ const NotificationSettingsScreen = ({ navigation }) => {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.notificationTypes')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settings.notificationTypes')}</Text>
           <View style={styles.infoContainer}>
-            <Ionicons name="information-circle-outline" size={20} color="#007AFF" />
-            <Text style={styles.infoText}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
               {t('settings.notificationTypesDescription')}
             </Text>
           </View>
@@ -449,52 +453,46 @@ const NotificationSettingsScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F2F2F7' },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E5EA'
+    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1
   },
   backButton: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '600', color: '#1C1C1E' },
-  saveIconButton: { paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#007AFF', borderRadius: 18 },
+  headerTitle: { fontSize: 18, fontWeight: '600' },
+  saveIconButton: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 18 },
   content: { flex: 1, paddingHorizontal: 16 },
-  section: { backgroundColor: '#FFFFFF', padding: 16, marginTop: 12, borderRadius: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#1C1C1E', marginBottom: 16 },
+  section: { padding: 16, marginTop: 12, borderRadius: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   labelContainer: { flex: 1, marginRight: 16 },
-  label: { fontSize: 16, fontWeight: '500', color: '#1C1C1E', marginBottom: 4 },
-  description: { fontSize: 14, color: '#8E8E93', lineHeight: 20 },
+  label: { fontSize: 16, fontWeight: '500', marginBottom: 4 },
+  description: { fontSize: 14, lineHeight: 20 },
   inputContainer: { marginTop: 12 },
-  inputLabel: { fontSize: 14, fontWeight: '500', color: '#1C1C1E', marginBottom: 8 },
+  inputLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8 },
   input: { 
     borderWidth: 1, 
-    borderColor: '#E5E5EA', 
     borderRadius: 8, 
     padding: 12,
-    fontSize: 16,
-    color: '#1C1C1E',
-    backgroundColor: '#FFFFFF'
+    fontSize: 16
   },
   inputError: {
     borderColor: '#FF3B30'
   },
   errorText: {
     fontSize: 12,
-    color: '#FF3B30',
+    // color handled by theme
     marginTop: 4
   },
   infoContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#F0F8FF',
     padding: 12,
     borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#007AFF'
+    borderLeftWidth: 3
   },
   infoText: {
     fontSize: 14,
-    color: '#1C1C1E',
     lineHeight: 20,
     marginLeft: 8,
     flex: 1
@@ -531,12 +529,10 @@ const styles = StyleSheet.create({
   },
   exceptionLabel: {
     fontSize: 14,
-    color: '#1C1C1E',
     fontWeight: '500'
   },
   permissionButton: {
     marginTop: 12,
-    backgroundColor: '#007AFF',
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -545,7 +541,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   permissionButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8

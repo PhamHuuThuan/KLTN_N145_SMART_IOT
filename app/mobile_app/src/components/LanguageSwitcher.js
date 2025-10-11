@@ -10,12 +10,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../hooks/useLanguage';
+import { useTheme } from '../contexts/ThemeContext';
 import ActionFeedback from './ActionFeedback';
 import CONFIG from '../constants/config';
 
 const LanguageSwitcher = ({ style }) => {
   const { t } = useTranslation();
   const { currentLanguage, changeLanguage, getAvailableLanguages, getCurrentLanguageInfo } = useLanguage();
+  const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackType, setFeedbackType] = useState('success');
@@ -49,19 +51,22 @@ const LanguageSwitcher = ({ style }) => {
     <TouchableOpacity
       style={[
         styles.languageItem,
-        currentLanguage === item.code && styles.selectedLanguageItem
+        { borderBottomColor: colors.border },
+        currentLanguage === item.code && { backgroundColor: colors.backgroundSecondary }
       ]}
       onPress={() => handleLanguageChange(item.code)}
     >
       <Text style={[
         styles.languageName,
-        currentLanguage === item.code && styles.selectedLanguageName
+        { color: colors.text },
+        currentLanguage === item.code && { color: colors.primary }
       ]}>
         {item.nativeName}
       </Text>
       <Text style={[
         styles.languageCode,
-        currentLanguage === item.code && styles.selectedLanguageCode
+        { color: colors.textSecondary },
+        currentLanguage === item.code && { color: colors.primary }
       ]}>
         {item.name}
       </Text>
@@ -69,7 +74,7 @@ const LanguageSwitcher = ({ style }) => {
         <Ionicons
           name="checkmark"
           size={20}
-          color={CONFIG.THEME.primary}
+          color={colors.primary}
           style={styles.checkIcon}
         />
       )}
@@ -79,28 +84,28 @@ const LanguageSwitcher = ({ style }) => {
   return (
     <View style={[styles.container, style]}>
       <TouchableOpacity
-        style={styles.languageButton}
+        style={[styles.languageButton, { borderBottomColor: colors.border }]}
         onPress={() => setModalVisible(true)}
       >
         <View style={styles.settingLeft}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="language-outline" size={24} color={CONFIG.THEME.primary} />
+          <View style={[styles.iconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+            <Ionicons name="language-outline" size={24} color={colors.primary} />
           </View>
           <View style={styles.settingText}>
-            <Text style={styles.settingTitle}>{t('settings.language')}</Text>
-            <Text style={styles.settingSubtitle}>
+            <Text style={[styles.settingTitle, { color: colors.text }]}>{t('settings.language')}</Text>
+            <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>
               {currentLangInfo.nativeName}
             </Text>
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={CONFIG.THEME.gray} />
+        <Ionicons name="chevron-forward" size={20} color={colors.gray} />
       </TouchableOpacity>
 
       <ActionFeedback
         type={feedbackType}
         message={feedbackMessage}
         visible={feedbackVisible}
-        onHide={() => setFeedbackVisible(true)}
+        onHide={() => setFeedbackVisible(false)}
       />
 
       <Modal
@@ -110,9 +115,9 @@ const LanguageSwitcher = ({ style }) => {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('settings.selectLanguage')}</Text>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{t('settings.selectLanguage')}</Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
@@ -120,7 +125,7 @@ const LanguageSwitcher = ({ style }) => {
                 <Ionicons
                   name="close"
                   size={24}
-                  color={CONFIG.THEME.gray}
+                  color={colors.gray}
                 />
               </TouchableOpacity>
             </View>
@@ -141,7 +146,7 @@ const LanguageSwitcher = ({ style }) => {
 
 const styles = StyleSheet.create({
   container: {
-
+    backgroundColor: 'transparent', // Will be set by parent
   },
   languageButton: {
     flexDirection: 'row',
@@ -149,7 +154,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.THEME.border,
   },
   settingLeft: {
     flexDirection: 'row',

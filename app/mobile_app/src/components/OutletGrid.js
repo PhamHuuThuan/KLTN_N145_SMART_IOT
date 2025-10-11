@@ -6,6 +6,7 @@ import ActionFeedback from './ActionFeedback';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import OutletDetail from './OutletDetail';
 import CONFIG from '../constants/config';
+import { useTheme } from '../contexts/ThemeContext';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('OutletGrid');
@@ -19,6 +20,7 @@ const OutletGrid = ({
   onRefreshDeviceData
 }) => {
   const { t } = useTranslation();
+  const { colors } = useTheme();
   const [buttonScales] = useState(() => 
     Array.from({ length: 5 }, () => new Animated.Value(1))
   );
@@ -140,7 +142,7 @@ const OutletGrid = ({
 
   const getOutletColor = (outletId) => {
     const isOn = getOutletStatus(outletId);
-    return isOn ? CONFIG.COLORS.success : CONFIG.COLORS.gray;
+    return isOn ? colors.success : colors.gray;
   };
 
   const getOutletIcon = (outletId) => {
@@ -150,20 +152,20 @@ const OutletGrid = ({
 
   if (!selectedDevice) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.noDeviceText}>{t('devices.selectDeviceFirst')}</Text>
+      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.noDeviceText, { color: colors.textSecondary }]}>{t('devices.selectDeviceFirst')}</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🔌 {t('devices.outletControl')}</Text>
-      <Text style={styles.deviceInfo}>{t('devices.device')}: {selectedDevice || t('devices.notSelected')}</Text>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+      <Text style={[styles.title, { color: colors.primary }]}>🔌 {t('devices.outletControl')}</Text>
+      <Text style={[styles.deviceInfo, { color: colors.textSecondary }]}>{t('devices.device')}: {selectedDevice || t('devices.notSelected')}</Text>
       
       <View style={styles.grid}>
         {outlets.length === 0 && (
-          <Text style={styles.noDeviceText}>{t('devices.noOutletsConfigured')}</Text>
+          <Text style={[styles.noDeviceText, { color: colors.textSecondary }]}>{t('devices.noOutletsConfigured')}</Text>
         )}
         {outlets.map((outlet, index) => {
           const isOn = getOutletStatus(outlet.id);
@@ -176,8 +178,8 @@ const OutletGrid = ({
                 styles.outletCard,
                 {
                   transform: [{ scale: buttonScales[index] }],
-                  backgroundColor: isOn ? CONFIG.COLORS.success : CONFIG.COLORS.light,
-                  borderColor: isOn ? CONFIG.THEME.success : CONFIG.THEME.border,
+                  backgroundColor: isOn ? colors.success : colors.backgroundSecondary,
+                  borderColor: isOn ? colors.success : colors.border,
                 }
               ]}
             >
@@ -191,11 +193,11 @@ const OutletGrid = ({
                   <MaterialCommunityIcons 
                     name={outlet.icon} 
                     size={20} 
-                    color={isOn ? CONFIG.COLORS.white : CONFIG.COLORS.gray} 
+                    color={isOn ? colors.white : colors.gray} 
                   />
                   <Text style={[
                     styles.outletName,
-                    { color: isOn ? CONFIG.COLORS.white : CONFIG.COLORS.gray }
+                    { color: isOn ? colors.white : colors.gray }
                   ]}>
                     {outlet.name}
                   </Text>
@@ -205,11 +207,11 @@ const OutletGrid = ({
                   <MaterialCommunityIcons 
                     name={getOutletIcon(outlet.id)} 
                     size={24} 
-                    color={isOn ? CONFIG.COLORS.white : CONFIG.COLORS.gray} 
+                    color={isOn ? colors.white : colors.gray} 
                   />
                   <Text style={[
                     styles.statusText,
-                    { color: isOn ? CONFIG.COLORS.white : CONFIG.COLORS.gray }
+                    { color: isOn ? colors.white : colors.gray }
                   ]}>
                     {isOn ? t('common.on') : t('common.off')}
                   </Text>
@@ -220,7 +222,7 @@ const OutletGrid = ({
               <TouchableOpacity
                 style={[
                   styles.toggleButton,
-                  { backgroundColor: isOn ? CONFIG.COLORS.danger : CONFIG.COLORS.success }
+                  { backgroundColor: isOn ? colors.danger : colors.success }
                 ]}
                 onPress={() => handleQuickToggle(outlet.id)}
                 disabled={isDisabled}
@@ -229,9 +231,9 @@ const OutletGrid = ({
                 <MaterialCommunityIcons 
                   name={isOn ? 'power-off' : 'power'} 
                   size={18} 
-                  color={CONFIG.COLORS.white} 
+                  color={colors.white} 
                 />
-                <Text style={styles.toggleText}>
+                <Text style={[styles.toggleText, { color: colors.white }]}>
                   {isOn ? t('devices.turnOff') : t('devices.turnOn')}
                 </Text>
               </TouchableOpacity>
@@ -241,7 +243,7 @@ const OutletGrid = ({
       </View>
       
       {loading && (
-        <Text style={styles.loadingText}>⏳ {t('common.processing')}</Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>⏳ {t('common.processing')}</Text>
       )}
 
       <OutletDetail
@@ -272,7 +274,6 @@ const OutletGrid = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: CONFIG.COLORS.white,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     padding: CONFIG.DIMENSIONS.cardPadding,
     marginBottom: 15,
@@ -285,13 +286,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: CONFIG.COLORS.primary,
     marginBottom: 10,
     textAlign: 'center',
   },
   deviceInfo: {
     fontSize: 14,
-    color: CONFIG.COLORS.gray,
     marginBottom: 15,
     textAlign: 'center',
   },
@@ -341,14 +340,12 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: CONFIG.COLORS.gray,
     textAlign: 'center',
     marginTop: 10,
     fontStyle: 'italic',
   },
   noDeviceText: {
     fontSize: 14,
-    color: CONFIG.COLORS.gray,
     textAlign: 'center',
     fontStyle: 'italic',
   },
@@ -370,7 +367,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   toggleText: {
-    color: CONFIG.COLORS.white,
     fontSize: 12,
     fontWeight: 'bold',
     marginLeft: 6,

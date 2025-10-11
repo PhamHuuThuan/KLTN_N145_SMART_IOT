@@ -12,12 +12,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import ThemeSwitcher from '../components/ThemeSwitcher';
 import CONFIG from '../constants/config';
 
 const SettingsScreen = ({ navigation }) => {
   const { t } = useTranslation();
   const { logout } = useAuth();
+  const { colors } = useTheme();
 
   const handleLogout = () => {
     Alert.alert(
@@ -37,36 +40,36 @@ const SettingsScreen = ({ navigation }) => {
   };
 
   const renderSettingItem = (icon, title, subtitle, onPress, showArrow = true) => (
-    <TouchableOpacity style={styles.settingItem} onPress={onPress}>
+    <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.border }]} onPress={onPress}>
       <View style={styles.settingLeft}>
-        <View style={styles.iconContainer}>
-          <Ionicons name={icon} size={24} color={CONFIG.THEME.primary} />
+        <View style={[styles.iconContainer, { backgroundColor: colors.backgroundSecondary }]}>
+          <Ionicons name={icon} size={24} color={colors.primary} />
         </View>
         <View style={styles.settingText}>
-          <Text style={styles.settingTitle}>{title}</Text>
-          {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
+          <Text style={[styles.settingTitle, { color: colors.text }]}>{title}</Text>
+          {subtitle && <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>}
         </View>
       </View>
       {showArrow && (
-        <Ionicons name="chevron-forward" size={20} color={CONFIG.THEME.gray} />
+        <Ionicons name="chevron-forward" size={20} color={colors.gray} />
       )}
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={CONFIG.THEME.primary} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={colors.isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.primary} />
       
       {/* Header */}
-      <View style={styles.headerContainer}>
+      <View style={[styles.headerContainer, { backgroundColor: colors.primary }]}>
         <View style={styles.headerLeft} />
-        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.white }]}>{t('settings.title')}</Text>
         <View style={styles.headerRight} />
       </View>
       
       <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.accountSettings')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text, borderBottomColor: colors.border }]}>{t('settings.accountSettings')}</Text>
           {renderSettingItem(
             'person-outline',
             t('common.profile'),
@@ -81,8 +84,8 @@ const SettingsScreen = ({ navigation }) => {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.appSettings')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text, borderBottomColor: colors.border }]}>{t('settings.appSettings')}</Text>
           {renderSettingItem(
             'notifications-outline',
             t('settings.notificationsSettings'),
@@ -90,16 +93,11 @@ const SettingsScreen = ({ navigation }) => {
             () => navigation.navigate('NotificationSettingsFromSettings')
           )}
           <LanguageSwitcher />
-          {renderSettingItem(
-            'moon-outline',
-            t('settings.darkMode'),
-            t('settings.system'),
-            () => Alert.alert(t('common.comingSoon'), t('settings.comingSoon'))
-          )}
+          <ThemeSwitcher />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.support')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text, borderBottomColor: colors.border }]}>{t('settings.support')}</Text>
           {renderSettingItem(
             'help-circle-outline',
             t('settings.helpSupport'),
@@ -114,7 +112,7 @@ const SettingsScreen = ({ navigation }) => {
           )}
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           {renderSettingItem(
             'log-out-outline',
             t('common.logout'),
@@ -131,10 +129,8 @@ const SettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: CONFIG.THEME.background,
   },
   headerContainer: {
-    backgroundColor: CONFIG.THEME.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -148,7 +144,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: CONFIG.COLORS.white,
   },
   headerRight: {
     width: 40,
@@ -158,7 +153,6 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   section: {
-    backgroundColor: CONFIG.THEME.surface,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     marginBottom: 15,
     shadowColor: '#000',
@@ -170,11 +164,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: CONFIG.COLORS.dark,
     padding: 15,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.THEME.border,
   },
   settingItem: {
     flexDirection: 'row',
@@ -182,7 +174,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.THEME.border,
   },
   settingLeft: {
     flexDirection: 'row',
@@ -193,7 +184,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: CONFIG.THEME.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
@@ -204,12 +194,10 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: CONFIG.COLORS.dark,
     marginBottom: 2,
   },
   settingSubtitle: {
     fontSize: 14,
-    color: CONFIG.THEME.gray,
   },
 });
 
