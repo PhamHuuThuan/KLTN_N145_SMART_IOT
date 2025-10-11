@@ -1,0 +1,255 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+
+const useVoiceControl = () => {
+  const { t } = useTranslation();
+  const [isListening, setIsListening] = useState(false);
+  const [lastCommand, setLastCommand] = useState('');
+
+  // Vietnamese voice commands mapping
+  const voiceCommands = {
+    // Turn on commands
+    'bật': 'on',
+    'mở': 'on', 
+    'khởi động': 'on',
+    'kích hoạt': 'on',
+    'start': 'on',
+    'turn on': 'on',
+    
+    // Turn off commands  
+    'tắt': 'off',
+    'đóng': 'off',
+    'dừng': 'off',
+    'ngừng': 'off',
+    'stop': 'off',
+    'turn off': 'off',
+    
+    // Outlet names
+    'ổ cắm': 'outlet',
+    'socket': 'outlet',
+    'outlet': 'outlet',
+    
+    // Device names
+    'thiết bị': 'device',
+    'device': 'device',
+    
+    // Numbers (Vietnamese and English)
+    'một': '1', 'hai': '2', 'ba': '3', 'bốn': '4', 'năm': '5',
+    'sáu': '6', 'bảy': '7', 'tám': '8', 'chín': '9', 'mười': '10',
+    '1': '1', '2': '2', '3': '3', '4': '4', '5': '5',
+    '6': '6', '7': '7', '8': '8', '9': '9', '10': '10',
+    
+    // Device/Appliance names
+    'quạt': 'fan',
+    'fan': 'fan',
+    'đèn': 'light',
+    'light': 'light',
+    'máy': 'machine',
+    'machine': 'machine',
+    'tivi': 'tv',
+    'tv': 'tv',
+    'điều hòa': 'ac',
+    'ac': 'ac',
+    'tủ': 'refrigerator',
+    'lạnh': 'refrigerator',
+    'tủ lạnh': 'refrigerator',
+    'refrigerator': 'refrigerator',
+    'lò': 'microwave',
+    'vi': 'microwave',
+    'sóng': 'microwave',
+    'lò vi sóng': 'microwave',
+    'microwave': 'microwave',
+    'giặt': 'washing',
+    'máy giặt': 'washing',
+    'washing': 'washing',
+    'nóng': 'heater',
+    'bình nóng lạnh': 'heater',
+    'heater': 'heater',
+    
+    // Common words to ignore
+    'của': '',
+    'the': '',
+    'a': '',
+    'an': '',
+    'and': '',
+    'với': '',
+    'with': '',
+    'số': '',
+    'number': '',
+  };
+
+  const parseVoiceCommand = useCallback((transcript) => {
+    if (!transcript) return null;
+    
+    const lowerTranscript = transcript.toLowerCase();
+    let action = null;
+    let target = null;
+    let number = null;
+    let location = null;
+    let outletName = null;
+    
+    // Extract action - check for multi-word actions first
+    const actionPhrases = ['turn on', 'turn off'];
+    for (const phrase of actionPhrases) {
+      if (lowerTranscript.includes(phrase)) {
+        action = phrase === 'turn on' ? 'on' : 'off';
+        break;
+      }
+    }
+    
+    // If no multi-word action found, check single words
+    if (!action) {
+      const words = lowerTranscript.split(/\s+/);
+      for (const word of words) {
+        if (voiceCommands[word] === 'on' || voiceCommands[word] === 'off') {
+          action = voiceCommands[word];
+          break;
+        }
+      }
+    }
+    
+    // Extract target type
+    const words = lowerTranscript.split(/\s+/);
+    for (const word of words) {
+      if (voiceCommands[word] === 'outlet' || voiceCommands[word] === 'device') {
+        target = voiceCommands[word];
+        break;
+      }
+    }
+    
+    // Extract device/appliance name - check for multi-word devices first
+    const devicePhrases = ['tủ lạnh', 'lò vi sóng', 'máy giặt', 'bình nóng lạnh', 'điều hòa'];
+    for (const phrase of devicePhrases) {
+      if (lowerTranscript.includes(phrase)) {
+        location = voiceCommands[phrase];
+        break;
+      }
+    }
+    
+    // If no multi-word device found, check single words
+    if (!location) {
+      for (const word of words) {
+        if (voiceCommands[word] === 'fan' || voiceCommands[word] === 'light' || 
+            voiceCommands[word] === 'machine' || voiceCommands[word] === 'tv' ||
+            voiceCommands[word] === 'ac' || voiceCommands[word] === 'refrigerator' ||
+            voiceCommands[word] === 'microwave' || voiceCommands[word] === 'washing' ||
+            voiceCommands[word] === 'heater') {
+          location = voiceCommands[word];
+          break;
+        }
+      }
+    }
+    
+    // Extract number
+    for (const word of words) {
+      if (voiceCommands[word] && !isNaN(voiceCommands[word])) {
+        number = voiceCommands[word];
+        break;
+      }
+    }
+    
+    // Build outlet name if device name and number are found
+    if (location && number) {
+      outletName = `${location}_${number}`;
+    } else if (location) {
+      // If only device name without number, use device name as outlet name
+      outletName = location;
+    } else if (number) {
+      outletName = `outlet_${number}`;
+    }
+    
+    // Default to outlet if no target specified
+    if (!target) {
+      target = 'outlet';
+    }
+    
+    console.log('Parsed command:', { action, target, number, location, outletName, originalText: transcript });
+    
+    return { 
+      action, 
+      target, 
+      number, 
+      location,
+      outletName,
+      originalText: transcript 
+    };
+  }, []);
+
+  const executeVoiceCommand = useCallback((command, onOutletControl) => {
+    if (!command || !command.action || !onOutletControl) {
+      return { success: false, message: t('voice.commandNotUnderstood') };
+    }
+    
+    try {
+      if (command.target === 'outlet') {
+        // For outlet control
+        if (command.outletName) {
+          // Specific outlet by name (e.g., kitchen_1, bedroom_2)
+          const success = onOutletControl(command.action, command.outletName);
+          const displayName = command.location && command.number 
+            ? `${command.location} ${command.number}` 
+            : command.outletName;
+          
+          return {
+            success,
+            message: success 
+              ? t('voice.outletCommandSuccess', { 
+                  action: command.action === 'on' ? t('common.on') : t('common.off'),
+                  outlet: displayName
+                })
+              : t('voice.commandFailed')
+          };
+        } else if (command.number) {
+          // Specific outlet by number only
+          const outletId = `outlet_${command.number}`;
+          const success = onOutletControl(command.action, outletId);
+          return {
+            success,
+            message: success 
+              ? t('voice.outletCommandSuccess', { 
+                  action: command.action === 'on' ? t('common.on') : t('common.off'),
+                  outlet: `ổ cắm ${command.number}`
+                })
+              : t('voice.commandFailed')
+          };
+        } else {
+          // All outlets
+          const success = onOutletControl(command.action, 'all');
+          return {
+            success,
+            message: success 
+              ? t('voice.allOutletsCommandSuccess', { 
+                  action: command.action === 'on' ? t('common.on') : t('common.off')
+                })
+              : t('voice.commandFailed')
+          };
+        }
+      }
+      
+      return { success: false, message: t('voice.commandNotSupported') };
+    } catch (error) {
+      console.error('Voice command execution error:', error);
+      return { success: false, message: t('voice.commandError') };
+    }
+  }, [t]);
+
+  const processTranscript = useCallback((transcript) => {
+    if (!transcript) return null;
+    
+    setLastCommand(transcript);
+    const command = parseVoiceCommand(transcript);
+    
+    return command;
+  }, [parseVoiceCommand]);
+
+  return {
+    isListening,
+    setIsListening,
+    lastCommand,
+    parseVoiceCommand,
+    executeVoiceCommand,
+    processTranscript,
+  };
+};
+
+export default useVoiceControl;

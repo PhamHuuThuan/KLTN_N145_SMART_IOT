@@ -304,9 +304,49 @@
     "welcomeMessage": "Chào mừng đến với Smart IoT Kitchen!",
     "deviceConnected": "Kết nối thiết bị thành công",
     "deviceDisconnected": "Thiết bị đã ngắt kết nối",
+    "errorLoadingData": "Lỗi khi tải dữ liệu",
     "ruleExecuted": "Thực thi quy tắc thành công",
     "notificationReceived": "Nhận thông báo mới",
     "dataUpdated": "Cập nhật dữ liệu thành công",
     "settingsSaved": "Lưu cài đặt thành công"
+  },
+  "chat": {
+    "welcome": "Xin chào! Tôi có thể giúp bạn điều khiển ổ cắm thông minh. Hãy thử nói 'Bật ổ cắm 1' để bật ổ cắm số 1.",
+    "voiceCommandsHelp": "Lệnh giọng nói: 'Bật/Tắt ổ cắm [số]' hoặc 'Bật/Tắt tất cả ổ cắm'",
+    "listening": "Đang nghe...",
+    "notListening": "Nhấn micro để bắt đầu điều khiển bằng giọng nói",
+    "selectDevice": "Chọn Thiết bị",
+    "noDeviceSelected": "Vui lòng chọn thiết bị trước khi điều khiển ổ cắm.",
+    "noDevicesFound": "Không tìm thấy thiết bị nào",
+    "addDeviceFirst": "Thêm thiết bị trước để điều khiển ổ cắm",
+    "outletTurnedOn": "✅ Đã bật ổ cắm",
+    "outletTurnedOff": "✅ Đã tắt ổ cắm",
+    "outletControlFailed": "❌ Không thể điều khiển ổ cắm",
+    "guidance": {
+      "selectDevice": "💡 Mẹo: Nhấn nút thiết bị ở header để chọn thiết bị trước.",
+      "tryCommands": "💡 Thử nói: 'Bật ổ cắm 1' hoặc 'Tắt tất cả ổ cắm'",
+      "checkDevice": "💡 Kiểm tra xem thiết bị có online không và thử lại.",
+      "general": "💡 Cần trợ giúp? Nhấn nút trợ giúp để xem hướng dẫn lệnh giọng nói."
+    }
+  },
+  "voice": {
+    "commandNotUnderstood": "Tôi không hiểu lệnh đó. Hãy thử 'Bật ổ cắm 1' hoặc 'Tắt tất cả ổ cắm'",
+    "outletCommandSuccess": "Đã {{action}} {{outlet}} thành công",
+    "allOutletsCommandSuccess": "Đã {{action}} tất cả ổ cắm thành công",
+    "commandFailed": "Không thể thực hiện lệnh",
+    "commandNotSupported": "Lệnh không được hỗ trợ",
+    "commandError": "Lỗi khi thực hiện lệnh",
+    "commandsHelp": "Hướng dẫn lệnh giọng nói",
+    "outletControl": "Điều khiển ổ cắm",
+    "namedOutlets": "Điều khiển theo tên thiết bị",
+    "turnOnOutlet1": "Bật ổ cắm số 1",
+    "turnOffOutlet2": "Tắt ổ cắm số 2",
+    "turnOnAllOutlets": "Bật tất cả ổ cắm",
+    "turnOffAllOutlets": "Tắt tất cả ổ cắm",
+    "alternativeCommands": "Lệnh thay thế",
+    "alternativeForOn": "Từ thay thế cho 'bật'",
+    "alternativeForOff": "Từ thay thế cho 'tắt'",
+    "englishCommands": "Lệnh tiếng Anh cũng hoạt động",
+    "tip": "Nói rõ ràng và tạm dừng ngắn giữa các từ để nhận diện tốt hơn"
   }
 }

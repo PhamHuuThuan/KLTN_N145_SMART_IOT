@@ -308,5 +308,44 @@
     "notificationReceived": "New notification received",
     "dataUpdated": "Data updated successfully",
     "settingsSaved": "Settings saved successfully"
+  },
+  "chat": {
+    "welcome": "Hello! I can help you control your smart outlets. Try saying 'Bật ổ cắm 1' to turn on outlet 1.",
+    "voiceCommandsHelp": "Voice commands: 'Bật/Tắt ổ cắm [số]' or 'Bật/Tắt tất cả ổ cắm'",
+    "listening": "Listening...",
+    "notListening": "Tap microphone to start voice control",
+    "selectDevice": "Select Device",
+    "noDeviceSelected": "Please select a device first to control outlets.",
+    "noDevicesFound": "No devices found",
+    "addDeviceFirst": "Add a device first to control outlets",
+    "outletTurnedOn": "✅ Outlet turned on",
+    "outletTurnedOff": "✅ Outlet turned off",
+    "outletControlFailed": "❌ Failed to control outlet",
+    "guidance": {
+      "selectDevice": "💡 Tip: Tap the device button in the header to select a device first.",
+      "tryCommands": "💡 Try saying: 'Bật ổ cắm 1' or 'Tắt tất cả ổ cắm'",
+      "checkDevice": "💡 Check if your device is online and try again.",
+      "general": "💡 Need help? Tap the help button for voice commands guide."
+    }
+  },
+  "voice": {
+    "commandNotUnderstood": "I didn't understand that command. Try 'Bật ổ cắm 1' or 'Tắt tất cả ổ cắm'",
+    "outletCommandSuccess": "Successfully turned {{action}} {{outlet}}",
+    "allOutletsCommandSuccess": "Successfully turned {{action}} all outlets",
+    "commandFailed": "Failed to execute command",
+    "commandNotSupported": "Command not supported",
+    "commandError": "Error executing command",
+    "commandsHelp": "Voice Commands Help",
+    "outletControl": "Outlet Control",
+    "namedOutlets": "Device Name Control",
+    "turnOnOutlet1": "Turn on outlet 1",
+    "turnOffOutlet2": "Turn off outlet 2",
+    "turnOnAllOutlets": "Turn on all outlets",
+    "turnOffAllOutlets": "Turn off all outlets",
+    "alternativeCommands": "Alternative Commands",
+    "alternativeForOn": "Alternative words for 'turn on'",
+    "alternativeForOff": "Alternative words for 'turn off'",
+    "englishCommands": "English commands also work",
+    "tip": "Speak clearly and pause briefly between words for better recognition"
   }
 }

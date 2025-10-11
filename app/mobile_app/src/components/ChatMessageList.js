@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { View, FlatList, Text, StyleSheet } from 'react-native';
 import ChatMessageBubble from './ChatMessageBubble';
 import CONFIG from '../constants/config';
+import { useTheme } from '../contexts/ThemeContext';
 
 const formatDateDDMMYYYY = (d) => {
   const dt = new Date(d);
@@ -11,15 +12,19 @@ const formatDateDDMMYYYY = (d) => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
-const DateSeparator = ({ date }) => (
-  <View style={styles.separatorContainer}>
-    <Text style={styles.separatorText}>
-      {formatDateDDMMYYYY(date)}
-    </Text>
-  </View>
-);
+const DateSeparator = ({ date }) => {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.separatorContainer}>
+      <Text style={[styles.separatorText, { color: colors.textSecondary }]}>
+        {formatDateDDMMYYYY(date)}
+      </Text>
+    </View>
+  );
+};
 
-const ChatMessageList = ({ messages, userId }) => {
+const ChatMessageList = ({ messages, userId, onOutletPress }) => {
+  const { colors } = useTheme();
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -44,6 +49,7 @@ const ChatMessageList = ({ messages, userId }) => {
           isOwn={item.userId === userId}
           isFirstInGroup={isFirstInGroup}
           isLastInGroup={isLastInGroup}
+          onOutletPress={onOutletPress}
         />
       </View>
     );
@@ -56,14 +62,14 @@ const ChatMessageList = ({ messages, userId }) => {
       renderItem={renderItem}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.listContent}
-      style={styles.list}
+      style={[styles.list, { backgroundColor: colors.background }]}
     />
   );
 };
 
 const styles = StyleSheet.create({
   list: {
-    backgroundColor: '#F7FAFF',
+    // backgroundColor handled by theme
   },
   listContent: {
     paddingVertical: 12,
@@ -80,7 +86,6 @@ const styles = StyleSheet.create({
   },
   separatorText: {
     fontSize: 12,
-    color: '#6B7A99',
   },
 });
 

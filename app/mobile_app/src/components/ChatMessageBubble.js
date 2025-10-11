@@ -1,16 +1,47 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
+import { useTheme } from '../contexts/ThemeContext';
 
-const ChatMessageBubble = ({ message, isOwn, showAvatar = false, showTime = true, isFirstInGroup = true, isLastInGroup = true }) => {
+const ChatMessageBubble = ({ message, isOwn, showAvatar = false, showTime = true, isFirstInGroup = true, isLastInGroup = true, onOutletPress }) => {
+  const { colors } = useTheme();
+  
   return (
     <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}> 
-      <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther, isFirstInGroup ? styles.bubbleFirst : null, isLastInGroup ? styles.bubbleLast : null] }>
+      <View style={[
+        styles.bubble, 
+        isOwn ? [styles.bubbleOwn, { backgroundColor: colors.primary }] : [styles.bubbleOther, { backgroundColor: colors.surface, borderColor: colors.border }], 
+        isFirstInGroup ? styles.bubbleFirst : null, 
+        isLastInGroup ? styles.bubbleLast : null
+      ]}>
         {!!message.text && (
-          <Text style={[styles.text, isOwn ? styles.textOwn : styles.textOther]}>{message.text}</Text>
+          <Text style={[styles.text, { color: isOwn ? colors.white : colors.text }]}>{message.text}</Text>
         )}
+        
+        {/* Outlet Card */}
+        {message.outletCard && (
+          <TouchableOpacity 
+            style={[styles.outletCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => onOutletPress && onOutletPress(message.outletCard)}
+          >
+            <View style={styles.outletHeader}>
+              <View style={[styles.outletStatus, { backgroundColor: message.outletCard.status ? colors.success : colors.gray }]} />
+              <Text style={[styles.outletName, { color: colors.text }]}>{message.outletCard.name}</Text>
+              <Ionicons 
+                name="chevron-forward" 
+                size={16} 
+                color={colors.textSecondary} 
+              />
+            </View>
+            <Text style={[styles.outletId, { color: colors.textSecondary }]}>
+              ID: {message.outletCard.id}
+            </Text>
+          </TouchableOpacity>
+        )}
+        
         {showTime && !!message.time && (
-          <Text style={[styles.time, isOwn ? styles.timeOwn : styles.timeOther]}>
+          <Text style={[styles.time, { color: isOwn ? 'rgba(255,255,255,0.8)' : colors.textSecondary }]}>
             {new Date(message.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
         )}
@@ -41,12 +72,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   bubbleOwn: {
-    backgroundColor: CONFIG.THEME.primary,
+    // backgroundColor handled by theme
   },
   bubbleOther: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E6EAF2',
   },
   bubbleFirst: {
     marginTop: 6,
@@ -59,21 +88,45 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   textOwn: {
-    color: CONFIG.COLORS.white,
+    // color handled by theme
   },
   textOther: {
-    color: CONFIG.COLORS.dark,
+    // color handled by theme
   },
   time: {
     fontSize: 11,
     marginTop: 6,
   },
+  outletCard: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  outletHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  outletStatus: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  outletName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  outletId: {
+    fontSize: 12,
+    marginTop: 2,
+  },
   timeOwn: {
-    color: 'rgba(255,255,255,0.8)',
     alignSelf: 'flex-end',
   },
   timeOther: {
-    color: CONFIG.COLORS.gray,
     alignSelf: 'flex-start',
   },
   tail: {},
