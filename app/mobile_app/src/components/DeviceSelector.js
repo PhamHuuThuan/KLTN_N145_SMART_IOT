@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
 import apiService from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,6 +9,7 @@ import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
 
 const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetails, onDeviceAdded, onDeviceRemoved }) => {
+  const { t } = useTranslation();
   const [showPicker, setShowPicker] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newDeviceId, setNewDeviceId] = useState('');
@@ -21,7 +23,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
     <View style={styles.section}>
       <View style={styles.headerRow}>
         <MaterialCommunityIcons name="devices" size={20} color={CONFIG.COLORS.primary} />
-        <Text style={styles.sectionTitle}>Connected Devices</Text>
+        <Text style={styles.sectionTitle}>{t('devices.connectedDevices')}</Text>
       </View>
       {devices.length > 0 ? (
         <View style={styles.row}>
@@ -32,7 +34,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
           >
             <MaterialCommunityIcons name="chevron-down" size={20} color={CONFIG.COLORS.gray} />
             <Text style={styles.selectText} numberOfLines={1}>
-              {selectedDevice || 'Select a device'}
+              {selectedDevice || t('devices.selectDevice')}
             </Text>
           </TouchableOpacity>
 
@@ -42,15 +44,15 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
             activeOpacity={0.9}
           >
             <MaterialCommunityIcons name="plus" size={18} color={CONFIG.THEME.surface} />
-            <Text style={styles.addText}>Add</Text>
+            <Text style={styles.addText}>{t('common.add')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.emptyState}>
           <MaterialCommunityIcons name="devices" size={48} color={CONFIG.COLORS.gray} />
-          <Text style={styles.emptyStateTitle}>No Devices Connected</Text>
+          <Text style={styles.emptyStateTitle}>{t('devices.noDevicesConnected')}</Text>
           <Text style={styles.emptyStateSubtitle}>
-            Add your first smart kitchen device to get started
+            {t('devices.addFirstDevice')}
           </Text>
           <TouchableOpacity
             style={styles.emptyStateButton}
@@ -58,7 +60,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
             activeOpacity={0.9}
           >
             <MaterialCommunityIcons name="plus" size={20} color={CONFIG.THEME.surface} />
-            <Text style={styles.emptyStateButtonText}>Add Device</Text>
+            <Text style={styles.emptyStateButtonText}>{t('devices.addDevice')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -72,7 +74,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Device</Text>
+              <Text style={styles.modalTitle}>{t('devices.selectDevice')}</Text>
               <TouchableOpacity onPress={() => setShowPicker(false)}>
                 <MaterialCommunityIcons name="close" size={20} color={CONFIG.COLORS.gray} />
               </TouchableOpacity>
@@ -98,15 +100,15 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                       activeOpacity={0.7}
                       onPress={() => {
                       Alert.alert(
-                        'Remove Device',
-                        `Are you sure you want to remove "${deviceId}" from your account? This will unassign the device but keep it in the system.`,
+                        t('devices.removeDevice'),
+                        t('devices.removeDeviceConfirm', { deviceId }),
                         [
                           {
-                            text: 'Cancel',
+                            text: t('common.cancel'),
                             style: 'cancel'
                           },
                           {
-                            text: 'Remove',
+                            text: t('devices.remove'),
                             style: 'destructive',
                             onPress: async () => {
                               try {
@@ -117,7 +119,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                                   setFeedback({
                                     visible: true,
                                     type: 'success',
-                                    message: 'Device removed successfully'
+                                    message: t('devices.deviceRemoved')
                                   });
                                   setShowPicker(false);
                                   
@@ -131,7 +133,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                                   setFeedback({
                                     visible: true,
                                     type: 'error',
-                                    message: result.message || 'Failed to remove device'
+                                    message: result.message || t('devices.deviceRemovedError')
                                   });
                                 }
                               } catch (error) {
@@ -139,7 +141,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                                 setFeedback({
                                   visible: true,
                                   type: 'error',
-                                  message: error.message || 'Failed to remove device'
+                                    message: error.message || t('devices.deviceRemovedError')
                                 });
                               } finally {
                                 setShowLoader(false);
@@ -170,16 +172,16 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Device</Text>
+              <Text style={styles.modalTitle}>{t('devices.addDevice')}</Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)}>
                 <MaterialCommunityIcons name="close" size={20} color={CONFIG.COLORS.gray} />
               </TouchableOpacity>
             </View>
             <View style={styles.modalContent}>
-              <Text style={styles.inputLabel}>Device ID / Pairing Code *</Text>
+              <Text style={styles.inputLabel}>{t('devices.deviceId')}</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g., KITCHEN-ESP32-001"
+                placeholder={t('devices.deviceIdPlaceholder')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={newDeviceId}
@@ -187,35 +189,35 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                 maxLength={50}
               />
               <Text style={styles.inputHint}>
-                Enter the unique identifier for your device
+                {t('devices.deviceIdHint')}
               </Text>
               
-              <Text style={styles.inputLabel}>Device Name (optional)</Text>
+              <Text style={styles.inputLabel}>{t('devices.deviceName')}</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="My Kitchen Controller"
+                placeholder={t('devices.deviceNamePlaceholder')}
                 value={newDeviceName}
                 onChangeText={setNewDeviceName}
                 maxLength={50}
               />
               <Text style={styles.inputHint}>
-                Give your device a friendly name
+                {t('devices.deviceNameHint')}
               </Text>
               <TouchableOpacity
                 style={[styles.addConfirmButton, submitting && { opacity: 0.7 }]}
                 onPress={async () => {
                   if (!newDeviceId?.trim()) {
-                    Alert.alert('Validation Error', 'Please enter a device ID');
+                    Alert.alert(t('common.error'), t('devices.deviceIdRequired'));
                     return;
                   }
                   
                   if (newDeviceId.trim().length < 3) {
-                    Alert.alert('Validation Error', 'Device ID must be at least 3 characters long');
+                    Alert.alert(t('common.error'), t('devices.deviceIdTooShort'));
                     return;
                   }
                   
                   if (!user?.id) {
-                    Alert.alert('Authentication Required', 'Please login to add devices');
+                    Alert.alert(t('auth.authenticationRequired'), t('devices.loginRequired'));
                     return;
                   }
                   
@@ -235,7 +237,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                       setFeedback({ 
                         visible: true, 
                         type: 'success', 
-                        message: 'Device added successfully!' 
+                        message: t('devices.deviceAdded') 
                       });
                       setShowAddModal(false);
                       setNewDeviceId('');
@@ -246,19 +248,19 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                       setFeedback({ 
                         visible: true, 
                         type: 'error', 
-                        message: resp?.data?.message || 'Could not add device' 
+                        message: resp?.data?.message || t('devices.deviceAddError') 
                       });
                     }
                   } catch (e) {
                     console.error('Add device error:', e);
-                    let errorMessage = 'Failed to add device';
+                    let errorMessage = t('devices.deviceAddError');
                     
                     if (e.response?.status === 400) {
-                      errorMessage = 'Invalid device ID or device already exists';
+                      errorMessage = t('devices.deviceIdInvalid');
                     } else if (e.response?.status === 401) {
-                      errorMessage = 'Authentication failed. Please login again';
+                      errorMessage = t('auth.authenticationFailed');
                     } else if (e.response?.status === 500) {
-                      errorMessage = 'Server error. Please try again later';
+                      errorMessage = t('errors.serverError');
                     }
                     
                     setFeedback({ 
@@ -279,7 +281,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                 ) : (
                   <>
                     <MaterialCommunityIcons name="content-save" size={18} color={CONFIG.THEME.surface} />
-                    <Text style={styles.addConfirmText}>Add Device</Text>
+                    <Text style={styles.addConfirmText}>{t('devices.addDevice')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -291,7 +293,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
       {/* Global overlays */}
       <OverlayLoader
         visible={showLoader}
-        message="Adding device..."
+        message={t('devices.addingDevice')}
         onCancel={() => {
           setShowLoader(false);
           setSubmitting(false);

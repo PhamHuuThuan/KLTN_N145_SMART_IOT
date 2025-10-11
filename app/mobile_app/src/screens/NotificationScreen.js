@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useNotificationContext } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationItem from '../components/NotificationItem';
@@ -18,6 +19,7 @@ import ActionFeedback from '../components/ActionFeedback';
 import { notificationService } from '../services/notificationService';
 
 const NotificationScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const {
     notifications,
     unreadCount,
@@ -50,9 +52,9 @@ const NotificationScreen = ({ navigation }) => {
     try {
       await refreshNotifications();
       setHasMore(false);
-      setFeedback({ visible: true, type: 'success', message: 'Refreshed' });
+      setFeedback({ visible: true, type: 'success', message: t('common.refresh') });
     } catch (e) {
-      setFeedback({ visible: true, type: 'error', message: 'Refresh failed' });
+      setFeedback({ visible: true, type: 'error', message: t('errors.refreshFailed') });
     } finally {
       setShowLoader(false);
     }
@@ -93,19 +95,19 @@ const NotificationScreen = ({ navigation }) => {
     if (unreadCount === 0) return;
 
     Alert.alert(
-      'Mark All as Read',
-      `Are you sure you want to mark ${unreadCount} notifications as read?`,
+      t('notifications.markAllAsRead'),
+      t('notifications.markAllConfirm', { count: unreadCount }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Confirm',
+          text: t('common.confirm'),
           onPress: async () => {
             setShowLoader(true);
             try {
               await markAllAsRead();
-              setFeedback({ visible: true, type: 'success', message: 'All marked as read' });
+              setFeedback({ visible: true, type: 'success', message: t('notifications.allMarkedAsRead') });
             } catch (_) {
-              setFeedback({ visible: true, type: 'error', message: 'Failed to mark all' });
+              setFeedback({ visible: true, type: 'error', message: t('errors.markAllFailed') });
             } finally {
               setShowLoader(false);
             }
@@ -144,7 +146,7 @@ const NotificationScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
       </View>
       <View style={styles.headerRight}>
         {unreadCount > 0 && (
@@ -152,7 +154,7 @@ const NotificationScreen = ({ navigation }) => {
             style={styles.markAllButton}
             onPress={handleMarkAllAsRead}
           >
-            <Text style={styles.markAllText}>Mark All Read</Text>
+            <Text style={styles.markAllText}>{t('notifications.markAllAsRead')}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
@@ -168,9 +170,9 @@ const NotificationScreen = ({ navigation }) => {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="notifications-outline" size={64} color="#C7C7CC" />
-      <Text style={styles.emptyTitle}>No Notifications</Text>
+      <Text style={styles.emptyTitle}>{t('notifications.noNotifications')}</Text>
       <Text style={styles.emptyMessage}>
-        You'll receive notifications for important events
+        {t('notifications.emptyMessage')}
       </Text>
       
     </View>
@@ -188,7 +190,7 @@ const NotificationScreen = ({ navigation }) => {
     return (
       <View style={styles.loadingMore}>
         <ActivityIndicator size="small" color="#007AFF" />
-        <Text style={styles.loadingMoreText}>Loading more...</Text>
+        <Text style={styles.loadingMoreText}>{t('common.loadingMore')}</Text>
       </View>
     );
   };
@@ -199,7 +201,7 @@ const NotificationScreen = ({ navigation }) => {
         {renderHeader()}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading notifications...</Text>
+          <Text style={styles.loadingText}>{t('notifications.loading')}</Text>
         </View>
       </View>
     );
@@ -213,7 +215,7 @@ const NotificationScreen = ({ navigation }) => {
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-            <Text style={styles.retryText}>Thử lại</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -239,7 +241,7 @@ const NotificationScreen = ({ navigation }) => {
       />
       <OverlayLoader
         visible={showLoader}
-        message="Working..."
+        message={t('common.loading')}
         onCancel={() => setShowLoader(false)}
       />
       <ActionFeedback

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Switch, TextInput, TouchableOpacity, Alert, Scr
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Application from 'expo-application';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('NotifSettings');
@@ -13,6 +14,7 @@ import ActionFeedback from '../components/ActionFeedback';
 import TimePicker from '../components/TimePicker';
 
 const NotificationSettingsScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const { user, registerFCMToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,13 +53,13 @@ const NotificationSettingsScreen = ({ navigation }) => {
         // Don't call save() here because addFCMToken API already handles the token storage
         // and save() would overwrite the tokens array
         
-        setFeedback({ visible: true, type: 'success', message: 'Push notifications enabled successfully!' });
+        setFeedback({ visible: true, type: 'success', message: t('settings.pushNotificationsEnabled') });
       } catch (error) {
         log.error('Failed to register FCM token', error?.message || error);
         // Revert the toggle on error
         setPrefs({ ...prefs, fcm: { enabled: false } });
         // Show error feedback
-        let errorMessage = 'Failed to register push token. Please try again.';
+        let errorMessage = t('settings.pushTokenError');
         if (error.response?.data?.message) {
           errorMessage = error.response.data.message;
         }
@@ -105,7 +107,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
         });
       }
     } catch (e) {
-      setFeedback({ visible: true, type: 'error', message: 'Failed to load preferences' });
+      setFeedback({ visible: true, type: 'error', message: t('settings.loadPreferencesError') });
     } finally {
       setLoading(false);
       setShowLoader(false);
@@ -114,11 +116,11 @@ const NotificationSettingsScreen = ({ navigation }) => {
 
   const validateForm = () => {
     if (prefs.email.enabled && !prefs.email.address) {
-      setFeedback({ visible: true, type: 'error', message: 'Email address is required when email notifications are enabled' });
+      setFeedback({ visible: true, type: 'error', message: t('settings.emailRequired') });
       return false;
     }
     if (prefs.sms.enabled && !prefs.sms.phoneNumber) {
-      setFeedback({ visible: true, type: 'error', message: 'Phone number is required when SMS notifications are enabled' });
+      setFeedback({ visible: true, type: 'error', message: t('settings.phoneRequired') });
       return false;
     }
     return true;
@@ -149,13 +151,13 @@ const NotificationSettingsScreen = ({ navigation }) => {
       };
       const res = await notificationService.updatePreferences(user.id, payload);
       if (res.success) {
-        setFeedback({ visible: true, type: 'success', message: 'Notification preferences saved successfully!' });
+        setFeedback({ visible: true, type: 'success', message: t('settings.preferencesSaved') });
       } else {
-        setFeedback({ visible: true, type: 'error', message: res.message || 'Failed to save preferences' });
+        setFeedback({ visible: true, type: 'error', message: res.message || t('settings.savePreferencesError') });
       }
     } catch (e) {
       console.error('Save preferences error:', e);
-      let errorMessage = 'Failed to save preferences. Please try again.';
+      let errorMessage = t('settings.savePreferencesError');
       
       if (e.response?.data?.message) {
         errorMessage = e.response.data.message;
@@ -241,98 +243,97 @@ const NotificationSettingsScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notification Settings</Text>
+        <Text style={styles.headerTitle}>{t('settings.notificationSettings')}</Text>
         <TouchableOpacity style={styles.saveIconButton} onPress={save} disabled={saving || loading}>
           <Ionicons name="save-outline" size={22} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Allow Permissions</Text>
+          <Text style={styles.sectionTitle}>{t('settings.allowPermissions')}</Text>
           <Text style={styles.description}>
-            Enable lock-screen display, pop-up/overlay and battery optimization exceptions
-            so emergency alerts can always break through.
+            {t('settings.permissionsDescription')}
           </Text>
           <TouchableOpacity style={styles.permissionButton} onPress={openSystemPermissionScreens}>
             <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" />
-            <Text style={styles.permissionButtonText}>Open System Notification Permissions</Text>
+            <Text style={styles.permissionButtonText}>{t('settings.openSystemPermissions')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Push Notifications</Text>
+          <Text style={styles.sectionTitle}>{t('settings.pushNotifications')}</Text>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>In-App Notifications</Text>
-              <Text style={styles.description}>Receive notifications within the app</Text>
+              <Text style={styles.label}>{t('settings.inAppNotifications')}</Text>
+              <Text style={styles.description}>{t('settings.inAppDescription')}</Text>
             </View>
             <Switch value={true} onValueChange={() => {}} disabled />
           </View>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>Push Notifications</Text>
-              <Text style={styles.description}>Receive notifications even when app is closed</Text>
+              <Text style={styles.label}>{t('settings.pushNotifications')}</Text>
+              <Text style={styles.description}>{t('settings.pushDescription')}</Text>
             </View>
             <Switch value={prefs.fcm.enabled} onValueChange={handleFCMToggle} />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Email Notifications</Text>
+          <Text style={styles.sectionTitle}>{t('settings.emailNotifications')}</Text>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>Email Alerts</Text>
-              <Text style={styles.description}>Receive notifications via email</Text>
+              <Text style={styles.label}>{t('settings.emailAlerts')}</Text>
+              <Text style={styles.description}>{t('settings.emailDescription')}</Text>
             </View>
             <Switch value={prefs.email.enabled} onValueChange={(v) => setPrefs({ ...prefs, email: { ...prefs.email, enabled: v } })} />
           </View>
           {prefs.email.enabled && (
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email Address</Text>
+              <Text style={styles.inputLabel}>{t('settings.emailAddress')}</Text>
               <TextInput
                 style={[styles.input, !prefs.email.address && styles.inputError]}
-                placeholder="Enter your email address"
+                placeholder={t('settings.enterEmailAddress')}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={prefs.email.address}
                 onChangeText={(t) => setPrefs({ ...prefs, email: { ...prefs.email, address: t } })}
               />
-              {!prefs.email.address && <Text style={styles.errorText}>Email address is required when email notifications are enabled</Text>}
+              {!prefs.email.address && <Text style={styles.errorText}>{t('settings.emailRequired')}</Text>}
             </View>
           )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SMS Notifications</Text>
+          <Text style={styles.sectionTitle}>{t('settings.smsNotifications')}</Text>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>SMS Alerts</Text>
-              <Text style={styles.description}>Receive critical alerts via SMS</Text>
+              <Text style={styles.label}>{t('settings.smsAlerts')}</Text>
+              <Text style={styles.description}>{t('settings.smsDescription')}</Text>
             </View>
             <Switch value={prefs.sms.enabled} onValueChange={(v) => setPrefs({ ...prefs, sms: { ...prefs.sms, enabled: v } })} />
           </View>
           {prefs.sms.enabled && (
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Phone Number</Text>
+              <Text style={styles.inputLabel}>{t('settings.phoneNumber')}</Text>
               <TextInput
                 style={[styles.input, !prefs.sms.phoneNumber && styles.inputError]}
-                placeholder="Enter your phone number"
+                placeholder={t('settings.enterPhoneNumber')}
                 keyboardType="phone-pad"
                 value={prefs.sms.phoneNumber}
                 onChangeText={(t) => setPrefs({ ...prefs, sms: { ...prefs.sms, phoneNumber: t } })}
               />
-              {!prefs.sms.phoneNumber && <Text style={styles.errorText}>Phone number is required when SMS notifications are enabled</Text>}
+              {!prefs.sms.phoneNumber && <Text style={styles.errorText}>{t('settings.phoneRequired')}</Text>}
             </View>
           )}
         </View>
 
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quiet Hours</Text>
+          <Text style={styles.sectionTitle}>{t('settings.quietHours')}</Text>
           <View style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.label}>Enable Quiet Hours</Text>
-              <Text style={styles.description}>Pause notifications during specified hours</Text>
+              <Text style={styles.label}>{t('settings.enableQuietHours')}</Text>
+              <Text style={styles.description}>{t('settings.quietHoursDescription')}</Text>
             </View>
             <Switch 
               value={prefs.quietHours.enabled} 
@@ -346,35 +347,35 @@ const NotificationSettingsScreen = ({ navigation }) => {
             <View style={styles.quietHoursContainer}>
               <View style={styles.timeRow}>
                 <View style={styles.timeInputContainer}>
-                  <Text style={styles.inputLabel}>Start Time</Text>
+                  <Text style={styles.inputLabel}>{t('settings.startTime')}</Text>
                   <TimePicker
                     value={prefs.quietHours.startTime}
                     onTimeChange={(startTime) => setPrefs({
                       ...prefs,
                       quietHours: { ...prefs.quietHours, startTime }
                     })}
-                    placeholder="Select start time"
+                    placeholder={t('settings.selectStartTime')}
                   />
                 </View>
                 <View style={styles.timeInputContainer}>
-                  <Text style={styles.inputLabel}>End Time</Text>
+                  <Text style={styles.inputLabel}>{t('settings.endTime')}</Text>
                   <TimePicker
                     value={prefs.quietHours.endTime}
                     onTimeChange={(endTime) => setPrefs({
                       ...prefs,
                       quietHours: { ...prefs.quietHours, endTime }
                     })}
-                    placeholder="Select end time"
+                    placeholder={t('settings.selectEndTime')}
                   />
                 </View>
               </View>
               <View style={styles.exceptionsContainer}>
-                <Text style={styles.inputLabel}>Exceptions (always notify)</Text>
+                <Text style={styles.inputLabel}>{t('settings.exceptions')}</Text>
                 {prefs.quietHours.exceptions.map((exception, index) => {
                   const exceptionLabels = {
-                    urgent: 'Urgent',
-                    security: 'Security',
-                    system: 'System'
+                    urgent: t('notifications.priorities.urgent'),
+                    security: t('settings.security'),
+                    system: t('settings.system')
                   };
                   
                   return (
@@ -415,11 +416,11 @@ const NotificationSettingsScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notification Types</Text>
+          <Text style={styles.sectionTitle}>{t('settings.notificationTypes')}</Text>
           <View style={styles.infoContainer}>
             <Ionicons name="information-circle-outline" size={20} color="#007AFF" />
             <Text style={styles.infoText}>
-              You'll receive notifications for device alerts, security events, system updates, and maintenance reminders based on your preferences above.
+              {t('settings.notificationTypesDescription')}
             </Text>
           </View>
         </View>
@@ -427,7 +428,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
       </ScrollView>
       <OverlayLoader
         visible={showLoader}
-        message={saving ? 'Saving...' : 'Loading...'}
+        message={saving ? t('settings.saving') : t('common.loading')}
         onCancel={() => setShowLoader(false)}
       />
       <ActionFeedback

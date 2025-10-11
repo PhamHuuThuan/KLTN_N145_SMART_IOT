@@ -10,20 +10,23 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import CONFIG from '../constants/config';
 
 const SettingsScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const { logout } = useAuth();
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      t('common.logout'),
+      t('settings.logoutConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         { 
-          text: 'Logout', 
+          text: t('common.logout'), 
           style: 'destructive',
           onPress: async () => {
             await logout();
@@ -57,70 +60,65 @@ const SettingsScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.headerContainer}>
         <View style={styles.headerLeft} />
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={styles.headerRight} />
       </View>
       
       <ScrollView style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={styles.sectionTitle}>{t('settings.accountSettings')}</Text>
           {renderSettingItem(
             'person-outline',
-            'Profile',
-            'Manage your account information',
+            t('common.profile'),
+            t('profile.personalInfo'),
             () => navigation.navigate('Profile')
           )}
           {renderSettingItem(
             'lock-closed-outline',
-            'Change Password',
-            'Update your password',
+            t('settings.changePassword'),
+            t('profile.changePassword'),
             () => navigation.navigate('ChangePassword')
           )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Settings</Text>
+          <Text style={styles.sectionTitle}>{t('settings.appSettings')}</Text>
           {renderSettingItem(
             'notifications-outline',
-            'Notifications',
-            'Manage notification preferences',
+            t('settings.notificationsSettings'),
+            t('settings.notificationSettings'),
             () => navigation.navigate('NotificationSettingsFromSettings')
           )}
-          {renderSettingItem(
-            'language-outline',
-            'Language',
-            'English',
-            () => Alert.alert('Coming Soon', 'This feature will be available soon')
-          )}
+          <LanguageSwitcher />
           {renderSettingItem(
             'moon-outline',
-            'Dark Mode',
-            'System',
-            () => Alert.alert('Coming Soon', 'This feature will be available soon')
+            t('settings.darkMode'),
+            t('settings.system'),
+            () => Alert.alert(t('common.comingSoon'), t('settings.comingSoon'))
           )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Support</Text>
+          <Text style={styles.sectionTitle}>{t('settings.support')}</Text>
           {renderSettingItem(
             'help-circle-outline',
-            'Help & Support',
-            'Get help and contact support',
-            () => Alert.alert('Coming Soon', 'This feature will be available soon')
+            t('settings.helpSupport'),
+            t('settings.helpDescription'),
+            () => Alert.alert(t('common.comingSoon'), t('settings.comingSoon'))
           )}
           {renderSettingItem(
             'information-circle-outline',
-            'About',
-            'App version and information',
-            () => Alert.alert('About', 'Smart IoT Kitchen v1.0.0\nBuilt with React Native & Expo')
+            t('settings.about'),
+            t('settings.versionInfo', { version: '1.0.0' }),
+            () => Alert.alert(t('settings.about'), t('settings.aboutDescription'))
           )}
         </View>
 
         <View style={styles.section}>
           {renderSettingItem(
             'log-out-outline',
-            'Logout',
-            'Sign out of your account',
+            t('common.logout'),
+            t('settings.logoutDescription'),
             handleLogout,
             false
           )}

@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -29,6 +30,7 @@ const OutletDetail = ({
   deviceData,
   onRefreshDeviceData
 }) => {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [outletName, setOutletName] = useState(outlet?.name || '');
   const [outletGroup, setOutletGroup] = useState(outlet?.type || 'kitchen');
@@ -61,7 +63,7 @@ const OutletDetail = ({
 
   const handleSave = async () => {
     if (!outletName.trim()) {
-      setFeedback({ visible: true, type: 'error', message: 'Please enter outlet name' });
+      setFeedback({ visible: true, type: 'error', message: t('devices.outletNameRequired') });
       return;
     }
 
@@ -72,9 +74,9 @@ const OutletDetail = ({
         type: outletGroup
       });
       setIsEditing(false);
-      setFeedback({ visible: true, type: 'success', message: 'Outlet updated' });
+      setFeedback({ visible: true, type: 'success', message: t('devices.outletUpdated') });
     } catch (error) {
-      setFeedback({ visible: true, type: 'error', message: error.message || 'Update failed' });
+      setFeedback({ visible: true, type: 'error', message: error.message || t('devices.updateFailed') });
     } finally {
       setShowLoader(false);
     }
@@ -92,12 +94,12 @@ const OutletDetail = ({
     
     if (!onControlOutlet) {
       console.error(`❌ onControlOutlet function not provided`);
-      setFeedback({ visible: true, type: 'error', message: 'Control function not available' });
+      setFeedback({ visible: true, type: 'error', message: t('devices.controlFunctionNotAvailable') });
       return;
     }
     
     if (!deviceId || !outlet?.id) {
-      setFeedback({ visible: true, type: 'error', message: 'Device or outlet not found' });
+      setFeedback({ visible: true, type: 'error', message: t('devices.deviceOrOutletNotFound') });
       return;
     }
     setShowLoader(true);
@@ -115,11 +117,11 @@ const OutletDetail = ({
         }, 300);
       }
       
-      setFeedback({ visible: true, type: 'success', message: `Outlet ${action} command sent` });
+      setFeedback({ visible: true, type: 'success', message: t('devices.outletCommandSent', { action }) });
       onClose();
     } else {
       log.error('toggle failed', outlet?.id, '->', action);
-      setFeedback({ visible: true, type: 'error', message: 'Failed to send command' });
+      setFeedback({ visible: true, type: 'error', message: t('devices.commandFailed') });
     }
   };
 
@@ -159,7 +161,7 @@ const OutletDetail = ({
       <View style={styles.modalOverlay}>
         <KeyboardAvoidingView style={styles.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
-            <Text style={styles.title}>Outlet Details</Text>
+            <Text style={styles.title}>{t('devices.outletDetails')}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <MaterialCommunityIcons name="close" size={24} color={CONFIG.COLORS.gray} />
             </TouchableOpacity>
@@ -175,13 +177,13 @@ const OutletDetail = ({
               <View style={styles.outletTitle}>
                 <Text style={styles.outletId}>{outlet.id.toUpperCase()}</Text>
                 <Text style={styles.outletName}>
-                  {isEditing ? outletName : (outlet.name || `Outlet ${outlet.id}`)}
+                  {isEditing ? outletName : (outlet.name || t('devices.outlet', { id: outlet.id }))}
                 </Text>
               </View>
             </View>
 
             <View style={styles.groupSection}>
-              <Text style={styles.groupLabel}>Group:</Text>
+              <Text style={styles.groupLabel}>{t('devices.group')}:</Text>
               <View style={styles.groupBadge}>
                 <Text style={[styles.groupText, { color: getGroupColor(outletGroup) }]}>
                   {isEditing ? outletGroup.toUpperCase() : (outlet.type || 'KITCHEN').toUpperCase()}
@@ -192,18 +194,18 @@ const OutletDetail = ({
             {isEditing && (
               <View style={styles.editSection}>
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Outlet Name:</Text>
+                  <Text style={styles.inputLabel}>{t('devices.outletName')}:</Text>
                   <TextInput
                     style={styles.textInput}
                     value={outletName}
                     onChangeText={setOutletName}
-                    placeholder="Enter outlet name"
+                    placeholder={t('devices.enterOutletName')}
                     maxLength={30}
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Group:</Text>
+                  <Text style={styles.inputLabel}>{t('devices.group')}:</Text>
                   <View style={styles.groupButtons}>
                     <TouchableOpacity
                       style={[
@@ -221,7 +223,7 @@ const OutletDetail = ({
                         styles.groupButtonText,
                         outletGroup === 'kitchen' && styles.groupButtonTextActive
                       ]}>
-                        Kitchen
+                        {t('devices.kitchen')}
                       </Text>
                     </TouchableOpacity>
                     
@@ -241,7 +243,7 @@ const OutletDetail = ({
                         styles.groupButtonText,
                         outletGroup === 'safety' && styles.groupButtonTextActive
                       ]}>
-                        Safety
+                        {t('devices.safety')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -260,8 +262,8 @@ const OutletDetail = ({
             />
             <Text style={styles.cautionText}>
               {outletGroup === 'safety'
-                ? 'Caution: In Emergency Mode, safety devices will automatically turn ON.'
-                : 'Caution: In Emergency Mode, kitchen devices will automatically turn OFF.'}
+                ? t('devices.safetyEmergencyCaution')
+                : t('devices.kitchenEmergencyCaution')}
             </Text>
           </View>
                 </View>
@@ -277,7 +279,7 @@ const OutletDetail = ({
                   onPress={handleEdit}
                 >
                   <MaterialCommunityIcons name="pencil" size={20} color={CONFIG.COLORS.white} />
-                  <Text style={styles.actionButtonText}>Edit</Text>
+                  <Text style={styles.actionButtonText}>{t('common.edit')}</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
@@ -295,7 +297,7 @@ const OutletDetail = ({
                     color={CONFIG.COLORS.white} 
                   />
                   <Text style={styles.actionButtonText}>
-                    {loading ? 'Processing...' : (outletStatus ? 'TURN OFF' : 'TURN ON')}
+                    {loading ? t('common.processing') : (outletStatus ? t('devices.turnOff') : t('devices.turnOn'))}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -306,7 +308,7 @@ const OutletDetail = ({
                   onPress={handleCancel}
                 >
                   <MaterialCommunityIcons name="close" size={20} color={CONFIG.COLORS.white} />
-                  <Text style={styles.actionButtonText}>Cancel</Text>
+                  <Text style={styles.actionButtonText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
@@ -314,14 +316,14 @@ const OutletDetail = ({
                   onPress={handleSave}
                 >
                   <MaterialCommunityIcons name="content-save" size={20} color={CONFIG.COLORS.white} />
-                  <Text style={styles.actionButtonText}>Save</Text>
+                  <Text style={styles.actionButtonText}>{t('common.save')}</Text>
                 </TouchableOpacity>
               </>
             )}
           </View>
         </KeyboardAvoidingView>
       </View>
-      <OverlayLoader visible={showLoader} message={isEditing ? 'Saving...' : 'Sending command...'} onCancel={() => setShowLoader(false)} />
+      <OverlayLoader visible={showLoader} message={isEditing ? t('common.saving') : t('devices.sendingCommand')} onCancel={() => setShowLoader(false)} />
       <ActionFeedback visible={feedback.visible} type={feedback.type} message={feedback.message} onHide={() => setFeedback({ ...feedback, visible: false })} />
     </Modal>
   );

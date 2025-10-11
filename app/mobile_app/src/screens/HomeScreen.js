@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useDeviceData } from '../hooks/useDeviceData';
 import { useOutletControl } from '../hooks/useOutletControl';
 import Header from '../components/Header';
@@ -23,6 +24,7 @@ const log = createLogger('Home');
 import CONFIG from '../constants/config';
 
 const HomeScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const {
     deviceData,
     deviceDetail,
@@ -102,7 +104,7 @@ const HomeScreen = ({ navigation }) => {
               await fetchDeviceStatus(selectedDevice);
             } catch (error) {
               log.error('Error updating outlet settings', error?.message || error);
-              setFeedback({ visible: true, type: 'error', message: error.message || 'Failed to update outlet settings' });
+              setFeedback({ visible: true, type: 'error', message: error.message || t('devices.updateOutletSettingsFailed') });
             }
           }}
           loading={controlLoading}
@@ -118,14 +120,14 @@ const HomeScreen = ({ navigation }) => {
         {deviceData?.lastUpdate && (
           <View style={styles.section}>
             <Text style={styles.lastUpdate}>
-              Last update: {new Date(deviceData.lastUpdate).toLocaleString()}
+              {t('devices.lastUpdate')}: {new Date(deviceData.lastUpdate).toLocaleString()}
             </Text>
           </View>
         )}
 
         {error && (
           <View style={styles.section}>
-            <Text style={styles.errorText}>Error: {error}</Text>
+            <Text style={styles.errorText}>{t('common.error')}: {error}</Text>
           </View>
         )}
       </ScrollView>

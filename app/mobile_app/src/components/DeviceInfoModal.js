@@ -1,10 +1,13 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
 import DeviceInfo from './DeviceInfo';
 
 const DeviceInfoModal = ({ visible, onClose, deviceData }) => {
+  const { t } = useTranslation();
+  
   return (
     <Modal
       animationType="slide"
@@ -15,7 +18,7 @@ const DeviceInfoModal = ({ visible, onClose, deviceData }) => {
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>Device Information</Text>
+            <Text style={styles.title}>{t('devices.deviceInformation')}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <MaterialCommunityIcons name="close" size={22} color={CONFIG.COLORS.gray} />
             </TouchableOpacity>

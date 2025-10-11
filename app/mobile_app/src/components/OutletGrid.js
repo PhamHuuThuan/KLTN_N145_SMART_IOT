@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,6 +18,7 @@ const OutletGrid = ({
   loading,
   onRefreshDeviceData
 }) => {
+  const { t } = useTranslation();
   const [buttonScales] = useState(() => 
     Array.from({ length: 5 }, () => new Animated.Value(1))
   );
@@ -30,7 +32,7 @@ const OutletGrid = ({
     if (deviceData?.outlets && Array.isArray(deviceData.outlets)) {
       return deviceData.outlets.map(outlet => ({
         id: outlet.id,
-        name: outlet.name || `Outlet ${outlet.id}`,
+        name: outlet.name || t('devices.outlet', { id: outlet.id }),
         icon: outlet.type === 'safety' ? 'shield' : 'stove',
         type: outlet.type || 'kitchen'
       }));
@@ -81,9 +83,9 @@ const OutletGrid = ({
     setShowLoader(false);
     log.debug('result', success);
     if (success) {
-      setFeedback({ visible: true, type: 'success', message: `Outlet ${action}` });
+      setFeedback({ visible: true, type: 'success', message: t('devices.outletAction', { action }) });
     } else {
-      setFeedback({ visible: true, type: 'error', message: 'Failed to send command' });
+      setFeedback({ visible: true, type: 'error', message: t('devices.commandFailed') });
     }
     return success;
   };
@@ -149,19 +151,19 @@ const OutletGrid = ({
   if (!selectedDevice) {
     return (
       <View style={styles.container}>
-        <Text style={styles.noDeviceText}>Please select a device first</Text>
+        <Text style={styles.noDeviceText}>{t('devices.selectDeviceFirst')}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🔌 Outlet Control</Text>
-      <Text style={styles.deviceInfo}>Device: {selectedDevice || 'Not selected'}</Text>
+      <Text style={styles.title}>🔌 {t('devices.outletControl')}</Text>
+      <Text style={styles.deviceInfo}>{t('devices.device')}: {selectedDevice || t('devices.notSelected')}</Text>
       
       <View style={styles.grid}>
         {outlets.length === 0 && (
-          <Text style={styles.noDeviceText}>No outlets configured or data not found</Text>
+          <Text style={styles.noDeviceText}>{t('devices.noOutletsConfigured')}</Text>
         )}
         {outlets.map((outlet, index) => {
           const isOn = getOutletStatus(outlet.id);
@@ -209,7 +211,7 @@ const OutletGrid = ({
                     styles.statusText,
                     { color: isOn ? CONFIG.COLORS.white : CONFIG.COLORS.gray }
                   ]}>
-                    {isOn ? 'ON' : 'OFF'}
+                    {isOn ? t('common.on') : t('common.off')}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -230,7 +232,7 @@ const OutletGrid = ({
                   color={CONFIG.COLORS.white} 
                 />
                 <Text style={styles.toggleText}>
-                  {isOn ? 'TURN OFF' : 'TURN ON'}
+                  {isOn ? t('devices.turnOff') : t('devices.turnOn')}
                 </Text>
               </TouchableOpacity>
             </Animated.View>
@@ -239,7 +241,7 @@ const OutletGrid = ({
       </View>
       
       {loading && (
-        <Text style={styles.loadingText}>⏳ Processing...</Text>
+        <Text style={styles.loadingText}>⏳ {t('common.processing')}</Text>
       )}
 
       <OutletDetail
@@ -255,7 +257,7 @@ const OutletGrid = ({
       />
       <OverlayLoader
         visible={showLoader}
-        message="Working..."
+        message={t('common.working')}
         onCancel={() => setShowLoader(false)}
       />
       <ActionFeedback

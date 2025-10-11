@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, DeviceEventEmitter } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { NotificationProvider } from './src/contexts/NotificationContext';
 import { useNotificationContext } from './src/contexts/NotificationContext';
+import './src/i18n'; // Initialize i18n
 import EmergencyScreen from './src/screens/EmergencyScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ChatScreen from './src/screens/ChatScreen';
@@ -20,6 +22,7 @@ import CONFIG from './src/constants/config';
 import apiService from './src/services/apiService';
 
 function AppContent() {
+  const { t } = useTranslation();
   const { isAuthenticated, isLoading } = useAuth();
   const { emergency, markAllAsRead, loadNotifications, dispatch } = useNotificationContext?.() || {};
   const [activeTab, setActiveTab] = useState('Home');
@@ -206,25 +209,25 @@ function AppContent() {
       {isAuthenticated && currentScreen === 'Main' && (
         <View style={styles.tabBar}>
           <TabButton
-            label="Home"
+            label={t('navigation.home')}
             icon="home"
             isActive={activeTab === 'Home'}
             onPress={() => setActiveTab('Home')}
           />
           <TabButton
-            label="Chat"
+            label={t('navigation.chat')}
             icon="chat"
             isActive={activeTab === 'Chat'}
             onPress={() => setActiveTab('Chat')}
           />
           <TabButton
-            label="Rules"
+            label={t('navigation.rules')}
             icon="tune"
             isActive={activeTab === 'Rules'}
             onPress={() => setActiveTab('Rules')}
           />
           <TabButton
-            label="Settings"
+            label={t('navigation.settings')}
             icon="cog"
             isActive={activeTab === 'Settings'}
             onPress={() => setActiveTab('Settings')}
