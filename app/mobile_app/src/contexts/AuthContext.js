@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { setAuthToken, clearAuthToken } from '../services/apiService';
+import chatSessionManager from '../services/chatSessionManager';
 import * as Notifications from 'expo-notifications';
 import { createLogger } from '../utils/logger';
 
@@ -68,12 +69,23 @@ export const AuthProvider = ({ children }) => {
       
       if (result.success) {
         const profile = await authService.getProfile();
-        setUser(profile?.success && profile.user ? profile.user : result.user);
+        const currentUser = profile?.success && profile.user ? profile.user : result.user;
+        setUser(currentUser);
         setIsAuthenticated(true);
         setToken(result.token);
         // Set token for all services
         notificationService.setAuthToken(result.token);
         setAuthToken(result.token);
+        
+        // Initialize chat session for the logged-in user
+        if (currentUser?.id) {
+          try {
+            await chatSessionManager.initializeSessionOnLogin(currentUser.id);
+            log.info('Chat session initialized for user:', currentUser.id);
+          } catch (chatError) {
+            log.error('Failed to initialize chat session:', chatError);
+          }
+        }
         
         // Register FCM token after successful login
         try {
@@ -131,7 +143,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoading(true);
       
-      // Remove FCM token before logout
+      // Remove FCM token and clear chat session before logout
       if (user?.id) {
         try {
           await removeFCMToken(user.id);
@@ -139,6 +151,15 @@ export const AuthProvider = ({ children }) => {
         } catch (fcmError) {
           log.warn('Failed to remove FCM token during logout', fcmError?.message || fcmError);
           // Don't fail logout if FCM token removal fails
+        }
+        
+        // Clear chat session for the user
+        try {
+          await chatSessionManager.clearCurrentSession();
+          log.info('Chat session cleared during logout');
+        } catch (chatError) {
+          log.warn('Failed to clear chat session during logout', chatError?.message || chatError);
+          // Don't fail logout if chat session cleanup fails
         }
       }
       

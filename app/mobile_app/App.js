@@ -108,7 +108,7 @@ function AppContent() {
           case 'Home':
             return <HomeScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
           case 'Chat':
-            return <ChatScreen />;
+            return <ChatScreen onNavigateToHome={() => setActiveTab('Home')} />;
           case 'Rules':
             return <RulesScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
           case 'Settings':

@@ -27,15 +27,19 @@ const ChatMessageList = ({ messages, userId, onOutletPress }) => {
   const { colors } = useTheme();
   const listRef = useRef(null);
 
+  // Sort messages by time (newest first for inverted list)
+  const sortedMessages = [...messages].sort((a, b) => b.time - a.time);
+
   useEffect(() => {
-    if (listRef.current && messages?.length) {
-      listRef.current.scrollToEnd({ animated: true });
+    if (listRef.current && sortedMessages?.length) {
+      // Scroll to top when new messages are added (since list is inverted)
+      listRef.current.scrollToOffset({ offset: 0, animated: true });
     }
-  }, [messages]);
+  }, [sortedMessages]);
 
   const renderItem = ({ item, index }) => {
-    const prev = messages[index - 1];
-    const next = messages[index + 1];
+    const prev = sortedMessages[index - 1];
+    const next = sortedMessages[index + 1];
     const samePrev = prev && prev.userId === item.userId;
     const sameNext = next && next.userId === item.userId;
     const showDate = !prev || new Date(prev.time).toDateString() !== new Date(item.time).toDateString();
@@ -58,11 +62,12 @@ const ChatMessageList = ({ messages, userId, onOutletPress }) => {
   return (
     <FlatList
       ref={listRef}
-      data={messages}
+      data={sortedMessages}
       renderItem={renderItem}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.listContent}
       style={[styles.list, { backgroundColor: colors.background }]}
+      inverted
     />
   );
 };

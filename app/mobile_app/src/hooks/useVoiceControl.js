@@ -155,7 +155,8 @@ const useVoiceControl = () => {
       // If only device name without number, use device name as outlet name
       outletName = location;
     } else if (number) {
-      outletName = `outlet_${number}`;
+      // Map number to outlet ID format (o1, o2, o3, etc.)
+      outletName = `o${number}`;
     }
     
     // Default to outlet if no target specified
@@ -175,7 +176,7 @@ const useVoiceControl = () => {
     };
   }, []);
 
-  const executeVoiceCommand = useCallback((command, onOutletControl) => {
+  const executeVoiceCommand = useCallback(async (command, onOutletControl) => {
     if (!command || !command.action || !onOutletControl) {
       return { success: false, message: t('voice.commandNotUnderstood') };
     }
@@ -185,43 +186,46 @@ const useVoiceControl = () => {
         // For outlet control
         if (command.outletName) {
           // Specific outlet by name (e.g., kitchen_1, bedroom_2)
-          const success = onOutletControl(command.action, command.outletName);
+          const result = await onOutletControl(command.action, command.outletName);
           const displayName = command.location && command.number 
             ? `${command.location} ${command.number}` 
             : command.outletName;
           
           return {
-            success,
-            message: success 
+            success: result.success || result,
+            message: result.success || result
               ? t('voice.outletCommandSuccess', { 
                   action: command.action === 'on' ? t('common.on') : t('common.off'),
-                  outlet: displayName
+                  outlet: result.outlet?.name || displayName
                 })
-              : t('voice.commandFailed')
+              : t('voice.commandFailed'),
+            outlet: result.outlet || null
           };
         } else if (command.number) {
           // Specific outlet by number only
-          const outletId = `outlet_${command.number}`;
-          const success = onOutletControl(command.action, outletId);
+          const outletId = `o${command.number}`;
+          const result = await onOutletControl(command.action, outletId);
           return {
-            success,
-            message: success 
+            success: result.success || result,
+            message: result.success || result
               ? t('voice.outletCommandSuccess', { 
                   action: command.action === 'on' ? t('common.on') : t('common.off'),
                   outlet: `ổ cắm ${command.number}`
                 })
-              : t('voice.commandFailed')
+              : t('voice.commandFailed'),
+            outlet: result.outlet || null
           };
         } else {
           // All outlets
-          const success = onOutletControl(command.action, 'all');
+          const result = await onOutletControl(command.action, 'all');
           return {
-            success,
-            message: success 
+            success: result.success || result,
+            message: result.success || result
               ? t('voice.allOutletsCommandSuccess', { 
                   action: command.action === 'on' ? t('common.on') : t('common.off')
                 })
-              : t('voice.commandFailed')
+              : t('voice.commandFailed'),
+            outlet: result.outlet || null
           };
         }
       }

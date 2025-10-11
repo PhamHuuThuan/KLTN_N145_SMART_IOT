@@ -22,21 +22,61 @@ const ChatMessageBubble = ({ message, isOwn, showAvatar = false, showTime = true
         {/* Outlet Card */}
         {message.outletCard && (
           <TouchableOpacity 
-            style={[styles.outletCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[
+              styles.outletCard, 
+              { 
+                backgroundColor: message.outletCard.status ? '#4CAF50' : '#FFFFFF',
+                borderColor: message.outletCard.status ? '#4CAF50' : '#E0E0E0',
+                borderWidth: 1
+              }
+            ]}
             onPress={() => onOutletPress && onOutletPress(message.outletCard)}
           >
+            {/* Header with icon and name */}
             <View style={styles.outletHeader}>
-              <View style={[styles.outletStatus, { backgroundColor: message.outletCard.status ? colors.success : colors.gray }]} />
-              <Text style={[styles.outletName, { color: colors.text }]}>{message.outletCard.name}</Text>
+              <Ionicons 
+                name="home-outline" 
+                size={20} 
+                color={message.outletCard.status ? '#FFFFFF' : '#666666'} 
+              />
+              <Text style={[
+                styles.outletName, 
+                { color: message.outletCard.status ? '#FFFFFF' : '#333333' }
+              ]}>
+                {message.outletCard.name}
+              </Text>
               <Ionicons 
                 name="chevron-forward" 
                 size={16} 
-                color={colors.textSecondary} 
+                color={message.outletCard.status ? '#FFFFFF' : '#666666'} 
+                style={styles.outletChevron}
               />
             </View>
-            <Text style={[styles.outletId, { color: colors.textSecondary }]}>
-              ID: {message.outletCard.id}
-            </Text>
+            
+            {/* Status icon and text */}
+            <View style={styles.outletStatusSection}>
+              <Ionicons 
+                name={message.outletCard.status ? "power" : "ellipse-outline"} 
+                size={24} 
+                color={message.outletCard.status ? '#FFFFFF' : '#666666'} 
+              />
+              <Text style={[
+                styles.outletStatusText,
+                { color: message.outletCard.status ? '#FFFFFF' : '#333333' }
+              ]}>
+                {message.outletCard.status ? 'BẬT' : 'TẮT'}
+              </Text>
+            </View>
+            
+            {/* Navigation hint */}
+            <View style={styles.outletHintSection}>
+              <Text style={[
+                styles.outletHintText,
+                { color: message.outletCard.status ? '#FFFFFF' : '#666666' }
+              ]}>
+                Nhấn để xem chi tiết
+              </Text>
+            </View>
           </TouchableOpacity>
         )}
         
@@ -99,29 +139,45 @@ const styles = StyleSheet.create({
   },
   outletCard: {
     marginTop: 8,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
+    padding: 16,
+    borderRadius: 12,
+    minHeight: 120,
+    justifyContent: 'space-between',
   },
   outletHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  outletStatus: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
+    marginBottom: 8,
   },
   outletName: {
-    flex: 1,
-    fontSize: 14,
+    marginLeft: 8,
+    fontSize: 16,
     fontWeight: '600',
+    flex: 1,
   },
-  outletId: {
-    fontSize: 12,
-    marginTop: 2,
+  outletChevron: {
+    marginLeft: 'auto',
+  },
+  outletStatusSection: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  outletStatusText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  outletHintSection: {
+    alignItems: 'center',
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.2)',
+  },
+  outletHintText: {
+    fontSize: 10,
+    fontStyle: 'italic',
+    opacity: 0.7,
   },
   timeOwn: {
     alignSelf: 'flex-end',

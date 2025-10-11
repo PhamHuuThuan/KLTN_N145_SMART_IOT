@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacit
 import { Ionicons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import ChatMessageList from '../components/ChatMessageList';
 import ChatInput from '../components/ChatInput';
@@ -13,28 +14,17 @@ import useSpeechToText from '../hooks/useSpeechToText';
 import useVoiceControl from '../hooks/useVoiceControl';
 import { useOutletControl } from '../hooks/useOutletControl';
 import apiService from '../services/apiService';
+import chatSessionManager from '../services/chatSessionManager';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('Chat');
 
-const ChatScreen = () => {
+const ChatScreen = ({ onNavigateToHome }) => {
   const { colors } = useTheme();
+  const { user } = useAuth();
   const { t } = useTranslation();
   const myId = 'me';
-  const [messages, setMessages] = useState(() => [
-    { 
-      id: 'm1', 
-      userId: 'bot', 
-      text: t('chat.welcome'), 
-      time: Date.now() - 60000 
-    },
-    { 
-      id: 'm2', 
-      userId: 'bot', 
-      text: t('chat.voiceCommandsHelp'), 
-      time: Date.now() - 30000 
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   
   // Device and outlet control state
   const [selectedDevice, setSelectedDevice] = useState(null);
@@ -49,10 +39,73 @@ const ChatScreen = () => {
   const { parseVoiceCommand, executeVoiceCommand, processTranscript } = useVoiceControl();
   const { controlOutlet: controlOutletHook } = useOutletControl();
 
-  // Load devices on component mount
+  // Load devices and messages on component mount
   useEffect(() => {
     loadDevices();
-  }, []);
+    if (user?.id) {
+      loadChatSession();
+    }
+  }, [user?.id]);
+
+  // Load chat session
+  const loadChatSession = async () => {
+    try {
+      // Get current user ID from auth context
+      const userId = user?.id;
+      if (!userId) {
+        log.warn('No user ID available for chat session');
+        return;
+      }
+      
+      // Initialize session and load messages
+      const sessionId = await chatSessionManager.initializeSessionOnLogin(userId);
+      if (sessionId) {
+        const savedMessages = await chatSessionManager.loadMessages(sessionId);
+        setMessages(savedMessages);
+        log.info('Loaded chat session:', sessionId, 'with', savedMessages.length, 'messages');
+      }
+    } catch (error) {
+      log.error('Error loading chat session:', error);
+      // Fallback to default messages
+      setMessages([
+        { 
+          id: 'm1', 
+          userId: 'bot', 
+          text: t('chat.welcome'), 
+          time: Date.now() - 60000 
+        },
+        { 
+          id: 'm2', 
+          userId: 'bot', 
+          text: t('chat.voiceCommandsHelp'), 
+          time: Date.now() - 30000 
+        },
+      ]);
+    }
+  };
+
+  // Save messages to session
+  const saveMessagesToSession = async (newMessages) => {
+    try {
+      await chatSessionManager.updateMessages(newMessages);
+    } catch (error) {
+      log.error('Error saving messages to session:', error);
+    }
+  };
+
+  // Update messages and save to session
+  const updateMessages = (messageUpdater) => {
+    setMessages((prevMessages) => {
+      const newMessages = typeof messageUpdater === 'function' 
+        ? messageUpdater(prevMessages) 
+        : messageUpdater;
+      
+      // Save to session asynchronously
+      saveMessagesToSession(newMessages);
+      
+      return newMessages;
+    });
+  };
 
   const loadDevices = async () => {
     try {
@@ -78,7 +131,7 @@ const ChatScreen = () => {
 
   const handleSend = (text) => {
     const msg = { id: `m_${Date.now()}`, userId: myId, text, time: Date.now() };
-    setMessages((prev) => [...prev, msg]);
+    updateMessages((prev) => [...prev, msg]);
     log.debug('send message', text);
     
     // Process voice command if it's a command
@@ -90,16 +143,22 @@ const ChatScreen = () => {
 
   const handleVoiceCommand = async (command) => {
     try {
-      const result = await executeVoiceCommand(command, handleOutletControl);
+      const result = await executeVoiceCommand(command, handleOutletControlSilent);
       
       // Add bot response
       const botMsg = { 
         id: `bot_${Date.now()}`, 
         userId: 'bot', 
         text: result.message, 
+        outletCard: result.outlet || null,
         time: Date.now() 
       };
-      setMessages((prev) => [...prev, botMsg]);
+      log.info('Adding bot message:', { text: result.message, hasOutlet: !!result.outlet });
+      updateMessages((prev) => {
+        const newMessages = [...prev, botMsg];
+        log.info('Updated messages count:', newMessages.length);
+        return newMessages;
+      });
 
       // If command failed, add helpful guidance
       if (!result.success) {
@@ -110,7 +169,7 @@ const ChatScreen = () => {
           time: Date.now()
         };
         setTimeout(() => {
-          setMessages((prev) => [...prev, helpMsg]);
+          updateMessages((prev) => [...prev, helpMsg]);
         }, 1000);
       }
     } catch (error) {
@@ -121,7 +180,7 @@ const ChatScreen = () => {
         text: t('voice.commandError'),
         time: Date.now()
       };
-      setMessages((prev) => [...prev, errorMsg]);
+      updateMessages((prev) => [...prev, errorMsg]);
     }
   };
 
@@ -137,17 +196,11 @@ const ChatScreen = () => {
     }
   };
 
-  const handleOutletControl = async (action, outletId) => {
+  // Silent version for voice command (doesn't add messages)
+  const handleOutletControlSilent = async (action, outletId) => {
     const deviceId = selectedDevice?.deviceId;
     
     if (!selectedDevice || !deviceId) {
-      const errorMsg = { 
-        id: `bot_${Date.now()}`, 
-        userId: 'bot', 
-        text: t('chat.noDeviceSelected'), 
-        time: Date.now() 
-      };
-      setMessages((prev) => [...prev, errorMsg]);
       return false;
     }
 
@@ -159,7 +212,9 @@ const ChatScreen = () => {
       
       if (outletId === 'all') {
         // Control all outlets
-        success = await controlAllOutlets(action);
+        const result = await controlAllOutlets(action);
+        success = result.success || result;
+        controlledOutlet = result.outlet || null;
       } else {
         // Control specific outlet
         const result = await controlOutlet(outletId, action);
@@ -167,27 +222,52 @@ const ChatScreen = () => {
         controlledOutlet = result.outlet;
       }
       
+      return { success, outlet: controlledOutlet };
+    } catch (error) {
+      log.error('Error controlling outlet:', error);
+      return { success: false };
+    }
+  };
+
+  // Version that adds messages (for direct calls)
+  const handleOutletControl = async (action, outletId) => {
+    const deviceId = selectedDevice?.deviceId;
+    
+    if (!selectedDevice || !deviceId) {
+      const errorMsg = { 
+        id: `bot_${Date.now()}`, 
+        userId: 'bot', 
+        text: t('chat.noDeviceSelected'), 
+        time: Date.now() 
+      };
+      updateMessages((prev) => [...prev, errorMsg]);
+      return false;
+    }
+
+    try {
+      const result = await handleOutletControlSilent(action, outletId);
+      
       // Add success/failure message with outlet card
-      if (success && controlledOutlet) {
+      if (result.success && result.outlet) {
         const successMsg = { 
           id: `bot_${Date.now()}`, 
           userId: 'bot', 
-          text: `${action === 'on' ? t('chat.outletTurnedOn') : t('chat.outletTurnedOff')}: ${controlledOutlet.name}`,
-          outletCard: controlledOutlet,
+          text: `${action === 'on' ? t('chat.outletTurnedOn') : t('chat.outletTurnedOff')}: ${result.outlet.name}`,
+          outletCard: result.outlet,
           time: Date.now() 
         };
-        setMessages((prev) => [...prev, successMsg]);
-      } else if (!success) {
+        updateMessages((prev) => [...prev, successMsg]);
+      } else if (!result.success) {
         const errorMsg = { 
           id: `bot_${Date.now()}`, 
           userId: 'bot', 
           text: t('chat.outletControlFailed'),
           time: Date.now() 
         };
-        setMessages((prev) => [...prev, errorMsg]);
+        updateMessages((prev) => [...prev, errorMsg]);
       }
       
-      return success;
+      return result.success;
     } catch (error) {
       log.error('Error controlling outlet:', error);
       return false;
@@ -209,7 +289,7 @@ const ChatScreen = () => {
       let actualOutletId = outletId;
       let currentOutlet = null;
       
-      // If it's a named outlet (e.g., fan_1, light, tv), try to find the actual outlet
+      // If it's a named outlet (e.g., fan_1, light, tv) or outlet ID (e.g., o1, o2), try to find the actual outlet
       if (!outletId.startsWith('outlet_') && outletId !== 'all') {
         // Try to find outlet by exact name match first
         let foundOutlet = outlets.find(outlet => 
@@ -240,7 +320,8 @@ const ChatScreen = () => {
           const keywords = deviceKeywords[outletId] || [];
           foundOutlet = outlets.find(outlet => 
             keywords.some(keyword => 
-              outlet.name?.toLowerCase().includes(keyword)
+              outlet.name?.toLowerCase().includes(keyword.toLowerCase()) ||
+              keyword.toLowerCase().includes(outlet.name?.toLowerCase())
             )
           );
         }
@@ -267,7 +348,14 @@ const ChatScreen = () => {
       
       if (success) {
         log.info(`Successfully ${action} ${outletId} (${actualOutletId}) on device ${deviceId}`);
-        return { success: true, outlet: currentOutlet };
+        
+        // Update outlet status based on action
+        const updatedOutlet = {
+          ...currentOutlet,
+          status: action === 'on' ? true : action === 'off' ? false : !currentOutlet.status
+        };
+        
+        return { success: true, outlet: updatedOutlet };
       } else {
         log.error('Failed to control outlet');
         return { success: false };
@@ -285,30 +373,29 @@ const ChatScreen = () => {
       // Get device outlets first
       const deviceResponse = await apiService.getDeviceDetail(deviceId);
       if (!deviceResponse.success || !deviceResponse.data?.outlets) {
-        return false;
+        return { success: false };
       }
 
       const outlets = deviceResponse.data.outlets;
       let allSuccess = true;
+      let firstControlledOutlet = null;
 
       // Control each outlet - toggle all to the desired state
       for (const outlet of outlets) {
-        // If outlet is already in desired state, skip
-        if ((action === 'on' && outlet.status) || (action === 'off' && !outlet.status)) {
-          continue;
-        }
-        
-        // Toggle outlet to change its state
-        const success = await controlOutlet(outlet.id, action);
-        if (!success) {
+        // Always control outlet (useOutletControl will handle the toggle logic)
+        const result = await controlOutlet(outlet.id, action);
+        if (!result.success) {
           allSuccess = false;
+        } else if (!firstControlledOutlet && result.outlet) {
+          // Store first controlled outlet for display
+          firstControlledOutlet = result.outlet;
         }
       }
 
-      return allSuccess;
+      return { success: allSuccess, outlet: firstControlledOutlet };
     } catch (error) {
       log.error('Error controlling all outlets:', error);
-      return false;
+      return { success: false };
     }
   };
 
@@ -361,8 +448,10 @@ const ChatScreen = () => {
               messages={messages} 
               userId={myId} 
               onOutletPress={(outlet) => {
-                setSelectedOutlet(outlet);
-                setShowOutletDetail(true);
+                // Navigate to Home tab
+                if (onNavigateToHome) {
+                  onNavigateToHome();
+                }
               }}
             />
           </View>
