@@ -38,24 +38,38 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
       {/* Template Stats */}
       <View style={styles.templateMeta}>
         <View style={styles.templateStats}>
-          <View style={styles.statItem}>
-            <MaterialIcons name="timer" size={12} color={CONFIG.COLORS.gray} />
-            <Text style={styles.statText}>
-              Cooldown: {formatCooldown(template.cooldownPeriod)}
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
-            <Text style={styles.statText}>
-              Max/day: {template.maxTriggersPerDay || '∞'}
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <MaterialIcons name="schedule" size={12} color={CONFIG.COLORS.gray} />
-            <Text style={styles.statText}>
-              Duration: {formatCooldown(template.duration)}
-            </Text>
-          </View>
+          {template.priority !== 'urgent' && (
+            <View style={styles.statItem}>
+              <MaterialIcons name="timer" size={12} color={CONFIG.COLORS.gray} />
+              <Text style={styles.statText}>
+                Cooldown: {formatCooldown(template.cooldownPeriod)}
+              </Text>
+            </View>
+          )}
+          {template.priority !== 'urgent' && (
+            <View style={styles.statItem}>
+              <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
+              <Text style={styles.statText}>
+                Max/day: {template.maxTriggersPerDay || '∞'}
+              </Text>
+            </View>
+          )}
+          {template.priority !== 'urgent' && (
+            <View style={styles.statItem}>
+              <MaterialIcons name="schedule" size={12} color={CONFIG.COLORS.gray} />
+              <Text style={styles.statText}>
+                Duration: {formatCooldown(template.duration)}
+              </Text>
+            </View>
+          )}
+          {template.priority === 'urgent' && (
+            <View style={styles.statItem}>
+              <MaterialIcons name="priority-high" size={12} color="#F44336" />
+              <Text style={[styles.statText, { color: '#F44336', fontWeight: 'bold' }]}>
+                Emergency Mode
+              </Text>
+            </View>
+          )}
         </View>
       </View>
       

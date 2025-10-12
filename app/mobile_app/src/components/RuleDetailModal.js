@@ -224,50 +224,69 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           </View>
         </View>
 
-        {/* Cooldown Period */}
-        <View style={{ marginTop: 16 }}>
-          <Text style={styles.inputLabel}>Cooldown Period (minutes)</Text>
-          <TextInput
-            style={styles.input}
-            value={editFields.cooldownPeriod ? String(Math.floor(editFields.cooldownPeriod / 60000)) : ''}
-            onChangeText={(text) => {
-              const minutes = parseInt(text) || 0;
-              setEditFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
-            }}
-            placeholder="5"
-            keyboardType="numeric"
-          />
-        </View>
+        {/* Cooldown Period - Hidden for urgent priority */}
+        {editFields.priority !== 'urgent' && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.inputLabel}>Cooldown Period (minutes)</Text>
+            <TextInput
+              style={styles.input}
+              value={editFields.cooldownPeriod ? String(Math.floor(editFields.cooldownPeriod / 60000)) : ''}
+              onChangeText={(text) => {
+                const minutes = parseInt(text) || 0;
+                setEditFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
+              }}
+              placeholder="5"
+              keyboardType="numeric"
+            />
+          </View>
+        )}
 
-        {/* Max Triggers Per Day */}
-        <View style={{ marginTop: 16 }}>
-          <Text style={styles.inputLabel}>Max Triggers/Day</Text>
-          <TextInput
-            style={styles.input}
-            value={editFields.maxTriggersPerDay ? String(editFields.maxTriggersPerDay) : ''}
-            onChangeText={(text) => {
-              const max = parseInt(text) || 0;
-              setEditFields(prev => ({ ...prev, maxTriggersPerDay: max }));
-            }}
-            placeholder="10"
-            keyboardType="numeric"
-          />
-        </View>
+        {/* Max Triggers Per Day - Hidden for urgent priority */}
+        {editFields.priority !== 'urgent' && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.inputLabel}>Max Triggers/Day</Text>
+            <TextInput
+              style={styles.input}
+              value={editFields.maxTriggersPerDay ? String(editFields.maxTriggersPerDay) : ''}
+              onChangeText={(text) => {
+                const max = parseInt(text) || 0;
+                setEditFields(prev => ({ ...prev, maxTriggersPerDay: max }));
+              }}
+              placeholder="10"
+              keyboardType="numeric"
+            />
+          </View>
+        )}
 
-        {/* Duration */}
-        <View style={{ marginTop: 16 }}>
-          <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Duration (minutes) - 0 = instant trigger</Text>
-          <TextInput
-            style={styles.input}
-            value={editFields.duration ? String(Math.floor(editFields.duration / 60000)) : ''}
-            onChangeText={(text) => {
-              const minutes = parseInt(text) || 0;
-              setEditFields(prev => ({ ...prev, duration: minutes * 60000 }));
-            }}
-            placeholder="0"
-            keyboardType="numeric"
-          />
-        </View>
+        {/* Duration - Hidden for urgent priority */}
+        {editFields.priority !== 'urgent' && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Duration (minutes) - 0 = instant trigger</Text>
+            <TextInput
+              style={styles.input}
+              value={editFields.duration ? String(Math.floor(editFields.duration / 60000)) : ''}
+              onChangeText={(text) => {
+                const minutes = parseInt(text) || 0;
+                setEditFields(prev => ({ ...prev, duration: minutes * 60000 }));
+              }}
+              placeholder="0"
+              keyboardType="numeric"
+            />
+          </View>
+        )}
+
+        {/* Emergency Mode Notice for Urgent Priority */}
+        {editFields.priority === 'urgent' && (
+          <View style={{ marginTop: 16, padding: 12, backgroundColor: '#F4433622', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F44336' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <MaterialIcons name="priority-high" size={16} color="#F44336" />
+              <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>Emergency Mode</Text>
+            </View>
+            <Text style={{ color: '#F44336', fontSize: 12 }}>
+              Urgent rules trigger immediately without cooldown or daily limits
+            </Text>
+          </View>
+        )}
         
         <TouchableOpacity
           style={[styles.createButton, { marginTop: 16 }]}

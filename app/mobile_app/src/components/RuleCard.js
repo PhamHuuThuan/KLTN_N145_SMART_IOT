@@ -91,18 +91,30 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
             <View style={styles.ruleStatsDivider} />
             <View style={styles.ruleStats}>
               <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <MaterialIcons name="timer" size={12} color={CONFIG.COLORS.gray} />
-                  <Text style={styles.statText}>
-                    Cooldown: {formatCooldown(rule.cooldownPeriod)}
-                  </Text>
-                </View>
-                <View style={styles.statItem}>
-                  <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
-                  <Text style={styles.statText}>
-                    Max/day: {rule.maxTriggersPerDay || '∞'}
-                  </Text>
-                </View>
+                {rule.priority !== 'urgent' && (
+                  <View style={styles.statItem}>
+                    <MaterialIcons name="timer" size={12} color={CONFIG.COLORS.gray} />
+                    <Text style={styles.statText}>
+                      Cooldown: {formatCooldown(rule.cooldownPeriod)}
+                    </Text>
+                  </View>
+                )}
+                {rule.priority !== 'urgent' && (
+                  <View style={styles.statItem}>
+                    <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
+                    <Text style={styles.statText}>
+                      Max/day: {rule.maxTriggersPerDay || '∞'}
+                    </Text>
+                  </View>
+                )}
+                {rule.priority === 'urgent' && (
+                  <View style={styles.statItem}>
+                    <MaterialIcons name="priority-high" size={12} color="#F44336" />
+                    <Text style={[styles.statText, { color: '#F44336', fontWeight: 'bold' }]}>
+                      Emergency Mode
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>

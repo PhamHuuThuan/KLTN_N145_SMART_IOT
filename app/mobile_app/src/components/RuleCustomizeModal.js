@@ -185,50 +185,69 @@ const CustomizeModal = ({
           ))}
         </View>
 
-        {/* Cooldown Period */}
-        <View style={{ marginTop: 16 }}>
-          <Text style={styles.inputLabel}>Cooldown Period (minutes)</Text>
-          <TextInput
-            style={styles.input}
-            value={customFields.cooldownPeriod ? String(Math.floor(customFields.cooldownPeriod / 60000)) : ''}
-            onChangeText={(text) => {
-              const minutes = parseInt(text) || 0;
-              setCustomFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
-            }}
-            placeholder="5"
-            keyboardType="numeric"
-          />
-        </View>
+        {/* Cooldown Period - Hidden for urgent priority */}
+        {customFields.priority !== 'urgent' && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.inputLabel}>Cooldown Period (minutes)</Text>
+            <TextInput
+              style={styles.input}
+              value={customFields.cooldownPeriod ? String(Math.floor(customFields.cooldownPeriod / 60000)) : ''}
+              onChangeText={(text) => {
+                const minutes = parseInt(text) || 0;
+                setCustomFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
+              }}
+              placeholder="5"
+              keyboardType="numeric"
+            />
+          </View>
+        )}
 
-        {/* Max Triggers Per Day */}
-        <View style={{ marginTop: 16 }}>
-          <Text style={styles.inputLabel}>Max Triggers/Day</Text>
-          <TextInput
-            style={styles.input}
-            value={customFields.maxTriggersPerDay ? String(customFields.maxTriggersPerDay) : ''}
-            onChangeText={(text) => {
-              const max = parseInt(text) || 0;
-              setCustomFields(prev => ({ ...prev, maxTriggersPerDay: max }));
-            }}
-            placeholder="10"
-            keyboardType="numeric"
-          />
-        </View>
+        {/* Max Triggers Per Day - Hidden for urgent priority */}
+        {customFields.priority !== 'urgent' && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.inputLabel}>Max Triggers/Day</Text>
+            <TextInput
+              style={styles.input}
+              value={customFields.maxTriggersPerDay ? String(customFields.maxTriggersPerDay) : ''}
+              onChangeText={(text) => {
+                const max = parseInt(text) || 0;
+                setCustomFields(prev => ({ ...prev, maxTriggersPerDay: max }));
+              }}
+              placeholder="10"
+              keyboardType="numeric"
+            />
+          </View>
+        )}
 
-        {/* Duration */}
-        <View style={{ marginTop: 16 }}>
-          <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Duration (minutes) - 0 = instant trigger</Text>
-          <TextInput
-            style={styles.input}
-            value={customFields.duration ? String(Math.floor(customFields.duration / 60000)) : ''}
-            onChangeText={(text) => {
-              const minutes = parseInt(text) || 0;
-              setCustomFields(prev => ({ ...prev, duration: minutes * 60000 }));
-            }}
-            placeholder="0"
-            keyboardType="numeric"
-          />
-        </View>
+        {/* Duration - Hidden for urgent priority */}
+        {customFields.priority !== 'urgent' && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Duration (minutes) - 0 = instant trigger</Text>
+            <TextInput
+              style={styles.input}
+              value={customFields.duration ? String(Math.floor(customFields.duration / 60000)) : ''}
+              onChangeText={(text) => {
+                const minutes = parseInt(text) || 0;
+                setCustomFields(prev => ({ ...prev, duration: minutes * 60000 }));
+              }}
+              placeholder="0"
+              keyboardType="numeric"
+            />
+          </View>
+        )}
+
+        {/* Emergency Mode Notice for Urgent Priority */}
+        {customFields.priority === 'urgent' && (
+          <View style={{ marginTop: 16, padding: 12, backgroundColor: '#F4433622', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F44336' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <MaterialIcons name="priority-high" size={16} color="#F44336" />
+              <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>Emergency Mode</Text>
+            </View>
+            <Text style={{ color: '#F44336', fontSize: 12 }}>
+              Urgent rules trigger immediately without cooldown or daily limits
+            </Text>
+          </View>
+        )}
         <TouchableOpacity
           style={[styles.createButton, { marginTop: 16 }]}
           onPress={() => {
