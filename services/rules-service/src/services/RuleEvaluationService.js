@@ -17,19 +17,57 @@ class RuleEvaluationService {
     this.producerConnected = false;
     
     this.priorityService = new RulePriorityService();
+    
+    // Anti-spam: track last evaluation time per device
+    this.lastEvaluationTime = new Map();
+    this.evaluationCooldown = 5000; // 5 seconds minimum between evaluations
   }
 
   // Đánh giá tất cả rules cho một device khi nhận dữ liệu sensor
   async evaluateRules(deviceId, sensorData, ownerId = null) {
     try {
-      console.log(`🔍 Evaluating rules for device: ${deviceId}`);
+      // Anti-spam: check if we evaluated this device recently
+      const now = Date.now();
+      const lastTime = this.lastEvaluationTime.get(deviceId);
+      if (lastTime && (now - lastTime) < this.evaluationCooldown) {
+        return;
+      }
+      
+      this.lastEvaluationTime.set(deviceId, now);
 
       // 🔎 1. Lấy danh sách rule đang hoạt động
-      const query = { deviceId, isActive: true };
-      if (ownerId && mongoose.Types.ObjectId.isValid(ownerId)) query.ownerId = new mongoose.Types.ObjectId(ownerId);
+      // If no ownerId, try to get from existing rules for this device
+      let finalOwnerId = ownerId;
+      
+      if (!finalOwnerId) {
+        const existingRule = await Rule.findOne({ deviceId, isActive: true });
+        if (existingRule) {
+          finalOwnerId = existingRule.ownerId;
+        } else {
+          return;
+        }
+      }
+      
+      const query = { 
+        deviceId, 
+        isActive: true,
+        ownerId: mongoose.Types.ObjectId.isValid(finalOwnerId) ? new mongoose.Types.ObjectId(finalOwnerId) : finalOwnerId
+      };
+      
       const rules = await Rule.find(query);
-      console.log(`📋 Found ${rules.length} active rules for device ${deviceId}`);
-      if (!rules.length) return;
+      
+      if (!rules.length) {
+        return;
+      }
+      
+      console.log(`📋 Rules:`, rules.map(r => ({ 
+        name: r.name, 
+        priority: r.priority, 
+        conditions: r.conditions.map(c => `${c.sensor} ${c.operator} ${c.value}`),
+        cooldown: r.cooldownPeriod,
+        dailyLimit: `${r.triggerCount}/${r.maxTriggersPerDay}`,
+        lastTriggered: r.lastTriggered
+      })));
   
       // ⚙️ 2. Đánh giá tất cả rule
       const triggeredRules = await Promise.all(
@@ -37,7 +75,6 @@ class RuleEvaluationService {
           try {
             return (await this.evaluateRule(rule, sensorData)) ? rule : null;
           } catch (err) {
-            console.error(`❌ Rule error [${rule.name}]:`, err);
             return null;
           }
         })
@@ -45,21 +82,28 @@ class RuleEvaluationService {
   
       // 📢 3. Xử lý kết quả theo priority
       if (triggeredRules.length > 1) {
-        console.log(`🔄 Multiple rules triggered (${triggeredRules.length}) - Processing by priority`);
+        console.log(`🔄 Multiple rules triggered: ${triggeredRules.map(r => r.name).join(', ')}`);
         
         // Sắp xếp theo priority: urgent → high → medium → low
         const sortedRules = this.priorityService.sortByPriority(triggeredRules);
-        console.log(`📊 Priority order: ${sortedRules.map(r => `${r.name}(${r.priority})`).join(' → ')}`);
         
         // Tạo consolidated notification
         const incident = this.priorityService.createIncidentReport(sortedRules, { ...sensorData, deviceId });
-        const consolidatedMessage = this.priorityService.buildConsolidatedNotification(incident, ownerId);
+        const consolidatedMessage = this.priorityService.buildConsolidatedNotification(incident, finalOwnerId);
         
         await this.sendToAlertsService(consolidatedMessage);
-        console.log(`📤 Consolidated alert sent (${triggeredRules.length} rules) - Priority: ${incident.severity}`);
+        console.log(`📤 Consolidated alert sent - Priority: ${incident.severity}`);
         
       } else if (triggeredRules.length === 1) {
-        console.log(`✅ Single rule triggered: ${triggeredRules[0].name} (${triggeredRules[0].priority})`);
+        console.log(`✅ Single rule triggered: ${triggeredRules[0].name}`);
+        
+        // Send notification for single rule
+        const rule = triggeredRules[0];
+        const incident = this.priorityService.createIncidentReport([rule], { ...sensorData, deviceId });
+        const singleRuleMessage = this.priorityService.buildConsolidatedNotification(incident, finalOwnerId);
+        
+        await this.sendToAlertsService(singleRuleMessage);
+        console.log(`📤 Single rule alert sent - Priority: ${incident.severity}`);
       }
     } catch (err) {
       console.error(`❌ evaluateRules() error for device ${deviceId}:`, err);
@@ -69,8 +113,7 @@ class RuleEvaluationService {
   // Đánh giá một rule cụ thể
   async evaluateRule(rule, sensorData) {
     try {
-      const { name, _id } = rule;
-      console.log(`🔍 Evaluating rule: ${name} (ID: ${_id})`);
+      const { name } = rule;
 
       // Special handling for gas leak - always trigger regardless of cooldown/limits
       const isGasLeak = rule.conditions.some(condition => 
@@ -79,18 +122,16 @@ class RuleEvaluationService {
       
       if (!isGasLeak) {
         // Check if rule can trigger (active, not paused, not in cooldown, not reached daily limit)
-        if (!(await rule.canTrigger())) {
-          console.log(`⏸️ Rule ${name} cannot trigger (paused/cooldown/daily limit)`);
+        const canTrigger = await rule.canTrigger();
+        if (!canTrigger) {
+          console.log(`⏸️ ${name}: cooldown/daily limit`);
           return false;
         }
-      } else {
-        console.log(`🚨 Gas leak rule - bypassing cooldown/limits for immediate alert`);
       }
 
       // Đánh giá tất cả conditions
       const conditionsMet = await this.evaluateConditions(rule.conditions, sensorData);
       if (!conditionsMet) {
-        console.log(`❌ Conditions not met for rule: ${name}`);
         // Reset duration tracking if conditions not met
         if (rule.duration > 0) {
           rule.resetDurationTracking();
@@ -103,20 +144,14 @@ class RuleEvaluationService {
       if (rule.duration > 0) {
         const durationMet = rule.checkDurationMet();
         if (!durationMet) {
-          console.log(`⏱️ Rule ${name} conditions met but duration not yet satisfied (${rule.duration}ms required)`);
           await rule.save(); // Save duration tracking state
           return false;
         }
-        console.log(`✅ Duration requirement met for rule: ${name}`);
       }
-
-      console.log(`✅ Conditions and duration met! Executing actions for: ${name}`);
       
       // Increment trigger count and update last triggered time (except for gas leak)
       if (!isGasLeak) {
         await rule.incrementTriggerCount();
-      } else {
-        console.log(`🚨 Gas leak - skipping trigger count increment for unlimited alerts`);
       }
       
       // Reset duration tracking after successful trigger
@@ -125,9 +160,7 @@ class RuleEvaluationService {
         await rule.save();
       }
       
-      await this.executeActions(rule, sensorData).catch(err =>
-        console.error(`❌ Action error for ${name}:`, err)
-      );
+      await this.executeActions(rule, sensorData).catch(err => {});
 
       return true;
     } catch (err) {
@@ -190,6 +223,12 @@ class RuleEvaluationService {
     
     console.log(`🔍 Sensor condition: ${sensor} ${operator} ${value}, actual: ${sensorValue}, result: ${result}`);
     console.log(`📊 Full sensor data:`, JSON.stringify(sensorData, null, 2));
+    
+    if (result) {
+      console.log(`✅ CONDITION MET: ${sensor} ${operator} ${value} (${sensorValue})`);
+    } else {
+      console.log(`❌ CONDITION NOT MET: ${sensor} ${operator} ${value} (${sensorValue})`);
+    }
     
     return result;
   }
@@ -475,18 +514,31 @@ class RuleEvaluationService {
   // Gửi message đến alerts-service qua Kafka
   async sendToAlertsService(message) {
     try {
+      console.log(`📤 Attempting to send to alerts-service:`, JSON.stringify(message, null, 2));
+      
       if (!this.producerConnected) {
+        console.log(`🔌 Connecting Kafka producer...`);
         await this.producer.connect();
         this.producerConnected = true;
         console.log('✅ Kafka producer connected');
       }
 
-      await this.producer.send({
+      const kafkaMessage = {
         topic: 'notification-requests',
-        messages: [{ key: message.userId || 'rules-service', value: JSON.stringify(message) }]
-      });
+        messages: [{ 
+          key: String(message.userId || 'rules-service'), 
+          value: JSON.stringify(message) 
+        }]
+      };
+      
+      console.log(`📤 Sending Kafka message:`, JSON.stringify(kafkaMessage, null, 2));
+      
+      const result = await this.producer.send(kafkaMessage);
+      console.log(`✅ Message sent successfully to alerts-service:`, result);
+      
     } catch (error) {
       console.error(`❌ Error sending to alerts-service:`, error);
+      console.error(`❌ Error details:`, error.message, error.stack);
     }
   }
 

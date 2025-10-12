@@ -168,12 +168,21 @@ class RulePriorityService {
       message = `Multiple alerts: ${summary}`;
     }
     
+    // Map severity to priority
+    const priorityMap = {
+      'critical': 'urgent',
+      'high': 'high', 
+      'medium': 'medium',
+      'low': 'low'
+    };
+
     return {
       userId,
       title,
       message,
-      priority: severity,
+      priority: priorityMap[severity] || 'medium',
       type: 'consolidated_alert',
+      category: severity === 'critical' ? 'security' : 'rule',
       metadata: {
         incidentId: incident.id,
         totalRules: rules.length,
