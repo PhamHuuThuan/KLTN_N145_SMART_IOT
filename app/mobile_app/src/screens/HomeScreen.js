@@ -8,6 +8,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../contexts/ThemeContext';
 import { useDeviceData } from '../hooks/useDeviceData';
 import { useOutletControl } from '../hooks/useOutletControl';
 import Header from '../components/Header';
@@ -23,6 +25,8 @@ const log = createLogger('Home');
 import CONFIG from '../constants/config';
 
 const HomeScreen = ({ navigation }) => {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const {
     deviceData,
     deviceDetail,
@@ -46,8 +50,8 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={CONFIG.COLORS.primary} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
       
       <Header onNotificationPress={() => navigation?.navigate('Notifications')} />
       
@@ -102,7 +106,7 @@ const HomeScreen = ({ navigation }) => {
               await fetchDeviceStatus(selectedDevice);
             } catch (error) {
               log.error('Error updating outlet settings', error?.message || error);
-              setFeedback({ visible: true, type: 'error', message: error.message || 'Failed to update outlet settings' });
+              setFeedback({ visible: true, type: 'error', message: error.message || t('devices.updateOutletSettingsFailed') });
             }
           }}
           loading={controlLoading}
@@ -116,16 +120,16 @@ const HomeScreen = ({ navigation }) => {
         />
 
         {deviceData?.lastUpdate && (
-          <View style={styles.section}>
-            <Text style={styles.lastUpdate}>
-              Last update: {new Date(deviceData.lastUpdate).toLocaleString()}
+          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.lastUpdate, { color: colors.textSecondary }]}>
+              {t('devices.lastUpdate')}: {new Date(deviceData.lastUpdate).toLocaleString()}
             </Text>
           </View>
         )}
 
         {error && (
-          <View style={styles.section}>
-            <Text style={styles.errorText}>Error: {error}</Text>
+          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.errorText, { color: colors.danger }]}>{t('common.error')}: {error}</Text>
           </View>
         )}
       </ScrollView>
@@ -143,14 +147,12 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ECF0F1',
   },
   content: {
     flex: 1,
     padding: 15,
   },
   section: {
-    backgroundColor: CONFIG.COLORS.white,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     padding: CONFIG.DIMENSIONS.cardPadding,
     marginBottom: 15,
@@ -162,13 +164,11 @@ const styles = StyleSheet.create({
   },
   lastUpdate: {
     fontSize: 12,
-    color: CONFIG.COLORS.gray,
     textAlign: 'center',
     fontStyle: 'italic',
   },
   errorText: {
     fontSize: 14,
-    color: CONFIG.COLORS.danger,
     textAlign: 'center',
   },
 });

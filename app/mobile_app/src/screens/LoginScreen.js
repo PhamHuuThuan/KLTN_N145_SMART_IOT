@@ -13,6 +13,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { createLogger } from '../utils/logger';
 import CONFIG from '../constants/config';
@@ -23,6 +24,7 @@ import ActionFeedback from '../components/ActionFeedback';
 const log = createLogger('Login');
 
 const LoginScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,12 +35,12 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ email và mật khẩu');
+      Alert.alert(t('common.error'), t('auth.emailRequired') + ' ' + t('auth.passwordRequired'));
       return;
     }
 
     if (!isValidEmail(email)) {
-      Alert.alert('Lỗi', 'Vui lòng nhập email hợp lệ');
+      Alert.alert(t('common.error'), t('auth.invalidEmail'));
       return;
     }
 
@@ -49,12 +51,12 @@ const LoginScreen = ({ navigation }) => {
       
       if (result.success) {
         log.info('Login successful');
-        setFeedback({ visible: true, type: 'success', message: 'Đăng nhập thành công' });
+        setFeedback({ visible: true, type: 'success', message: t('auth.loginSuccess') });
       } else {
-        setFeedback({ visible: true, type: 'error', message: result.error || 'Đăng nhập thất bại' });
+        setFeedback({ visible: true, type: 'error', message: result.error || t('auth.loginError') });
       }
     } catch (error) {
-      setFeedback({ visible: true, type: 'error', message: 'Có lỗi xảy ra khi đăng nhập' });
+      setFeedback({ visible: true, type: 'error', message: t('auth.loginError') });
     } finally {
       setIsLoading(false);
       setShowLoader(false);
@@ -77,10 +79,10 @@ const LoginScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>{t('common.email')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Nhập email của bạn"
+                placeholder={t('auth.email')}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -91,11 +93,11 @@ const LoginScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Mật khẩu</Text>
+              <Text style={styles.label}>{t('common.password')}</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder="Nhập mật khẩu"
+                  placeholder={t('auth.password')}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -125,23 +127,23 @@ const LoginScreen = ({ navigation }) => {
               {isLoading ? (
                 <ActivityIndicator color={CONFIG.COLORS.white} />
               ) : (
-                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+                <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
               )}
             </TouchableOpacity>
 
             <View style={styles.footer}>
-              <Text style={styles.footerText}>Chưa có tài khoản? </Text>
+              <Text style={styles.footerText}>{t('auth.dontHaveAccount')} </Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('Register')}
                 disabled={isLoading}
               >
-                <Text style={styles.linkText}>Đăng ký ngay</Text>
+                <Text style={styles.linkText}>{t('auth.signUp')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <OverlayLoader visible={showLoader} message="Đang đăng nhập..." onCancel={() => setShowLoader(false)} />
+      <OverlayLoader visible={showLoader} message={t('common.loading')} onCancel={() => setShowLoader(false)} />
       <ActionFeedback visible={feedback.visible} type={feedback.type} message={feedback.message} onHide={() => setFeedback({ ...feedback, visible: false })} />
     </View>
   );

@@ -2,12 +2,15 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
+import { useTheme } from '../contexts/ThemeContext';
 
 const SensorGrid = ({ deviceData }) => {
+  const { colors } = useTheme();
+  
   if (!deviceData) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.noDataText}>Device data not found</Text>
+      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>Device data not found</Text>
       </View>
     );
   }
@@ -15,8 +18,8 @@ const SensorGrid = ({ deviceData }) => {
   const { latestTelemetry } = deviceData;
   if (!latestTelemetry) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.noDataText}>No telemetry data</Text>
+      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>No telemetry data</Text>
       </View>
     );
   }
@@ -57,18 +60,18 @@ const SensorGrid = ({ deviceData }) => {
   ];
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>📊 Sensor Data</Text>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+      <Text style={[styles.title, { color: colors.primary }]}>📊 Sensor Data</Text>
       <View style={styles.grid}>
         {sensorData.map((sensor) => (
-          <View key={sensor.id} style={styles.sensorCard}>
+          <View key={sensor.id} style={[styles.sensorCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
             <View style={styles.sensorHeader}>
               <MaterialCommunityIcons 
                 name={sensor.icon} 
                 size={24} 
                 color={sensor.color} 
               />
-              <Text style={styles.sensorLabel}>{sensor.label}</Text>
+              <Text style={[styles.sensorLabel, { color: colors.textSecondary }]}>{sensor.label}</Text>
             </View>
             <Text style={[styles.sensorValue, { color: sensor.color }]}>
               {sensor.value}
@@ -82,7 +85,6 @@ const SensorGrid = ({ deviceData }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: CONFIG.COLORS.white,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     padding: CONFIG.DIMENSIONS.cardPadding,
     marginBottom: 15,
@@ -95,7 +97,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: CONFIG.COLORS.primary,
     marginBottom: 15,
     textAlign: 'center',
   },
@@ -106,13 +107,11 @@ const styles = StyleSheet.create({
   },
   sensorCard: {
     width: '48%',
-    backgroundColor: CONFIG.COLORS.light,
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: CONFIG.THEME.border,
   },
   sensorHeader: {
     flexDirection: 'row',
@@ -121,7 +120,6 @@ const styles = StyleSheet.create({
   },
   sensorLabel: {
     fontSize: 12,
-    color: CONFIG.COLORS.gray,
     marginLeft: 6,
     fontWeight: '500',
   },
@@ -132,7 +130,6 @@ const styles = StyleSheet.create({
   },
   noDataText: {
     fontSize: 14,
-    color: CONFIG.COLORS.gray,
     textAlign: 'center',
     fontStyle: 'italic',
   },

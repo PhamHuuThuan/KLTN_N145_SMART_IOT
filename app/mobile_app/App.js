@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, DeviceEventEmitter } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { NotificationProvider } from './src/contexts/NotificationContext';
 import { useNotificationContext } from './src/contexts/NotificationContext';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
+import './src/i18n'; // Initialize i18n
 import EmergencyScreen from './src/screens/EmergencyScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ChatScreen from './src/screens/ChatScreen';
@@ -20,7 +23,9 @@ import CONFIG from './src/constants/config';
 import apiService from './src/services/apiService';
 
 function AppContent() {
+  const { t } = useTranslation();
   const { isAuthenticated, isLoading } = useAuth();
+  const { colors } = useTheme();
   const { emergency, markAllAsRead, loadNotifications, dispatch } = useNotificationContext?.() || {};
   const [activeTab, setActiveTab] = useState('Home');
   const [currentScreen, setCurrentScreen] = useState('Main');
@@ -103,7 +108,7 @@ function AppContent() {
           case 'Home':
             return <HomeScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
           case 'Chat':
-            return <ChatScreen />;
+            return <ChatScreen onNavigateToHome={() => setActiveTab('Home')} />;
           case 'Rules':
             return <RulesScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
           case 'Settings':
@@ -181,9 +186,9 @@ function AppContent() {
       <MaterialCommunityIcons
         name={icon}
         size={24}
-        color={isActive ? CONFIG.THEME.primary : CONFIG.THEME.gray}
+        color={isActive ? colors.primary : colors.gray}
       />
-      <Text style={[styles.tabLabel, { color: isActive ? CONFIG.THEME.primary : CONFIG.THEME.gray }]}>
+      <Text style={[styles.tabLabel, { color: isActive ? colors.primary : colors.gray }]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -193,38 +198,38 @@ function AppContent() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={[styles.loadingText, { color: colors.primary }]}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>{renderScreen()}</View>
       
       {isAuthenticated && currentScreen === 'Main' && (
-        <View style={styles.tabBar}>
+        <View style={[styles.tabBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <TabButton
-            label="Home"
+            label={t('navigation.home')}
             icon="home"
             isActive={activeTab === 'Home'}
             onPress={() => setActiveTab('Home')}
           />
           <TabButton
-            label="Chat"
+            label={t('navigation.chat')}
             icon="chat"
             isActive={activeTab === 'Chat'}
             onPress={() => setActiveTab('Chat')}
           />
           <TabButton
-            label="Rules"
+            label={t('navigation.rules')}
             icon="tune"
             isActive={activeTab === 'Rules'}
             onPress={() => setActiveTab('Rules')}
           />
           <TabButton
-            label="Settings"
+            label={t('navigation.settings')}
             icon="cog"
             isActive={activeTab === 'Settings'}
             onPress={() => setActiveTab('Settings')}
@@ -249,11 +254,13 @@ function AppContent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <AppContent />
-        </NotificationProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -261,7 +268,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ECF0F1',
   },
   content: {
     flex: 1,
@@ -273,7 +279,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 18,
-    color: CONFIG.THEME.primary,
     fontWeight: '600',
   },
   tabBar: {
@@ -281,9 +286,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingVertical: 10,
-    backgroundColor: CONFIG.THEME.surface,
     borderTopWidth: 1,
-    borderTopColor: CONFIG.THEME.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.05,
