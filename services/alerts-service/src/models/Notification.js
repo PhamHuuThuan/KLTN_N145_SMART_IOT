@@ -19,7 +19,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion'],
+    enum: ['device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion', 'acknowledged', 'dismissed', 'false_alarm', 'consolidated_alert'],
     required: true
   },
   priority: {
@@ -63,7 +63,11 @@ const notificationSchema = new mongoose.Schema({
     sensorValue: { type: Number },
     threshold: { type: Number },
     ruleId: { type: String },
-    action: { type: String }
+    ruleName: { type: String },
+    action: { type: String },
+    source: { type: String },
+    responseType: { type: String },
+    responseTime: { type: Number }
   }
 }, {
   timestamps: true,
