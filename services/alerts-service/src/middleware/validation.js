@@ -35,7 +35,7 @@ const preferencesSchema = Joi.object({
   }),
   sms: Joi.object({
     enabled: Joi.boolean(),
-    phoneNumber: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).allow(''),
+    phoneNumber: Joi.string().pattern(/^(\+?[1-9]\d{1,14}|0\d{9,10})$/).allow(''),
     verified: Joi.boolean()
   }),
   fcm: Joi.object({
