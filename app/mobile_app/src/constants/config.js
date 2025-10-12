@@ -34,7 +34,8 @@ export const CONFIG = {
     gray: '#6C757D',
   },
 
-  // Simple, easy-on-the-eyes theme palette for consistent UI accents
+  // Theme colors will be provided by ThemeContext
+  // This is kept for backward compatibility
   THEME: {
     primary: '#2563EB',      // blue-600
     secondary: '#14B8A6',    // teal-500

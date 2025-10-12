@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import CONFIG from '../constants/config';
 import NotificationIcon from './NotificationIcon';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Header = ({ onNotificationPress }) => {
   const { isAuthenticated } = useAuth();
+  const { colors } = useTheme();
   const handleNotificationPress = () => {
     if (onNotificationPress) {
       onNotificationPress();
@@ -13,19 +15,19 @@ const Header = ({ onNotificationPress }) => {
   };
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor: colors.primary }]}>
       <Image
         source={require('../../assets/logo_app.png')}
         style={styles.logo}
         resizeMode="contain"
       />
-      <Text style={styles.headerTitle}>Smart IoT Kitchen</Text>
+      <Text style={[styles.headerTitle, { color: colors.white }]}>Smart IoT Kitchen</Text>
       <View style={styles.headerRight}>
         {isAuthenticated && (
           <NotificationIcon
             onPress={handleNotificationPress}
             size={24}
-            color={CONFIG.THEME.surface}
+            color={colors.white}
           />
         )}
       </View>
@@ -35,7 +37,6 @@ const Header = ({ onNotificationPress }) => {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: CONFIG.THEME.primary,
     paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
@@ -45,7 +46,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: CONFIG.THEME.surface,
     flex: 1,
     textAlign: 'center',
   },

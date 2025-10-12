@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
 import apiService from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
 
 const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetails, onDeviceAdded, onDeviceRemoved }) => {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newDeviceId, setNewDeviceId] = useState('');
@@ -18,47 +22,47 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
   const { user } = useAuth();
 
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, { backgroundColor: colors.surface }]}>
       <View style={styles.headerRow}>
-        <MaterialCommunityIcons name="devices" size={20} color={CONFIG.COLORS.primary} />
-        <Text style={styles.sectionTitle}>Connected Devices</Text>
+        <MaterialCommunityIcons name="devices" size={20} color={colors.primary} />
+        <Text style={[styles.sectionTitle, { color: colors.primary }]}>{t('devices.connectedDevices')}</Text>
       </View>
       {devices.length > 0 ? (
         <View style={styles.row}>
           <TouchableOpacity
-            style={styles.selectBox}
+            style={[styles.selectBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
             onPress={() => setShowPicker(true)}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="chevron-down" size={20} color={CONFIG.COLORS.gray} />
-            <Text style={styles.selectText} numberOfLines={1}>
-              {selectedDevice || 'Select a device'}
+            <MaterialCommunityIcons name="chevron-down" size={20} color={colors.gray} />
+            <Text style={[styles.selectText, { color: colors.text }]} numberOfLines={1}>
+              {selectedDevice || t('devices.selectDevice')}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.addButton}
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
             onPress={() => setShowAddModal(true)}
             activeOpacity={0.9}
           >
-            <MaterialCommunityIcons name="plus" size={18} color={CONFIG.THEME.surface} />
-            <Text style={styles.addText}>Add</Text>
+            <MaterialCommunityIcons name="plus" size={18} color={colors.white} />
+            <Text style={[styles.addText, { color: colors.white }]}>{t('common.add')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="devices" size={48} color={CONFIG.COLORS.gray} />
-          <Text style={styles.emptyStateTitle}>No Devices Connected</Text>
-          <Text style={styles.emptyStateSubtitle}>
-            Add your first smart kitchen device to get started
+          <MaterialCommunityIcons name="devices" size={48} color={colors.gray} />
+          <Text style={[styles.emptyStateTitle, { color: colors.text }]}>{t('devices.noDevicesConnected')}</Text>
+          <Text style={[styles.emptyStateSubtitle, { color: colors.textSecondary }]}>
+            {t('devices.addFirstDevice')}
           </Text>
           <TouchableOpacity
-            style={styles.emptyStateButton}
+            style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
             onPress={() => setShowAddModal(true)}
             activeOpacity={0.9}
           >
-            <MaterialCommunityIcons name="plus" size={20} color={CONFIG.THEME.surface} />
-            <Text style={styles.emptyStateButtonText}>Add Device</Text>
+            <MaterialCommunityIcons name="plus" size={20} color={colors.white} />
+            <Text style={[styles.emptyStateButtonText, { color: colors.white }]}>{t('devices.addDevice')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -70,11 +74,11 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
         onRequestClose={() => setShowPicker(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Device</Text>
+              <Text style={[styles.modalTitle, { color: colors.primary }]}>{t('devices.selectDevice')}</Text>
               <TouchableOpacity onPress={() => setShowPicker(false)}>
-                <MaterialCommunityIcons name="close" size={20} color={CONFIG.COLORS.gray} />
+                <MaterialCommunityIcons name="close" size={20} color={colors.gray} />
               </TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 260 }}>
@@ -83,30 +87,34 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                   <TouchableOpacity
                     style={[
                       styles.modalItem,
-                      selectedDevice === deviceId && styles.modalItemActive
+                      selectedDevice === deviceId && [styles.modalItemActive, { backgroundColor: colors.backgroundSecondary }]
                     ]}
                     onPress={() => {
                       setShowPicker(false);
                       onSelectDevice && onSelectDevice(deviceId);
                     }}
                   >
-                    <Text style={[styles.modalItemText, selectedDevice === deviceId && styles.modalItemTextActive]}>
+                    <Text style={[
+                      styles.modalItemText, 
+                      { color: colors.text },
+                      selectedDevice === deviceId && styles.modalItemTextActive
+                    ]}>
                       {deviceId}
                     </Text>
                     <TouchableOpacity
-                      style={styles.removeButton}
+                      style={[styles.removeButton, { backgroundColor: colors.backgroundSecondary }]}
                       activeOpacity={0.7}
                       onPress={() => {
                       Alert.alert(
-                        'Remove Device',
-                        `Are you sure you want to remove "${deviceId}" from your account? This will unassign the device but keep it in the system.`,
+                        t('devices.removeDevice'),
+                        t('devices.removeDeviceConfirm', { deviceId }),
                         [
                           {
-                            text: 'Cancel',
+                            text: t('common.cancel'),
                             style: 'cancel'
                           },
                           {
-                            text: 'Remove',
+                            text: t('devices.remove'),
                             style: 'destructive',
                             onPress: async () => {
                               try {
@@ -117,7 +125,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                                   setFeedback({
                                     visible: true,
                                     type: 'success',
-                                    message: 'Device removed successfully'
+                                    message: t('devices.deviceRemoved')
                                   });
                                   setShowPicker(false);
                                   
@@ -131,7 +139,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                                   setFeedback({
                                     visible: true,
                                     type: 'error',
-                                    message: result.message || 'Failed to remove device'
+                                    message: result.message || t('devices.deviceRemovedError')
                                   });
                                 }
                               } catch (error) {
@@ -139,7 +147,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                                 setFeedback({
                                   visible: true,
                                   type: 'error',
-                                  message: error.message || 'Failed to remove device'
+                                    message: error.message || t('devices.deviceRemovedError')
                                 });
                               } finally {
                                 setShowLoader(false);
@@ -150,7 +158,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                       );
                     }}
                   >
-                    <MaterialCommunityIcons name="delete-outline" size={18} color={CONFIG.THEME.danger} />
+                    <MaterialCommunityIcons name="delete-outline" size={18} color={colors.danger} />
                   </TouchableOpacity>
                   </TouchableOpacity>
                 </View>
@@ -168,54 +176,56 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
         onRequestClose={() => setShowAddModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Device</Text>
+              <Text style={[styles.modalTitle, { color: colors.primary }]}>{t('devices.addDevice')}</Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <MaterialCommunityIcons name="close" size={20} color={CONFIG.COLORS.gray} />
+                <MaterialCommunityIcons name="close" size={20} color={colors.gray} />
               </TouchableOpacity>
             </View>
             <View style={styles.modalContent}>
-              <Text style={styles.inputLabel}>Device ID / Pairing Code *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('devices.deviceId')}</Text>
               <TextInput
-                style={styles.textInput}
-                placeholder="e.g., KITCHEN-ESP32-001"
+                style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }]}
+                placeholder={t('devices.deviceIdPlaceholder')}
+                placeholderTextColor={colors.textSecondary}
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={newDeviceId}
                 onChangeText={setNewDeviceId}
                 maxLength={50}
               />
-              <Text style={styles.inputHint}>
-                Enter the unique identifier for your device
+              <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
+                {t('devices.deviceIdHint')}
               </Text>
               
-              <Text style={styles.inputLabel}>Device Name (optional)</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('devices.deviceName')}</Text>
               <TextInput
-                style={styles.textInput}
-                placeholder="My Kitchen Controller"
+                style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }]}
+                placeholder={t('devices.deviceNamePlaceholder')}
+                placeholderTextColor={colors.textSecondary}
                 value={newDeviceName}
                 onChangeText={setNewDeviceName}
                 maxLength={50}
               />
-              <Text style={styles.inputHint}>
-                Give your device a friendly name
+              <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
+                {t('devices.deviceNameHint')}
               </Text>
               <TouchableOpacity
-                style={[styles.addConfirmButton, submitting && { opacity: 0.7 }]}
+                style={[styles.addConfirmButton, { backgroundColor: colors.primary }, submitting && { opacity: 0.7 }]}
                 onPress={async () => {
                   if (!newDeviceId?.trim()) {
-                    Alert.alert('Validation Error', 'Please enter a device ID');
+                    Alert.alert(t('common.error'), t('devices.deviceIdRequired'));
                     return;
                   }
                   
                   if (newDeviceId.trim().length < 3) {
-                    Alert.alert('Validation Error', 'Device ID must be at least 3 characters long');
+                    Alert.alert(t('common.error'), t('devices.deviceIdTooShort'));
                     return;
                   }
                   
                   if (!user?.id) {
-                    Alert.alert('Authentication Required', 'Please login to add devices');
+                    Alert.alert(t('auth.authenticationRequired'), t('devices.loginRequired'));
                     return;
                   }
                   
@@ -235,7 +245,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                       setFeedback({ 
                         visible: true, 
                         type: 'success', 
-                        message: 'Device added successfully!' 
+                        message: t('devices.deviceAdded') 
                       });
                       setShowAddModal(false);
                       setNewDeviceId('');
@@ -246,19 +256,19 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                       setFeedback({ 
                         visible: true, 
                         type: 'error', 
-                        message: resp?.data?.message || 'Could not add device' 
+                        message: resp?.data?.message || t('devices.deviceAddError') 
                       });
                     }
                   } catch (e) {
                     console.error('Add device error:', e);
-                    let errorMessage = 'Failed to add device';
+                    let errorMessage = t('devices.deviceAddError');
                     
                     if (e.response?.status === 400) {
-                      errorMessage = 'Invalid device ID or device already exists';
+                      errorMessage = t('devices.deviceIdInvalid');
                     } else if (e.response?.status === 401) {
-                      errorMessage = 'Authentication failed. Please login again';
+                      errorMessage = t('auth.authenticationFailed');
                     } else if (e.response?.status === 500) {
-                      errorMessage = 'Server error. Please try again later';
+                      errorMessage = t('errors.serverError');
                     }
                     
                     setFeedback({ 
@@ -275,11 +285,11 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                 activeOpacity={0.9}
               >
                 {submitting ? (
-                  <ActivityIndicator color={CONFIG.THEME.surface} />
+                  <ActivityIndicator color={colors.white} />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="content-save" size={18} color={CONFIG.THEME.surface} />
-                    <Text style={styles.addConfirmText}>Add Device</Text>
+                    <MaterialCommunityIcons name="content-save" size={18} color={colors.white} />
+                    <Text style={[styles.addConfirmText, { color: colors.white }]}>{t('devices.addDevice')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -291,7 +301,7 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
       {/* Global overlays */}
       <OverlayLoader
         visible={showLoader}
-        message="Adding device..."
+        message={t('devices.addingDevice')}
         onCancel={() => {
           setShowLoader(false);
           setSubmitting(false);
@@ -309,7 +319,6 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
 
 const styles = StyleSheet.create({
   section: {
-    backgroundColor: CONFIG.COLORS.white,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     padding: CONFIG.DIMENSIONS.cardPadding,
     marginBottom: 15,
@@ -322,7 +331,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: CONFIG.COLORS.primary,
     marginBottom: 0,
   },
   headerRow: {
@@ -341,9 +349,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: CONFIG.COLORS.light,
     borderWidth: 1,
-    borderColor: CONFIG.THEME.border,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -351,32 +357,27 @@ const styles = StyleSheet.create({
   selectText: {
     flex: 1,
     fontSize: 14,
-    color: CONFIG.COLORS.dark,
     fontWeight: '600',
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: CONFIG.THEME.primary,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 10,
   },
   addText: {
-    color: CONFIG.THEME.surface,
     fontWeight: '700',
     fontSize: 12,
   },
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: CONFIG.COLORS.dark,
     marginBottom: 6,
   },
   inputHint: {
     fontSize: 12,
-    color: CONFIG.COLORS.gray,
     marginBottom: 12,
     lineHeight: 16,
   },
@@ -387,12 +388,9 @@ const styles = StyleSheet.create({
   },
   textInput: {
     borderWidth: 1,
-    borderColor: CONFIG.THEME.border,
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    color: CONFIG.COLORS.dark,
-    backgroundColor: CONFIG.COLORS.light,
   },
   addConfirmButton: {
     marginTop: 6,
@@ -400,12 +398,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: CONFIG.THEME.primary,
     paddingVertical: 12,
     borderRadius: 10,
   },
   addConfirmText: {
-    color: CONFIG.THEME.surface,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -417,14 +413,12 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: CONFIG.COLORS.dark,
     marginTop: 12,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyStateSubtitle: {
     fontSize: 14,
-    color: CONFIG.COLORS.gray,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
@@ -433,7 +427,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: CONFIG.THEME.primary,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -444,7 +437,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   emptyStateButtonText: {
-    color: CONFIG.THEME.surface,
     fontWeight: '700',
     fontSize: 16,
   },
@@ -458,10 +450,8 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: CONFIG.THEME.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: CONFIG.THEME.border,
     padding: 10,
   },
   modalHeader: {
@@ -473,7 +463,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: CONFIG.COLORS.primary,
   },
   modalItem: {
     flexDirection: 'row',
@@ -485,11 +474,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalItemActive: {
-    backgroundColor: CONFIG.COLORS.light,
+    // backgroundColor handled by theme
   },
   modalItemText: {
     fontSize: 14,
-    color: CONFIG.COLORS.dark,
     flex: 1,
   },
   modalItemTextActive: {
@@ -503,7 +491,6 @@ const styles = StyleSheet.create({
   removeButton: {
     padding: 6,
     borderRadius: 6,
-    backgroundColor: CONFIG.COLORS.light,
     borderWidth: 1,
     borderColor: CONFIG.THEME.danger + '30', // 30% opacity
     shadowColor: CONFIG.THEME.danger,

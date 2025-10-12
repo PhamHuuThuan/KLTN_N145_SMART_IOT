@@ -8,9 +8,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotificationContext } from '../contexts/NotificationContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const NotificationItem = ({ notification, onPress }) => {
   const { markAsRead, deleteNotification } = useNotificationContext();
+  const { colors } = useTheme();
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -108,7 +110,8 @@ const NotificationItem = ({ notification, onPress }) => {
     <TouchableOpacity
       style={[
         styles.container,
-        !notification.isRead && styles.unreadContainer,
+        { backgroundColor: colors.surface },
+        !notification.isRead && [styles.unreadContainer, { borderLeftColor: colors.primary }],
       ]}
       onPress={() => {
         handleMarkAsRead();
@@ -134,10 +137,10 @@ const NotificationItem = ({ notification, onPress }) => {
             )}
           </View>
           <View style={styles.headerText}>
-            <Text style={[styles.title, !notification.isRead && styles.unreadTitle]}>
+            <Text style={[styles.title, { color: colors.text }, !notification.isRead && styles.unreadTitle]}>
               {notification.title}
             </Text>
-            <Text style={styles.time}>
+            <Text style={[styles.time, { color: colors.textSecondary }]}>
               {formatTime(notification.createdAt)}
             </Text>
           </View>
@@ -146,31 +149,31 @@ const NotificationItem = ({ notification, onPress }) => {
             onPress={handleDelete}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close-outline" size={20} color="#8E8E93" />
+            <Ionicons name="close-outline" size={20} color={colors.gray} />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.message}>{notification.message || notification.body || 'No message'}</Text>
+        <Text style={[styles.message, { color: colors.text }]}>{notification.message || notification.body || 'No message'}</Text>
 
         {notification.metadata && Object.keys(notification.metadata).length > 0 && (
-          <View style={styles.metadata}>
+          <View style={[styles.metadata, { backgroundColor: colors.backgroundSecondary }]}>
             {notification.metadata.deviceName && (
-              <Text style={styles.metadataText}>
+              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
                 Thiết bị: {notification.metadata.deviceName}
               </Text>
             )}
             {notification.metadata.sensorType && (
-              <Text style={styles.metadataText}>
+              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
                 Loại: {notification.metadata.sensorType}
               </Text>
             )}
             {notification.metadata.sensorValue !== undefined && (
-              <Text style={styles.metadataText}>
+              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
                 Giá trị: {notification.metadata.sensorValue}
               </Text>
             )}
             {notification.metadata.threshold !== undefined && (
-              <Text style={styles.metadataText}>
+              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
                 Ngưỡng: {notification.metadata.threshold}
               </Text>
             )}
@@ -198,7 +201,6 @@ const NotificationItem = ({ notification, onPress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
     marginVertical: 4,
     borderRadius: 12,
@@ -213,7 +215,6 @@ const styles = StyleSheet.create({
   },
   unreadContainer: {
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
   },
   content: {
     padding: 16,
@@ -242,7 +243,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1C1C1E',
     marginBottom: 4,
   },
   unreadTitle: {
@@ -250,26 +250,22 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 12,
-    color: '#8E8E93',
   },
   deleteButton: {
     padding: 4,
   },
   message: {
     fontSize: 14,
-    color: '#3A3A3C',
     lineHeight: 20,
     marginBottom: 12,
   },
   metadata: {
-    backgroundColor: '#F2F2F7',
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
   },
   metadataText: {
     fontSize: 12,
-    color: '#6D6D70',
     marginBottom: 4,
   },
   footer: {

@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
+import { useTheme } from '../contexts/ThemeContext';
 
 const ChatInput = ({ onSend, onVoiceToggle, listening = false, value, onChangeText, disabled = false, placeholder = 'Type a message' }) => {
+  const { colors } = useTheme();
   const [innerText, setInnerText] = useState('');
   const text = value !== undefined ? value : innerText;
   const setText = onChangeText || setInnerText;
@@ -16,14 +18,14 @@ const ChatInput = ({ onSend, onVoiceToggle, listening = false, value, onChangeTe
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.inputWrapper}>
+    <View style={[styles.container, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+      <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.surface }]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.surface, color: colors.text }]}
           value={text}
           onChangeText={setText}
           placeholder={placeholder}
-          placeholderTextColor={CONFIG.COLORS.gray}
+          placeholderTextColor={colors.textSecondary}
           editable={!disabled}
           multiline
         />
@@ -37,13 +39,13 @@ const ChatInput = ({ onSend, onVoiceToggle, listening = false, value, onChangeTe
             <Ionicons
               name={listening ? 'mic' : 'mic-outline'}
               size={20}
-              color={listening ? CONFIG.THEME.primary : CONFIG.COLORS.gray}
+              color={listening ? colors.primary : colors.gray}
             />
           </TouchableOpacity>
         </View>
       </View>
       <TouchableOpacity style={styles.sendIconWrap} onPress={handleSend} disabled={disabled || !text.trim()}>
-        <Ionicons name="send" size={22} color={(disabled || !text.trim()) ? CONFIG.THEME.gray : CONFIG.THEME.primary} />
+        <Ionicons name="send" size={22} color={(disabled || !text.trim()) ? colors.gray : colors.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -55,9 +57,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     padding: 10,
     gap: 8,
-    backgroundColor: CONFIG.COLORS.white,
     borderTopWidth: 1,
-    borderTopColor: CONFIG.THEME.border,
   },
   input: {
     flex: 1,
@@ -65,7 +65,6 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: CONFIG.COLORS.white,
     borderRadius: 12,
   },
   inputWrapper: {
@@ -73,9 +72,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     borderWidth: 1,
-    borderColor: CONFIG.THEME.border,
     borderRadius: 16,
-    backgroundColor: CONFIG.COLORS.white,
   },
   sendIconWrap: {
     padding: 8,
