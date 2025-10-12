@@ -1,69 +1,5 @@
 import mongoose from 'mongoose';
 
-// Condition schema for rule conditions
-const conditionSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    required: true,
-    enum: ['sensor', 'time']
-  },
-  sensor: {
-    type: String,
-    enum: ['temperature', 'humidity', 'gas_ppm', 'smoke']
-  },
-  operator: {
-    type: String,
-    enum: ['>', '<', '>=', '<=', '==', '!=', 'between']
-  },
-  value: {
-    type: mongoose.Schema.Types.Mixed
-  },
-  timeCondition: {
-    hour: { type: Number, min: 0, max: 23 },
-    minute: { type: Number, min: 0, max: 59 },
-    days: [{ type: String, enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] }]
-  },
-  deviceId: String,
-  outletId: {
-    type: String,
-    enum: ['o1', 'o2', 'o3', 'o4', 'o5']
-  },
-  deviceStatus: {
-    type: String,
-    enum: ['online', 'offline', 'maintenance', 'error']
-  }
-}, { _id: false });
-
-// Action schema for rule actions
-const actionSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    required: true,
-    enum: ['send_notification', 'send_alert']
-  },
-  deviceId: String,
-  outletId: {
-    type: String,
-    enum: ['o1', 'o2', 'o3', 'o4', 'o5']
-  },
-  outletType: {
-    type: String,
-    enum: ['kitchen', 'safety']
-  },
-  status: Boolean,
-  message: String,
-  priority: {
-    type: String,
-    enum: ['low', 'medium', 'high', 'critical'],
-    default: 'medium'
-  },
-  delay: {
-    type: Number,
-    default: 0
-  }
-}, { _id: false });
-
-// Main rule schema
 const ruleSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -86,52 +22,205 @@ const ruleSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  category: {
-    type: String,
-    required: true,
-    enum: ['safety', 'automation', 'energy_saving', 'comfort', 'maintenance'],
-    default: 'automation'
-  },
   priority: {
-    type: Number,
-    min: 1,
-    max: 10,
-    default: 5
+    type: String,
+    enum: ['low', 'medium', 'high', 'urgent'],
+    default: 'medium'
   },
   isActive: {
     type: Boolean,
     default: true
   },
-  conditions: [conditionSchema],
-  actions: [actionSchema],
+  conditions: [{
+    type: {
+      type: String,
+      required: true,
+      enum: ['sensor']
+    },
+    sensor: {
+      type: String,
+      enum: ['temperature', 'humidity', 'gas_ppm', 'smoke']
+    },
+    operator: {
+      type: String,
+      enum: ['>', '<', '>=', '<=', '==', '!=', 'between']
+    },
+    value: mongoose.Schema.Types.Mixed,
+  }],
+  actions: [{
+    type: {
+      type: String,
+      required: true,
+      enum: ['send_notification', 'send_alert']
+    },
+    message: String
+  }],
+  pausedUntil: {
+    type: Date,
+    default: null
+  },
   cooldownPeriod: {
     type: Number,
-    default: 30000
+    default: 300000,
+    min: 0,
+    max: 86400000  // Max 24 hours
   },
-  lastTriggeredAt: {
-    type: Date
+  maxTriggersPerDay: {
+    type: Number,
+    default: 10,
+    min: 1,
+    max: 1000  // Max 1000 triggers per day
+  },
+  duration: {
+    type: Number,
+    default: 0,  // 0 = trigger ngay lập tức
+    min: 0,
+    max: 3600000  // Max 1 hour (ms)
   },
   triggerCount: {
     type: Number,
     default: 0
   },
-  settings: {
-    autoDisable: {
-      type: Boolean,
-      default: false
-    },
-    maxTriggersPerDay: {
-      type: Number,
-      default: 100
-    },
-    notificationEnabled: {
-      type: Boolean,
-      default: true
-    }
+  lastTriggered: {
+    type: Date,
+    default: null
+  },
+  dailyResetDate: {
+    type: Date,
+    default: null
+  },
+  durationStartTime: {
+    type: Date,
+    default: null
+  },
+  durationMet: {
+    type: Boolean,
+    default: false
   }
-}, {
-  timestamps: true
 });
+
+const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'];
+
+// Indexes
+ruleSchema.index({ ownerId: 1, deviceId: 1 });
+ruleSchema.index({ isActive: 1 });
+ruleSchema.index({ pausedUntil: 1 });
+ruleSchema.index({ lastTriggered: 1 });
+ruleSchema.index({ dailyResetDate: 1 });
+
+// sort by priority
+const sortByPriority = (a, b) =>
+  PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
+
+// Statics
+ruleSchema.statics.findActiveRulesForDevice = async function (deviceId, ownerId = null) {
+  const query = { deviceId, isActive: true, ...(ownerId && { ownerId }) };
+  const rules = await this.find(query).sort({ createdAt: 1 });
+  return rules.sort(sortByPriority);
+};
+
+// find by owner
+ruleSchema.statics.findByOwner = async function (ownerId, options = {}) {
+  const { deviceId, category, isActive, limit = 50, page = 1 } = options;
+  const query = { ownerId, ...(deviceId && { deviceId }), ...(category && { category }), ...(isActive !== undefined && { isActive }) };
+
+  const rules = await this.find(query)
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .skip((page - 1) * limit);
+
+  return rules.sort(sortByPriority);
+};
+
+// Methods
+ruleSchema.methods.isInCooldown = function() {
+  if (!this.lastTriggered || !this.cooldownPeriod) return false;
+  const now = new Date();
+  const cooldownEnd = new Date(this.lastTriggered.getTime() + this.cooldownPeriod);
+  return now < cooldownEnd;
+};
+
+ruleSchema.methods.hasReachedDailyLimit = async function() {
+  if (!this.maxTriggersPerDay) return false;
+  
+  // Reset daily counter if needed
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  if (!this.dailyResetDate || this.dailyResetDate < today) {
+    this.triggerCount = 0;
+    this.dailyResetDate = today;
+    await this.save();
+    return false;
+  }
+  
+  return this.triggerCount >= this.maxTriggersPerDay;
+};
+
+ruleSchema.methods.incrementTriggerCount = function() {
+  this.triggerCount++;
+  this.lastTriggered = new Date();
+  return this.save();
+};
+
+ruleSchema.methods.resetTriggerState = function() {
+  this.triggerCount = 0;
+  this.lastTriggered = null;
+  this.dailyResetDate = null;
+  return this.save();
+};
+
+ruleSchema.methods.canTrigger = async function() {
+  // Check if rule is active
+  if (!this.isActive) return false;
+  
+  // Check if rule is paused
+  if (this.pausedUntil && new Date() < this.pausedUntil) return false;
+  
+  // Check cooldown
+  if (this.isInCooldown()) return false;
+  
+  // Check daily limit
+  if (await this.hasReachedDailyLimit()) return false;
+  
+  return true;
+};
+
+// Start duration tracking
+ruleSchema.methods.startDurationTracking = function() {
+  if (this.duration > 0 && !this.durationStartTime) {
+    this.durationStartTime = new Date();
+    this.durationMet = false;
+    console.log(`⏱️ Started duration tracking for ${this.name}: ${this.duration}ms`);
+  }
+};
+
+// Check if duration has been met
+ruleSchema.methods.checkDurationMet = function() {
+  if (this.duration === 0) return true; // No duration required
+  
+  if (!this.durationStartTime) {
+    this.startDurationTracking();
+    return false;
+  }
+
+  const elapsed = Date.now() - this.durationStartTime.getTime();
+  const met = elapsed >= this.duration;
+  
+  if (met && !this.durationMet) {
+    this.durationMet = true;
+    console.log(`✅ Duration met for ${this.name}: ${elapsed}ms >= ${this.duration}ms`);
+  }
+  
+  return met;
+};
+
+// Reset duration tracking
+ruleSchema.methods.resetDurationTracking = function() {
+  this.durationStartTime = null;
+  this.durationMet = false;
+  console.log(`🔄 Reset duration tracking for ${this.name}`);
+};
 
 const Rule = mongoose.models.Rule || mongoose.model('Rule', ruleSchema);
 
