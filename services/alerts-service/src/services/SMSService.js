@@ -1,25 +1,22 @@
-import twilio from 'twilio';
+import axios from 'axios';
 import logger from '../utils/logger.js';
 
 class SMSService {
   constructor() {
-    this.client = null;
-    this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
+    this.apiKey = process.env.SPEEDSMS_API_KEY;
+    this.deviceId = process.env.SPEEDSMS_DEVICE_ID;
+    this.apiUrl = process.env.SPEEDSMS_API_URL || 'https://api.speedsms.vn/index.php/sms/send';
     this.initialized = false;
     this._initialize();
   }
 
   _initialize() {
     try {
-      if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-        this.client = twilio(
-          process.env.TWILIO_ACCOUNT_SID,
-          process.env.TWILIO_AUTH_TOKEN
-        );
+      if (this.apiKey) {
         this.initialized = true;
-        logger.info('📱 SMS service initialized successfully');
+        logger.info('📱 SpeedSMS service initialized successfully');
       } else {
-        logger.info('📱 SMS service disabled - Twilio credentials not provided');
+        logger.info('📱 SMS service disabled - SpeedSMS API key not provided');
       }
     } catch (error) {
       logger.error('Failed to initialize SMS service:', error);
@@ -34,28 +31,76 @@ class SMSService {
    */
   async send(to, message, metadata = {}) {
     try {
-      if (!this.initialized || !this.client) {
+      if (!this.initialized) {
         logger.warn('SMS service not initialized, skipping SMS send');
         return null;
       }
 
       const formattedMessage = this._formatMessage(message, metadata);
+      const phoneNumber = this._formatPhoneNumber(to);
       
-      const result = await this.client.messages.create({
-        body: formattedMessage,
-        from: this.fromNumber,
-        to: this._formatPhoneNumber(to)
+      // SpeedSMS API expects JSON data with Basic Auth (official NodeJS format)
+      const requestData = {
+        to: [phoneNumber],
+        content: formattedMessage,
+        sms_type: 5,
+        sender: this.deviceId,
+      };
+
+      // Create Basic Auth header
+      const auth = Buffer.from(`${this.apiKey}:x`).toString('base64');
+
+      logger.info('Sending SMS request to SpeedSMS', {
+        url: this.apiUrl,
+        to: phoneNumber,
+        messageLength: formattedMessage.length,
+        sender: requestData.sender,
+        smsType: requestData.sms_type
       });
 
-      logger.info('SMS sent successfully', { 
-        sid: result.sid, 
-        to, 
-        status: result.status 
+      const response = await axios.post(this.apiUrl, requestData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${auth}`,
+          'User-Agent': 'Smart-IoT-Kitchen/1.0'
+        },
+        timeout: 30000
       });
-      
-      return result;
+
+      if (response.data && response.data.status === 'success') {
+        logger.info('SMS sent successfully', { 
+          transactionId: response.data.tranId, 
+          to: phoneNumber,
+          status: response.data.status
+        });
+        
+        return {
+          success: true,
+          transactionId: response.data.tranId,
+          status: response.data.status,
+          to: phoneNumber
+        };
+      } else {
+        logger.error('SpeedSMS API error response', {
+          status: response.status,
+          statusText: response.statusText,
+          data: response.data,
+          headers: response.headers
+        });
+        throw new Error(response.data?.message || `Failed to send SMS: ${response.status} ${response.statusText}`);
+      }
     } catch (error) {
-      logger.error('Error sending SMS:', error);
+      logger.error('Error sending SMS:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
+        }
+      });
       throw error;
     }
   }
@@ -141,21 +186,26 @@ class SMSService {
     try {
       const formattedNumber = this._formatPhoneNumber(phoneNumber);
       
-      // Use Twilio Lookup API to verify the number
-      const result = await this.client.lookups.v1.phoneNumbers(formattedNumber).fetch();
+      // SpeedSMS doesn't have a lookup API, so we'll just validate the format
+      const isValidFormat = /^(\+84|84|0)[1-9]\d{8,9}$/.test(formattedNumber);
       
-      logger.info('Phone number verified', { 
-        phoneNumber: formattedNumber,
-        countryCode: result.countryCode,
-        nationalFormat: result.nationalFormat
-      });
-      
-      return {
-        valid: true,
-        formatted: result.phoneNumber,
-        countryCode: result.countryCode,
-        nationalFormat: result.nationalFormat
-      };
+      if (isValidFormat) {
+        logger.info('Phone number format validated', { 
+          phoneNumber: formattedNumber
+        });
+        
+        return {
+          valid: true,
+          formatted: formattedNumber,
+          countryCode: '+84',
+          nationalFormat: formattedNumber
+        };
+      } else {
+        return {
+          valid: false,
+          error: 'Invalid phone number format'
+        };
+      }
     } catch (error) {
       logger.error('Error verifying phone number:', error);
       return {
@@ -172,13 +222,13 @@ class SMSService {
    */
   async sendVerificationCode(phoneNumber, code) {
     try {
-      const message = `Mã xác thực Smart IoT Kitchen: ${code}\nMã có hiệu lực trong 5 phút.`;
+      const message = `Ma xac thuc Smart IoT Kitchen: ${code}. Ma co hieu luc trong 5 phut.`;
       
       const result = await this.send(phoneNumber, message);
       
       logger.info('Verification code sent', { 
         phoneNumber, 
-        sid: result.sid 
+        transactionId: result.transactionId 
       });
       
       return result;
@@ -190,20 +240,18 @@ class SMSService {
 
   /**
    * Check SMS delivery status
-   * @param {string} messageSid - Twilio message SID
+   * @param {string} transactionId - SpeedSMS transaction ID
    */
-  async checkDeliveryStatus(messageSid) {
+  async checkDeliveryStatus(transactionId) {
     try {
-      const message = await this.client.messages(messageSid).fetch();
+      // SpeedSMS uses webhook for delivery status, not direct API call
+      // This method is kept for compatibility but will return basic info
+      logger.info('Checking delivery status via webhook', { transactionId });
       
       return {
-        sid: message.sid,
-        status: message.status,
-        errorCode: message.errorCode,
-        errorMessage: message.errorMessage,
-        dateCreated: message.dateCreated,
-        dateSent: message.dateSent,
-        dateUpdated: message.dateUpdated
+        transactionId: transactionId,
+        status: 'pending', // Status will be updated via webhook
+        message: 'Delivery status will be updated via webhook'
       };
     } catch (error) {
       logger.error('Error checking SMS delivery status:', error);
@@ -217,23 +265,16 @@ class SMSService {
    */
   async getUsageStats(options = {}) {
     try {
-      const { startDate, endDate, limit = 100 } = options;
+      // SpeedSMS balance check would need separate endpoint
+      // For now, return basic info
+      logger.info('Getting SMS usage stats', { apiKey: this.apiKey ? 'provided' : 'missing' });
       
-      const messages = await this.client.messages.list({
-        dateSentAfter: startDate,
-        dateSentBefore: endDate,
-        limit
-      });
-      
-      const stats = {
-        total: messages.length,
-        sent: messages.filter(m => m.status === 'sent').length,
-        delivered: messages.filter(m => m.status === 'delivered').length,
-        failed: messages.filter(m => m.status === 'failed').length,
-        undelivered: messages.filter(m => m.status === 'undelivered').length
+      return {
+        balance: 'unknown', // Would need separate API call
+        currency: 'VND',
+        lastUpdated: new Date().toISOString(),
+        message: 'Balance information requires separate API endpoint'
       };
-      
-      return stats;
     } catch (error) {
       logger.error('Error getting SMS usage stats:', error);
       throw error;

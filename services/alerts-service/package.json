@@ -33,8 +33,7 @@
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.1",
     "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
-    "twilio": "^4.19.0"
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "jest": "^29.7.0",
