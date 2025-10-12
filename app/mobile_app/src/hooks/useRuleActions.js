@@ -48,8 +48,9 @@ export const useRuleActions = (loadRules) => {
       setCreatingRule(true);
       setCreatingTemplateId(template.id);
       
-      if (!user?.id) {
-        console.error('User ID is required to create a rule');
+      const userId = user?.id || user?.userId || user?._id;
+      if (!userId) {
+        console.error('User ID is required to create a rule. User object:', user);
         return;
       }
       if (!selectedDevice) {
@@ -61,7 +62,7 @@ export const useRuleActions = (loadRules) => {
 
       const response = await rulesService.createRuleFromTemplate(
         template.id,
-        user.id,
+        userId,
         selectedDevice,
         overrides
       );
