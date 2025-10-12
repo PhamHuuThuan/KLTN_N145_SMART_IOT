@@ -5,7 +5,6 @@ class SMSService {
   constructor() {
     this.apiKey = process.env.SPEEDSMS_API_KEY;
     this.deviceId = process.env.SPEEDSMS_DEVICE_ID;
-    this.senderName = process.env.SPEEDSMS_SENDER_NAME || '';
     this.apiUrl = process.env.SPEEDSMS_API_URL || 'https://api.speedsms.vn/index.php/sms/send';
     this.initialized = false;
     this._initialize();
@@ -44,8 +43,7 @@ class SMSService {
       const requestData = {
         to: [phoneNumber],
         content: formattedMessage,
-        sms_type: 5, // 1 = SMS thường
-        device_id: this.deviceId,
+        sms_type: 5,
         sender: this.deviceId,
       };
 
@@ -59,8 +57,6 @@ class SMSService {
         sender: requestData.sender,
         smsType: requestData.sms_type
       });
-      
-      console.log('requestData', requestData);
 
       const response = await axios.post(this.apiUrl, requestData, {
         headers: {
