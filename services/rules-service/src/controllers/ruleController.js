@@ -1,43 +1,66 @@
 import Rule from '../models/Rule.js';
-import mongoose from 'mongoose';
+import { Kafka } from 'kafkajs';
+
+// Kafka producer for sending user responses
+const kafka = new Kafka({
+  clientId: 'rules-service-controller',
+  brokers: [process.env.KAFKA_BROKERS || 'localhost:9092']
+});
+const producer = kafka.producer();
+
+// Initialize producer
+let producerConnected = false;
+const initProducer = async () => {
+  if (!producerConnected) {
+    await producer.connect();
+    producerConnected = true;
+    console.log('✅ Rules Controller Kafka producer connected');
+  }
+};
 
 // Get all rules for a user
 export const getAllRules = async (req, res) => {
   try {
-    const { ownerId, deviceId, category, isActive, limit = 50, page = 1 } = req.query;
-    
-    let query = {};
-    if (ownerId) {
-      query.ownerId = mongoose.Types.ObjectId.isValid(ownerId)
-        ? new mongoose.Types.ObjectId(ownerId)
-        : ownerId;
-    }
+    const { deviceId, isActive, limit = 50, page = 1 } = req.query;
+    const ownerId = req.user.userId;
+
+    const query = { ownerId };
     if (deviceId) query.deviceId = deviceId;
-    if (category) query.category = category;
     if (isActive !== undefined) query.isActive = isActive === 'true';
-    
+
+    const numericLimit = parseInt(limit);
+    const numericPage = parseInt(page);
+
+    // Lấy danh sách rule
     const rules = await Rule.find(query)
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .sort({ priority: -1, createdAt: -1 });
-    
+      .sort({ createdAt: -1 })
+      .skip((numericPage - 1) * numericLimit)
+      .limit(numericLimit);
+
+    // Sắp xếp lại theo priority: urgent → high → medium → low
+    const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'];
+    rules.sort(
+      (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
+    );
+
+    // Đếm tổng số rule
     const total = await Rule.countDocuments(query);
-    
+
     res.json({
       success: true,
       data: rules,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: numericPage,
+        limit: numericLimit,
         total,
-        pages: Math.ceil(total / parseInt(limit))
-      }
+        pages: Math.ceil(total / numericLimit),
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: 'Error fetching rules',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -47,53 +70,30 @@ export const createRule = async (req, res) => {
   try {
     console.log('Create rule request body:', JSON.stringify(req.body, null, 2));
     
-    const {
-      name,
-      description,
-      ownerId,
-      deviceId,
-      category,
-      priority,
-      conditions,
-      actions,
-      cooldownPeriod,
-      settings
-    } = req.body;
-    
-    if (!name || !ownerId || !deviceId || !conditions || !actions) {
+    const { name, description, deviceId, priority, conditions, actions } = req.body;
+    const ownerId = (req.user && (req.user.userId || req.user.sub || req.user.id)) || null;
+
+    if (!name || !deviceId || !conditions?.length || !actions?.length) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: name, ownerId, deviceId, conditions, actions'
+        message: 'Missing required fields: name, deviceId, conditions, actions'
       });
     }
-    
-    if (!Array.isArray(conditions) || conditions.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one condition is required'
-      });
-    }
-    
-    if (!Array.isArray(actions) || actions.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one action is required'
-      });
-    }
-    
+
+    // Chỉ cho phép giá trị enum hợp lệ
+    const validPriorities = ['low', 'medium', 'high', 'urgent'];
+    const normalizedPriority = validPriorities.includes(priority) ? priority : 'medium';
+
     const rule = new Rule({
       name,
       description,
       ownerId,
       deviceId,
-      category: category || 'automation',
-      priority: priority || 5,
+      priority: normalizedPriority,
       conditions,
-      actions,
-      cooldownPeriod: cooldownPeriod || 30000,
-      settings: settings || {}
+      actions
     });
-    
+
     await rule.save();
 
     res.status(201).json({
@@ -115,38 +115,34 @@ export const createRule = async (req, res) => {
 export const updateRule = async (req, res) => {
   try {
     const { ruleId } = req.params;
-    const updateData = req.body;
-    
-    delete updateData._id;
-    delete updateData.createdAt;
-    delete updateData.updatedAt;
-    delete updateData.lastTriggeredAt;
-    delete updateData.triggerCount;
-    
-    const rule = await Rule.findByIdAndUpdate(
+    const { _id, createdAt, updatedAt, ownerId, ...updateData } = req.body;
+
+    // Kiểm tra rule thuộc quyền user
+    const rule = await Rule.findOne({ _id: ruleId, ownerId: req.user.userId });
+    if (!rule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Rule not found or access denied',
+      });
+    }
+
+    // Cập nhật rule
+    const updatedRule = await Rule.findByIdAndUpdate(
       ruleId,
       { ...updateData, updatedAt: new Date() },
       { new: true, runValidators: true }
     );
-    
-    if (!rule) {
-      return res.status(404).json({
-        success: false,
-        message: 'Rule not found'
-      });
-    }
-    
 
     res.json({
       success: true,
-      data: rule,
-      message: 'Rule updated successfully'
+      data: updatedRule,
+      message: 'Rule updated successfully',
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: 'Error updating rule',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -155,24 +151,29 @@ export const updateRule = async (req, res) => {
 export const deleteRule = async (req, res) => {
   try {
     const { ruleId } = req.params;
-    
-    const rule = await Rule.findByIdAndDelete(ruleId);
-    if (!rule) {
+
+    // Xóa rule nếu thuộc quyền sở hữu user
+    const deletedRule = await Rule.findOneAndDelete({
+      _id: ruleId,
+      ownerId: req.user.userId
+    });
+
+    if (!deletedRule) {
       return res.status(404).json({
         success: false,
-        message: 'Rule not found'
+        message: 'Rule not found or access denied',
       });
     }
-    
+
     res.json({
       success: true,
-      message: 'Rule deleted successfully'
+      message: 'Rule deleted successfully',
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: 'Error deleting rule',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -183,23 +184,31 @@ export const toggleRuleStatus = async (req, res) => {
     const { ruleId } = req.params;
     const { isActive } = req.body;
 
-    const rule = await Rule.findByIdAndUpdate(
-      ruleId,
+    // Cập nhật rule chỉ khi thuộc về user
+    const updatedRule = await Rule.findOneAndUpdate(
+      { _id: ruleId, ownerId: req.user.userId },
       { isActive: !!isActive, updatedAt: new Date() },
       { new: true }
     );
 
-    if (!rule) {
-      return res.status(404).json({ success: false, message: 'Rule not found' });
+    if (!updatedRule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Rule not found or access denied',
+      });
     }
 
     res.json({
       success: true,
-      data: rule,
-      message: `Rule ${rule.isActive ? 'activated' : 'deactivated'} successfully`
+      data: updatedRule,
+      message: `Rule ${updatedRule.isActive ? 'activated' : 'deactivated'} successfully`,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error updating rule status', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error updating rule status',
+      error: error.message,
+    });
   }
 };
 
@@ -208,31 +217,14 @@ export const getRuleTemplates = async (req, res) => {
   try {
     const templates = [
       {
-        id: 'temperature_high',
-        name: 'High Temperature Alert',
-        description: 'Alert when temperature exceeds threshold',
-        category: 'safety',
-        conditions: [
-          {
-            type: 'sensor',
-            sensor: 'temperature',
-            operator: '>',
-            value: 40
-          }
-        ],
-        actions: [
-          {
-            type: 'send_notification',
-            message: 'High temperature detected!',
-            priority: 'high'
-          }
-        ]
-      },
-      {
         id: 'gas_leak_detection',
         name: 'Gas Leak Detection',
         description: 'Emergency response for gas leak',
-        category: 'safety',
+        priority: 'urgent',
+        isActive: true,
+        cooldownPeriod: null,  // No cooldown for gas emergency
+        maxTriggersPerDay: null,  // Unlimited for gas emergency
+        duration: 0,  // Immediate trigger
         conditions: [
           {
             type: 'sensor',
@@ -244,8 +236,7 @@ export const getRuleTemplates = async (req, res) => {
         actions: [
           {
             type: 'send_alert',
-            message: 'Gas leak detected! Emergency mode activated.',
-            priority: 'critical'
+            message: 'Gas leak detected! Emergency mode activated.'
           }
         ]
       },
@@ -253,7 +244,11 @@ export const getRuleTemplates = async (req, res) => {
         id: 'smoke_detection',
         name: 'Smoke Detection',
         description: 'Emergency response for smoke detection',
-        category: 'safety',
+        priority: 'high',
+        isActive: true,
+        cooldownPeriod: 300000,  // 5 minutes cooldown
+        maxTriggersPerDay: 20,  // 20 times per day
+        duration: 30000,  // 30 seconds duration
         conditions: [
           {
             type: 'sensor',
@@ -264,32 +259,56 @@ export const getRuleTemplates = async (req, res) => {
         ],
         actions: [
           {
-            type: 'send_alert',
-            message: 'Smoke detected! Emergency mode activated.',
-            priority: 'critical'
+            type: 'send_notification',
+            message: 'Smoke detected! Please check if it\'s from cooking or if there\'s a real fire.'
           }
         ]
       },
       {
-        id: 'auto_outlet_off',
-        name: 'Auto Turn Off Outlets',
-        description: 'Send notification reminder to turn off kitchen outlets at night',
-        category: 'energy_saving',
+        id: 'temperature_high',
+        name: 'High Temperature Alert',
+        description: 'Alert when temperature exceeds threshold',
+        priority: 'high',
+        isActive: true,
+        cooldownPeriod: 300000,  // 5 minutes
+        maxTriggersPerDay: 20,  // 20 times per day
+        duration: 300000,  // 5 minutes duration
         conditions: [
           {
-            type: 'time',
-            timeCondition: {
-              hour: 23,
-              minute: 0,
-              days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-            }
+            type: 'sensor',
+            sensor: 'temperature',
+            operator: '>',
+            value: 40
           }
         ],
         actions: [
           {
             type: 'send_notification',
-            message: 'Reminder: Turn off kitchen outlets before bed.',
-            priority: 'medium'
+            message: 'High temperature detected!'
+          }
+        ]
+      },
+      {
+        id: 'humidity_high',
+        name: 'High Humidity Alert',
+        description: 'Alert when humidity exceeds comfortable level',
+        priority: 'medium',
+        isActive: true,
+        cooldownPeriod: 600000,  // 10 minutes
+        maxTriggersPerDay: 10,  // 10 times per day
+        duration: 600000,  // 10 minutes duration
+        conditions: [
+          {
+            type: 'sensor',
+            sensor: 'humidity',
+            operator: '>',
+            value: 80
+          }
+        ],
+        actions: [
+          {
+            type: 'send_notification',
+            message: 'High humidity detected! Consider ventilation.'
           }
         ]
       }
@@ -308,6 +327,113 @@ export const getRuleTemplates = async (req, res) => {
   }
 };
 
+// User responds to an alert (acknowledge, dismiss, false alarm)
+export const respondToAlert = async (req, res) => {
+  try {
+    const { ruleId } = req.params;
+    const { response, metadata = {}, timeoutMs } = req.body || {};
+    const userId = req.user?.userId || req.user?.sub;
 
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Unauthorized - user ID required' 
+      });
+    }
 
+    if (!ruleId || !response) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'ruleId and response are required' 
+      });
+    }
 
+    // Validate response type
+    const validResponses = ['acknowledged', 'dismissed', 'false_alarm'];
+    if (!validResponses.includes(response)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid response. Must be one of: ${validResponses.join(', ')}` 
+      });
+    }
+
+    // Find the rule
+    const rule = await Rule.findById(ruleId);
+    if (!rule) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Rule not found' 
+      });
+    }
+
+    // Check if user owns the rule
+    if (rule.ownerId.toString() !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied - you can only respond to your own rules' 
+      });
+    }
+
+    console.log(`👤 User ${userId} responded to rule ${rule.name}: ${response}`);
+
+    // Send response to alerts-service via Kafka
+    const responseMessage = {
+      type: response,
+      userId: userId,
+      ruleId: ruleId,
+      ruleName: rule.name,
+      deviceId: rule.deviceId,
+      priority: rule.priority,
+      timestamp: new Date(),
+      metadata: {
+        ...metadata,
+        responseTime: Date.now(),
+        userAction: response
+      }
+    };
+
+    // Send response to alerts-service via Kafka
+    try {
+      await initProducer();
+      await producer.send({
+        topic: 'notification-requests',
+        messages: [{
+          key: userId,
+          value: JSON.stringify(responseMessage)
+        }]
+      });
+      console.log(`📤 User response sent to alerts-service: ${response}`);
+    } catch (kafkaError) {
+      console.error('❌ Failed to send user response to alerts-service:', kafkaError);
+      // Don't fail the request, just log the error
+    }
+
+    // Log the response
+    console.log(`📤 User response sent:`, {
+      ruleId,
+      ruleName: rule.name,
+      response,
+      userId,
+      timestamp: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: `Response '${response}' recorded successfully`,
+      data: {
+        ruleId,
+        ruleName: rule.name,
+        response,
+        timestamp: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error handling user response:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process user response',
+      error: error.message
+    });
+  }
+};

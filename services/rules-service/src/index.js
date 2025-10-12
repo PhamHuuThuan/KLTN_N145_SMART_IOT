@@ -64,8 +64,13 @@ async function bootstrap() {
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-    process.on('unhandledRejection', () => process.exit(1));
-    process.on('uncaughtException', () => process.exit(1));
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    });
+    
+    process.on('uncaughtException', (error) => {
+      console.error('❌ Uncaught Exception:', error);
+    });
   } catch (error) {
     process.exit(1);
   }
