@@ -1,27 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Switch } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 
-const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onSave }) => {
-  if (!selectedRule) return null;
-  const [pausing, setPausing] = useState(false);
-  const [unpausing, setUnpausing] = useState(false);
-  const [pausedUntilLocal, setPausedUntilLocal] = useState(selectedRule?.pausedUntil || null);
+const CustomizeModal = ({ 
+  visible, 
+  onClose, 
+  customizeTemplate, 
+  customFields, 
+  setCustomFields, 
+  onCreate 
+}) => {
+  if (!customizeTemplate) return null;
 
-  useEffect(() => {
-    setPausedUntilLocal(selectedRule?.pausedUntil || null);
-  }, [selectedRule?.pausedUntil, selectedRule?._id]);
-
-  // Initialize editFields.conditions if not exists
-  useEffect(() => {
-    if (selectedRule?.conditions && !editFields.conditions) {
-      setEditFields(prev => ({ ...prev, conditions: selectedRule.conditions }));
+  // Initialize customFields.conditions if not exists
+  React.useEffect(() => {
+    if (customizeTemplate?.conditions && !customFields.conditions) {
+      setCustomFields(prev => ({ ...prev, conditions: customizeTemplate.conditions }));
     }
-  }, [selectedRule?.conditions, editFields.conditions, setEditFields]);
-
-  const isPaused = !!(pausedUntilLocal && new Date(pausedUntilLocal) > new Date());
-  const pausedUntilText = isPaused ? new Date(pausedUntilLocal).toLocaleString() : '';
+  }, [customizeTemplate?.conditions, customFields.conditions, setCustomFields]);
 
   const getPriorityColor = (priority) => {
     const priorityMap = {
@@ -76,7 +73,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
   return (
     <View style={styles.modalContainer}>
       <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Rule Details</Text>
+        <Text style={styles.modalTitle}>Customize Rule</Text>
         <TouchableOpacity
           style={styles.closeButton}
           onPress={onClose}
@@ -85,50 +82,27 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {isPaused && (
-          <View style={styles.pausedBanner}>
-            <MaterialIcons name="pause-circle" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pausedBannerText}>Paused until {pausedUntilText}</Text>
-            <TouchableOpacity
-              disabled={unpausing}
-              onPress={async () => {
-                try {
-                  setUnpausing(true);
-                  const rulesService = (await import('../services/rulesService')).default;
-                  await rulesService.updateRule(selectedRule._id, { pausedUntil: null });
-                  setPausedUntilLocal(null);
-                } finally {
-                  setUnpausing(false);
-                }
-              }}
-              style={styles.unpauseButton}
-            >
-              <Text style={styles.unpauseButtonText}>{unpausing ? 'Unpausing...' : 'Unpause now'}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
         <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Rule name</Text>
         <TextInput
           style={styles.input}
-          value={editFields.name}
-          onChangeText={(t) => setEditFields(prev => ({ ...prev, name: t }))}
+          value={customFields.name}
+          onChangeText={(t) => setCustomFields(prev => ({ ...prev, name: t }))}
           placeholder="Rule name"
         />
         <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>Description</Text>
         <TextInput
           style={[styles.input, styles.multilineInput]}
-          value={editFields.description}
-          onChangeText={(t) => setEditFields(prev => ({ ...prev, description: t }))}
+          value={customFields.description}
+          onChangeText={(t) => setCustomFields(prev => ({ ...prev, description: t }))}
           placeholder="Description"
           multiline
           textAlignVertical="top"
         />
-
         {/* Editable Conditions */}
-        {selectedRule.conditions && selectedRule.conditions.length > 0 && (
+        {customizeTemplate.conditions && customizeTemplate.conditions.length > 0 && (
           <View style={styles.conditionsSection}>
             <Text style={styles.sectionTitle}>Conditions (Editable):</Text>
-            {selectedRule.conditions.map((condition, index) => (
+            {customizeTemplate.conditions.map((condition, index) => (
               <View key={index} style={styles.conditionEditItem}>
                 <View style={styles.conditionHeader}>
                   <MaterialIcons 
@@ -149,17 +123,17 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                           key={op}
                           style={[
                             styles.operatorButton,
-                            editFields.conditions?.[index]?.operator === op && styles.operatorButtonSelected
+                            customFields.conditions?.[index]?.operator === op && styles.operatorButtonSelected
                           ]}
                           onPress={() => {
-                            const newConditions = [...editFields.conditions];
+                            const newConditions = [...customFields.conditions];
                             newConditions[index] = { ...newConditions[index], operator: op };
-                            setEditFields(prev => ({ ...prev, conditions: newConditions }));
+                            setCustomFields(prev => ({ ...prev, conditions: newConditions }));
                           }}
                         >
                           <Text style={[
                             styles.operatorText,
-                            editFields.conditions?.[index]?.operator === op && styles.operatorTextSelected
+                            customFields.conditions?.[index]?.operator === op && styles.operatorTextSelected
                           ]}>{op}</Text>
                         </TouchableOpacity>
                       ))}
@@ -174,11 +148,11 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                     </Text>
                     <TextInput
                       style={styles.input}
-                      value={editFields.conditions?.[index]?.value !== undefined ? String(editFields.conditions[index].value) : ''}
+                      value={customFields.conditions?.[index]?.value !== undefined ? String(customFields.conditions[index].value) : ''}
                       onChangeText={(text) => {
-                        const newConditions = [...editFields.conditions];
+                        const newConditions = [...customFields.conditions];
                         newConditions[index] = { ...newConditions[index], value: text === '' ? '' : parseFloat(text) || 0 };
-                        setEditFields(prev => ({ ...prev, conditions: newConditions }));
+                        setCustomFields(prev => ({ ...prev, conditions: newConditions }));
                       }}
                       placeholder={String(condition.value)}
                       keyboardType="numeric"
@@ -189,39 +163,26 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             ))}
           </View>
         )}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Priority</Text>
-            <View style={styles.prioritySelector}>
-              {['low', 'medium', 'high', 'urgent'].map((priority) => (
-                <TouchableOpacity
-                  key={priority}
-                  style={[
-                    styles.priorityOption,
-                    editFields.priority === priority && styles.priorityOptionSelected,
-                    { borderColor: getPriorityColor(priority) }
-                  ]}
-                  onPress={() => setEditFields(prev => ({ ...prev, priority }))}
-                >
-                  <Text style={[
-                    styles.priorityOptionText,
-                    editFields.priority === priority && { color: getPriorityColor(priority) }
-                  ]}>
-                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Active</Text>
-            <Switch
-              value={editFields.isActive}
-              onValueChange={(val) => setEditFields(prev => ({ ...prev, isActive: val }))}
-              trackColor={{ false: CONFIG.COLORS.gray, true: CONFIG.COLORS.success }}
-              thumbColor={CONFIG.COLORS.white}
-            />
-          </View>
+
+        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>Priority</Text>
+        <View style={styles.prioritySelector}>
+          {['low', 'medium', 'high', 'urgent'].map((priority) => (
+            <TouchableOpacity
+              key={priority}
+              activeOpacity={0.85}
+              style={[
+                styles.priorityChip,
+                customFields.priority === priority && [styles.priorityChipSelected, { borderColor: getPriorityColor(priority), backgroundColor: `${getPriorityColor(priority)}22` }],
+                { borderColor: getPriorityColor(priority) }
+              ]}
+              onPress={() => setCustomFields(prev => ({ ...prev, priority }))}
+            >
+              <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(priority) }]} />
+              <Text style={[styles.priorityLabel, customFields.priority === priority && { color: getPriorityColor(priority), fontWeight: '700' }]}>
+                {priority.charAt(0).toUpperCase() + priority.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Cooldown Period */}
@@ -229,10 +190,10 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           <Text style={styles.inputLabel}>Cooldown Period (minutes)</Text>
           <TextInput
             style={styles.input}
-            value={editFields.cooldownPeriod ? String(Math.floor(editFields.cooldownPeriod / 60000)) : ''}
+            value={customFields.cooldownPeriod ? String(Math.floor(customFields.cooldownPeriod / 60000)) : ''}
             onChangeText={(text) => {
               const minutes = parseInt(text) || 0;
-              setEditFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
+              setCustomFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
             }}
             placeholder="5"
             keyboardType="numeric"
@@ -244,10 +205,10 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           <Text style={styles.inputLabel}>Max Triggers/Day</Text>
           <TextInput
             style={styles.input}
-            value={editFields.maxTriggersPerDay ? String(editFields.maxTriggersPerDay) : ''}
+            value={customFields.maxTriggersPerDay ? String(customFields.maxTriggersPerDay) : ''}
             onChangeText={(text) => {
               const max = parseInt(text) || 0;
-              setEditFields(prev => ({ ...prev, maxTriggersPerDay: max }));
+              setCustomFields(prev => ({ ...prev, maxTriggersPerDay: max }));
             }}
             placeholder="10"
             keyboardType="numeric"
@@ -259,71 +220,32 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Duration (minutes) - 0 = instant trigger</Text>
           <TextInput
             style={styles.input}
-            value={editFields.duration ? String(Math.floor(editFields.duration / 60000)) : ''}
+            value={customFields.duration ? String(Math.floor(customFields.duration / 60000)) : ''}
             onChangeText={(text) => {
               const minutes = parseInt(text) || 0;
-              setEditFields(prev => ({ ...prev, duration: minutes * 60000 }));
+              setCustomFields(prev => ({ ...prev, duration: minutes * 60000 }));
             }}
             placeholder="0"
             keyboardType="numeric"
           />
         </View>
-        
         <TouchableOpacity
           style={[styles.createButton, { marginTop: 16 }]}
           onPress={() => {
-            // Ensure conditions are properly formatted before saving
-            const updatedEditFields = {
-              ...editFields,
-              conditions: editFields.conditions?.map(condition => ({
+            // Ensure conditions are properly formatted before creating
+            const updatedCustomFields = {
+              ...customFields,
+              conditions: customFields.conditions?.map(condition => ({
                 ...condition,
                 value: condition.value === '' ? condition.value : (typeof condition.value === 'number' ? condition.value : parseFloat(condition.value) || 0)
               }))
             };
-            onSave(updatedEditFields);
+            onCreate(updatedCustomFields);
           }}
         >
-          <MaterialIcons name="save" size={20} color={CONFIG.COLORS.white} />
-          <Text style={styles.createButtonText}>Save changes</Text>
+          <MaterialIcons name="check" size={20} color={CONFIG.COLORS.white} />
+          <Text style={styles.createButtonText}>Create with customization</Text>
         </TouchableOpacity>
-
-        {/* Quick actions: pause rule without toggling off */}
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-          <TouchableOpacity
-            disabled={pausing}
-            onPress={async () => {
-              try {
-                setPausing(true);
-                const rulesService = (await import('../services/rulesService')).default;
-                await rulesService.respondToAlert(selectedRule._id, 'dismissed', { ruleName: selectedRule.name });
-                onClose && onClose();
-              } finally {
-                setPausing(false);
-              }
-            }}
-            style={[styles.pauseButton, { backgroundColor: '#FFB020' }]}
-          >
-            <MaterialIcons name="pause-circle" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>Pause 1h</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            disabled={pausing}
-            onPress={async () => {
-              try {
-                setPausing(true);
-                const rulesService = (await import('../services/rulesService')).default;
-                await rulesService.respondToAlert(selectedRule._id, 'false_alarm', { ruleName: selectedRule.name });
-                onClose && onClose();
-              } finally {
-                setPausing(false);
-              }
-            }}
-            style={[styles.pauseButton, { backgroundColor: '#E53935' }]}
-          >
-            <MaterialIcons name="block" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>Pause 24h</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </View>
   );
@@ -332,10 +254,10 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: CONFIG.COLORS.light,
+    backgroundColor: CONFIG.THEME.background,
   },
   input: {
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
     borderWidth: 1,
     borderColor: CONFIG.COLORS.light,
     borderRadius: 8,
@@ -352,7 +274,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: CONFIG.COLORS.white,
+    backgroundColor: CONFIG.THEME.surface,
     borderBottomWidth: 1,
     borderBottomColor: CONFIG.COLORS.light,
   },
@@ -379,46 +301,37 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
-  pauseButton: {
-    flex: 1,
+  prioritySelector: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  pauseButtonText: {
-    color: CONFIG.COLORS.white,
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  pausedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
-    backgroundColor: '#6D6E71',
-    paddingVertical: 10,
+  },
+  priorityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  pausedBannerText: {
-    color: CONFIG.COLORS.white,
-    fontSize: 13,
-    flex: 1,
-  },
-  unpauseButton: {
     paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: '#2E7D32',
-    borderRadius: 6,
+    borderRadius: 18,
+    borderWidth: 1,
+    backgroundColor: CONFIG.THEME.surface,
   },
-  unpauseButtonText: {
-    color: CONFIG.COLORS.white,
-    fontSize: 12,
-    fontWeight: '700',
+  priorityChipSelected: {
+    backgroundColor: '#F5F5F5',
+  },
+  priorityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  priorityLabel: {
+    fontSize: 13,
+    color: CONFIG.COLORS.gray,
+  },
+  inputLabel: {
+    marginBottom: 6,
+    color: CONFIG.COLORS.gray,
+    fontSize: 14,
   },
   conditionsSection: {
     marginTop: 16,
@@ -500,41 +413,6 @@ const styles = StyleSheet.create({
   valueInput: {
     flex: 1,
   },
-  prioritySelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  priorityOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    backgroundColor: CONFIG.COLORS.white,
-  },
-  priorityOptionSelected: {
-    backgroundColor: '#F5F5F5',
-  },
-  priorityOptionText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: CONFIG.COLORS.gray,
-  },
-  rowContainer: {
-    flexDirection: 'row',
-    marginTop: 16,
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  inputContainer: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  inputLabel: {
-    marginBottom: 6,
-    color: CONFIG.COLORS.gray,
-    fontSize: 14,
-  },
 });
 
-export default RuleDetailModal;
+export default CustomizeModal;
