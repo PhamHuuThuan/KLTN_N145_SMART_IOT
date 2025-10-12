@@ -21,6 +21,7 @@ import NotificationScreen from './src/screens/NotificationScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import CONFIG from './src/constants/config';
 import apiService from './src/services/apiService';
+import rulesService from './src/services/rulesService';
 
 function AppContent() {
   const { t } = useTranslation();
@@ -131,11 +132,15 @@ function AppContent() {
     }
   };
 
-  const handleCheckNow = () => {
-    // Navigate user to Notifications or Home for quick inspection
+  const handleCheckNow = async () => {
+    try {
+      const ruleId = emergency?.metadata?.ruleId || (emergency?.metadata?.deviceId ? `emergency_${emergency.metadata.deviceId}` : null);
+      if (ruleId) {
+        await rulesService.respondToAlert(ruleId, 'acknowledged', emergency?.metadata || {});
+      }
+    } catch (_) {}
     setCurrentScreen('Main');
     setActiveTab('Home');
-    // Clear emergency state if available
     if (dispatch) {
       dispatch({ type: 'SET_EMERGENCY', payload: null });
     }
@@ -175,7 +180,13 @@ function AppContent() {
     }
   };
 
-  const handleDismissEmergency = () => {
+  const handleDismissEmergency = async () => {
+    try {
+      const ruleId = emergency?.metadata?.ruleId || (emergency?.metadata?.deviceId ? `emergency_${emergency.metadata.deviceId}` : null);
+      if (ruleId) {
+        await rulesService.respondToAlert(ruleId, 'dismissed', emergency?.metadata || {});
+      }
+    } catch (_) {}
     if (dispatch) {
       dispatch({ type: 'SET_EMERGENCY', payload: null });
     }
