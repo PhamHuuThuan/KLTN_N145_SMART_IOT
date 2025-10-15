@@ -11,11 +11,9 @@ export const useRuleActions = (loadRules) => {
       const response = await rulesService.toggleRuleStatus(ruleId, !currentStatus);
       if (response.success) {
         await loadRules();
-        Alert.alert('Success', `Rule ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
       }
     } catch (error) {
       console.error('Error toggling rule status:', error);
-      Alert.alert('Error', 'Failed to update rule status');
     }
   };
 
@@ -33,11 +31,9 @@ export const useRuleActions = (loadRules) => {
               const response = await rulesService.deleteRule(ruleId);
               if (response.success) {
                 await loadRules();
-                Alert.alert('Success', 'Rule deleted successfully');
               }
             } catch (error) {
               console.error('Error deleting rule:', error);
-              Alert.alert('Error', 'Failed to delete rule');
             }
           }
         }
@@ -52,12 +48,13 @@ export const useRuleActions = (loadRules) => {
       setCreatingRule(true);
       setCreatingTemplateId(template.id);
       
-      if (!user?.id) {
-        Alert.alert('Error', 'Please log in again');
+      const userId = user?.id || user?.userId || user?._id;
+      if (!userId) {
+        console.error('User ID is required to create a rule. User object:', user);
         return;
       }
       if (!selectedDevice) {
-        Alert.alert('Error', 'Please select a device first');
+        console.error('Device selection is required to create a rule');
         return;
       }
 
@@ -65,22 +62,21 @@ export const useRuleActions = (loadRules) => {
 
       const response = await rulesService.createRuleFromTemplate(
         template.id,
-        user.id,
+        userId,
         selectedDevice,
         overrides
       );
       
       if (response.success) {
         await loadRules();
-        Alert.alert('Success', `Created rule "${template.name}" successfully!`);
         return true;
       } else {
-        Alert.alert('Error', response.message || 'Failed to create rule from template');
+        console.error('Failed to create rule from template:', response.message);
         return false;
       }
     } catch (error) {
       console.error('Error creating rule from template:', error);
-      Alert.alert('Error', `Create rule failed: ${error.message}`);
+      console.error('Create rule failed:', error.message);
       return false;
     } finally {
       setCreatingRule(false);
@@ -93,14 +89,13 @@ export const useRuleActions = (loadRules) => {
       const response = await rulesService.updateRule(ruleId, updateData);
       if (response.success) {
         await loadRules();
-        Alert.alert('Thành công', 'Đã lưu thay đổi');
         return true;
       } else {
-        Alert.alert('Lỗi', response.message || 'Không thể cập nhật');
+        console.error('Failed to update rule:', response.message || 'Unknown error');
         return false;
       }
     } catch (error) {
-      Alert.alert('Lỗi', error.message);
+      console.error('Error updating rule:', error.message);
       return false;
     }
   };

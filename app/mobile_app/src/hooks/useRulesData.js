@@ -35,13 +35,7 @@ export const useRulesData = () => {
       
       if (response.success) {
         const items = response.data || [];
-        const sorted = [...items].sort((a, b) => {
-          const pa = typeof a.priority === 'number' ? a.priority : 99;
-          const pb = typeof b.priority === 'number' ? b.priority : 99;
-          if (pa !== pb) return pa - pb;
-          return (a.createdAt || '').localeCompare(b.createdAt || '');
-        });
-        setRules(sorted);
+        setRules(items);
         console.log('Rules loaded successfully:', response.data?.length || 0, 'rules');
       } else {
         console.error('Failed to load rules:', response.message);
@@ -55,12 +49,20 @@ export const useRulesData = () => {
 
   const loadTemplates = async () => {
     try {
+      console.log('Loading rule templates...');
       const response = await rulesService.getRuleTemplates();
+      console.log('Templates response:', response);
+      
       if (response.success) {
-        setTemplates(response.data);
+        setTemplates(response.data || []);
+        console.log('Templates loaded successfully:', response.data?.length || 0, 'templates');
+      } else {
+        console.error('Failed to load templates:', response.message);
+        setTemplates([]);
       }
     } catch (error) {
       console.error('Error loading templates:', error);
+      setTemplates([]);
     }
   };
 

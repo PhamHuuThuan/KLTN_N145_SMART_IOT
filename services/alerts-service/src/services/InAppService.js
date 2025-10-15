@@ -36,13 +36,34 @@ class InAppService {
       // Send via Socket.IO if available
       if (global.io) {
         console.log(`🔌 Sending notification via Socket.IO to user_${userId}:`, notification);
-        global.io.to(`user_${userId}`).emit('notification', notification);
+        
+        // Check if this is an emergency notification
+        const isEmergency = priority === 'urgent' || category === 'security' || type === 'security_alert' || type === 'consolidated_alert';
+        
+        // Debug consolidated alert
+        if (type === 'consolidated_alert') {
+          console.log(`🔄 CONSOLIDATED ALERT InAppService:`, JSON.stringify(notification, null, 2));
+          console.log(`🔄 Consolidated alert isEmergency: ${isEmergency}`);
+        }
+        
+        if (isEmergency) {
+          console.log(`🚨 EMERGENCY NOTIFICATION - Broadcasting to all users`);
+          // For emergency, broadcast to all connected users
+          global.io.emit('emergency_notification', notification);
+        } else {
+          // Regular notification - send to specific user
+          global.io.to(`user_${userId}`).emit('notification', notification);
+        }
+        
         logger.info('In-app notification sent via Socket.IO', { 
           userId, 
           title, 
-          notificationId: notification.id 
+          notificationId: notification.id,
+          isEmergency,
+          priority,
+          category
         });
-        console.log(`✅ Socket.IO notification sent to user_${userId}`);
+        console.log(`✅ Socket.IO notification sent to user_${userId} (emergency: ${isEmergency})`);
       } else {
         console.log('❌ Socket.IO not available (global.io is null)');
       }

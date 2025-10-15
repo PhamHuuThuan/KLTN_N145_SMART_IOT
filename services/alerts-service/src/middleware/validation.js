@@ -13,7 +13,7 @@ const notificationSchema = Joi.object({
   }),
   title: Joi.string().max(200).required(),
   message: Joi.string().max(1000).required(),
-  type: Joi.string().valid('device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion').required(),
+  type: Joi.string().valid('device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion', 'acknowledged', 'dismissed', 'false_alarm', 'consolidated_alert').required(),
   priority: Joi.string().valid('low', 'medium', 'high', 'urgent').default('medium'),
   metadata: Joi.object({
     deviceId: Joi.string(),
@@ -22,7 +22,11 @@ const notificationSchema = Joi.object({
     sensorValue: Joi.number(),
     threshold: Joi.number(),
     ruleId: Joi.string(),
-    action: Joi.string()
+    ruleName: Joi.string(),
+    action: Joi.string(),
+    source: Joi.string(),
+    responseType: Joi.string(),
+    responseTime: Joi.number()
   }).default({})
 });
 

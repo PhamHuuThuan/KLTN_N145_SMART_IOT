@@ -66,6 +66,11 @@ userNotificationPreferencesSchema.methods.shouldSendNotification = function(meth
     return false;
   }
 
+  // Đơn giản hóa: chỉ urgent bypass tất cả, còn lại theo quiet hours
+  if (priority === 'urgent') {
+    return true; // Urgent luôn gửi qua tất cả channels
+  }
+
   // Check quiet hours for non-urgent notifications
   if (this.quietHours.enabled && priority !== 'urgent') {
     const now = new Date();

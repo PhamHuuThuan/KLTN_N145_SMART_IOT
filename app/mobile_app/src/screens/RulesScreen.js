@@ -1,21 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  Modal,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import DeviceSelector from '../components/DeviceSelector';
 import RuleCard from '../components/RuleCard';
-import TemplateCard from '../components/TemplateCard';
-import CategoryFilter from '../components/CategoryFilter';
+import TemplateCard from '../components/RuleTemplateCard';
 import RuleDetailModal from '../components/RuleDetailModal';
-import CustomizeModal from '../components/CustomizeModal';
+import CustomizeModal from '../components/RuleCustomizeModal';
 import { useRulesData } from '../hooks/useRulesData';
 import { useRuleActions } from '../hooks/useRuleActions';
 import CONFIG from '../constants/config';
@@ -23,40 +14,35 @@ import CONFIG from '../constants/config';
 const RulesScreen = () => {
   const { user } = useAuth();
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [customizeVisible, setCustomizeVisible] = useState(false);
   const [customizeTemplate, setCustomizeTemplate] = useState(null);
   const [customFields, setCustomFields] = useState({
     name: '',
     description: '',
-    priority: 5,
-    category: 'automation',
+    priority: 'medium',
+    maxTriggersPerDay: 10,
+    cooldownPeriod: 300000,
     sensorValue: '',
     timeHour: '',
     timeMinute: '',
   });
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedRule, setSelectedRule] = useState(null);
+  const [busyAction, setBusyAction] = useState(null);
   const [editFields, setEditFields] = useState({
     name: '',
     description: '',
-    priority: 5,
+    priority: 'medium',
     isActive: true,
+    maxTriggersPerDay: 10,
+    cooldownPeriod: 300000,
     sensorValue: '',
     timeHour: '',
     timeMinute: '',
   });
-
-  // Custom hooks
   const { rules, templates, devices, loading, refreshing, loadRules, onRefresh } = useRulesData();
   const { creatingRule, creatingTemplateId, toggleRuleStatus, deleteRule, createRuleFromTemplate, updateRule } = useRuleActions(loadRules);
-
-  const categories = [
-    { id: 'all', name: 'All', icon: 'list' },
-    { id: 'safety', name: 'Safety', icon: 'security' },
-    { id: 'energy_saving', name: 'Energy Saving', icon: 'eco' },
-  ];
 
   useEffect(() => {
     if (devices.length > 0 && !selectedDevice) {
@@ -75,8 +61,11 @@ const RulesScreen = () => {
     setCustomFields({
       name: template.name || '',
       description: template.description || '',
-      priority: 5,
-      category: template.category || 'automation',
+      priority: template.priority || 'medium',
+      maxTriggersPerDay: template.maxTriggersPerDay || 10,
+      cooldownPeriod: template.cooldownPeriod || 300000,
+      duration: template.duration || 0,
+      conditions: template.conditions || [],
       sensorValue: template?.conditions?.[0]?.type === 'sensor' ? `${template.conditions[0].value}` : '',
       timeHour: template?.conditions?.[0]?.type === 'time' ? `${template.conditions[0]?.timeCondition?.hour ?? ''}` : '',
       timeMinute: template?.conditions?.[0]?.type === 'time' ? `${template.conditions[0]?.timeCondition?.minute ?? ''}` : '',
@@ -92,40 +81,29 @@ const RulesScreen = () => {
     }
   };
 
-  const getCategoryIcon = (category) => {
-    const categoryData = categories.find(c => c.id === category);
-    return categoryData ? categoryData.icon : 'settings';
-  };
-
-  const getCategoryColor = (category) => {
-    switch (category) {
-      case 'safety':
-        return CONFIG.THEME.danger;
-      case 'energy_saving':
-        return CONFIG.THEME.success;
-      default:
-        return CONFIG.THEME.gray;
-    }
-  };
-
   const getPriorityColor = (priority) => {
-    if (priority >= 8) return CONFIG.THEME.danger;
-    if (priority >= 6) return CONFIG.THEME.warning;
-    if (priority >= 4) return CONFIG.THEME.info;
-    return CONFIG.THEME.success;
+    const priorityMap = {
+      'urgent': '#F44336',
+      'high': '#FF5722', 
+      'medium': '#FF9800',
+      'low': '#4CAF50'
+    };
+    return priorityMap[priority] || '#FF9800';
   };
 
-  const filteredRules = selectedCategory === 'all' 
-    ? rules 
-    : rules.filter(rule => rule.category === selectedCategory);
+  const filteredRules = rules;
 
   const openRuleDetail = (rule) => {
     setSelectedRule(rule);
     setEditFields({
       name: rule.name || '',
       description: rule.description || '',
-      priority: rule.priority ?? 5,
+      priority: rule.priority || 'medium',
       isActive: !!rule.isActive,
+      maxTriggersPerDay: rule.maxTriggersPerDay || 10,
+      cooldownPeriod: rule.cooldownPeriod || 300000,
+      duration: rule.duration || 0,
+      conditions: rule.conditions || [],
       sensorValue: rule?.conditions?.[0]?.type === 'sensor' ? String(rule.conditions[0].value) : '',
       timeHour: rule?.conditions?.[0]?.type === 'time' ? String(rule.conditions[0]?.timeCondition?.hour ?? '') : '',
       timeMinute: rule?.conditions?.[0]?.type === 'time' ? String(rule.conditions[0]?.timeCondition?.minute ?? '') : '',
@@ -133,44 +111,33 @@ const RulesScreen = () => {
     setDetailVisible(true);
   };
 
-  const saveRuleEdits = async () => {
+  const saveRuleEdits = async (updatedEditFields) => {
     if (!selectedRule) return;
-    
+    setBusyAction('save');
+    const fields = updatedEditFields || editFields;
     const update = {
-      name: editFields.name,
-      description: editFields.description,
-      priority: Number(editFields.priority) || 5,
-      isActive: editFields.isActive,
+      name: fields.name,
+      description: fields.description,
+      priority: fields.priority,
+      isActive: fields.isActive,
+      maxTriggersPerDay: fields.maxTriggersPerDay,
+      cooldownPeriod: fields.cooldownPeriod,
+      duration: fields.duration,
     };
     
-    if (selectedRule.conditions?.[0]?.type === 'sensor' && editFields.sensorValue !== '') {
-      update.conditions = [
-        {
-          ...selectedRule.conditions[0],
-          value: Number(editFields.sensorValue),
-        }
-      ];
-    }
-    
-    if (selectedRule.conditions?.[0]?.type === 'time') {
-      const hour = editFields.timeHour !== '' ? Number(editFields.timeHour) : selectedRule.conditions[0].timeCondition?.hour;
-      const minute = editFields.timeMinute !== '' ? Number(editFields.timeMinute) : selectedRule.conditions[0].timeCondition?.minute;
-      update.conditions = [
-        {
-          ...selectedRule.conditions[0],
-          timeCondition: {
-            ...selectedRule.conditions[0].timeCondition,
-            hour,
-            minute,
-          }
-        }
-      ];
+    // Use the updated conditions from editFields
+    if (fields.conditions && fields.conditions.length > 0) {
+      update.conditions = fields.conditions.map(condition => ({
+        ...condition,
+        value: condition.value === '' ? condition.value : (typeof condition.value === 'number' ? condition.value : parseFloat(condition.value) || 0)
+      }));
     }
     
     const success = await updateRule(selectedRule._id, update);
     if (success) {
       setDetailVisible(false);
     }
+    setBusyAction(null);
   };
 
   const renderRuleItem = ({ item: rule }) => (
@@ -179,8 +146,6 @@ const RulesScreen = () => {
       onPress={() => openRuleDetail(rule)}
       onToggleStatus={toggleRuleStatus}
       onDelete={deleteRule}
-      getCategoryIcon={getCategoryIcon}
-      getCategoryColor={getCategoryColor}
       getPriorityColor={getPriorityColor}
     />
   );
@@ -190,16 +155,6 @@ const RulesScreen = () => {
       template={template}
       onPress={() => openCustomize(template)}
       isCreating={creatingTemplateId === template.id}
-      getCategoryIcon={getCategoryIcon}
-      getCategoryColor={getCategoryColor}
-    />
-  );
-
-  const renderCategoryFilter = () => (
-    <CategoryFilter
-      categories={categories}
-      selectedCategory={selectedCategory}
-      onSelectCategory={setSelectedCategory}
     />
   );
 
@@ -224,7 +179,7 @@ const RulesScreen = () => {
       </View>
 
       {/* Device selector for scoping rules to a device */}
-      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+      <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
         <DeviceSelector
           devices={devices}
           selectedDevice={selectedDevice}
@@ -234,26 +189,34 @@ const RulesScreen = () => {
         />
       </View>
 
-      {renderCategoryFilter()}
+      {/* Rules section */}
+      <View style={styles.rulesCard}>
+        <View style={styles.rulesHeader}>
+          <MaterialIcons name="rule" size={20} color={CONFIG.THEME.primary} />
+          <Text style={styles.sectionTitle}>Rule Data</Text>
+        </View>
 
-      <FlatList
-        data={filteredRules}
-        renderItem={renderRuleItem}
-        keyExtractor={(item) => item._id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        contentContainerStyle={styles.rulesList}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <MaterialIcons name="rule" size={48} color={CONFIG.THEME.gray} />
-            <Text style={styles.emptyText}>No rules yet</Text>
-            <Text style={styles.emptySubtext}>
-              Create your first rule from available templates
-            </Text>
-          </View>
-        }
-      />
+        <FlatList
+          data={filteredRules}
+          renderItem={renderRuleItem}
+          keyExtractor={(item) => item._id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          style={styles.rulesListView}
+          contentContainerStyle={styles.rulesList}
+          nestedScrollEnabled={true}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <MaterialIcons name="rule" size={48} color={CONFIG.THEME.gray} />
+              <Text style={styles.emptyText}>No rules yet</Text>
+              <Text style={styles.emptySubtext}>
+                Create your first rule from available templates
+              </Text>
+            </View>
+          }
+        />
+      </View>
 
       {/* Templates Modal */}
       <Modal
@@ -272,12 +235,27 @@ const RulesScreen = () => {
             </TouchableOpacity>
           </View>
           
-          <FlatList
-            data={templates}
-            renderItem={renderTemplateItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.templatesList}
-          />
+          {templates.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <MaterialIcons name="library-books" size={64} color={CONFIG.THEME.gray} />
+              <Text style={styles.emptyText}>No Templates Available</Text>
+              <Text style={styles.emptySubtext}>
+                Rule templates are not loaded. Please check your connection and try again.
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={templates}
+              renderItem={renderTemplateItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.templatesList}
+            />
+          )}
+          {creatingRule && (
+            <View style={styles.loadingOverlay}>
+              <Text style={styles.loadingText}>Creating...</Text>
+            </View>
+          )}
         </View>
       </Modal>
       {/* Rule Detail Modal */}
@@ -294,6 +272,11 @@ const RulesScreen = () => {
           setEditFields={setEditFields}
           onSave={saveRuleEdits}
         />
+        {busyAction === 'save' && (
+          <View style={styles.loadingOverlay}>
+            <Text style={styles.loadingText}>Saving...</Text>
+          </View>
+        )}
       </Modal>
       {/* Customize Modal */}
       <Modal
@@ -307,35 +290,26 @@ const RulesScreen = () => {
           customizeTemplate={customizeTemplate}
           customFields={customFields}
           setCustomFields={setCustomFields}
-          onCreate={() => {
+          onCreate={(updatedCustomFields) => {
             if (!customizeTemplate) return;
+            const fields = updatedCustomFields || customFields;
             const overrides = { 
-              name: customFields.name, 
-              description: customFields.description,
-              priority: Number(customFields.priority) || 5
+              name: fields.name, 
+              description: fields.description,
+              priority: fields.priority,
+              maxTriggersPerDay: fields.maxTriggersPerDay,
+              cooldownPeriod: fields.cooldownPeriod,
+              duration: fields.duration,
             };
-            if (customizeTemplate.conditions?.[0]?.type === 'sensor' && customFields.sensorValue !== '') {
-              overrides.conditions = [
-                {
-                  ...customizeTemplate.conditions[0],
-                  value: Number(customFields.sensorValue)
-                }
-              ];
+            
+            // Use the updated conditions from customFields
+            if (fields.conditions && fields.conditions.length > 0) {
+              overrides.conditions = fields.conditions.map(condition => ({
+                ...condition,
+                value: condition.value === '' ? condition.value : (typeof condition.value === 'number' ? condition.value : parseFloat(condition.value) || 0)
+              }));
             }
-            if (customizeTemplate.conditions?.[0]?.type === 'time') {
-              const hour = customFields.timeHour !== '' ? Number(customFields.timeHour) : customizeTemplate.conditions[0].timeCondition?.hour;
-              const minute = customFields.timeMinute !== '' ? Number(customFields.timeMinute) : customizeTemplate.conditions[0].timeCondition?.minute;
-              overrides.conditions = [
-                {
-                  ...customizeTemplate.conditions[0],
-                  timeCondition: {
-                    ...customizeTemplate.conditions[0].timeCondition,
-                    hour,
-                    minute,
-                  }
-                }
-              ];
-            }
+            
             handleCreateRuleFromTemplate(customizeTemplate, overrides);
           }}
         />
@@ -381,13 +355,14 @@ const styles = StyleSheet.create({
   rulesList: {
     paddingTop: 8,
     paddingBottom: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    alignItems: 'stretch'
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingVertical: 48,
+    paddingVertical: 24,
+    paddingTop: 12,
   },
   emptyText: {
     fontSize: 18,
@@ -425,6 +400,33 @@ const styles = StyleSheet.create({
   },
   templatesList: {
     padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: CONFIG.THEME.primary,
+    textAlign: 'center',
+    marginLeft: 8,
+  },
+  rulesCard: {
+    marginHorizontal: 12,
+    marginTop: 2,
+    backgroundColor: CONFIG.THEME.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: CONFIG.THEME.border,
+    paddingBottom: 8,
+    flex: 1,
+  },
+  rulesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+  },
+  rulesListView: {
+    flexGrow: 1,
   },
 });
 

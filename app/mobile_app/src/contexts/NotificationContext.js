@@ -18,6 +18,7 @@ const initialState = {
   loading: false,
   error: null,
   refreshing: false,
+  emergency: null,
 };
 
 // Action types
@@ -31,6 +32,7 @@ const NOTIFICATION_ACTIONS = {
   DELETE_NOTIFICATION: 'DELETE_NOTIFICATION',
   SET_REFRESHING: 'SET_REFRESHING',
   UPDATE_UNREAD_COUNT: 'UPDATE_UNREAD_COUNT',
+  SET_EMERGENCY: 'SET_EMERGENCY',
 };
 
 // Reducer
@@ -103,6 +105,9 @@ const notificationReducer = (state, action) => {
     
     case NOTIFICATION_ACTIONS.UPDATE_UNREAD_COUNT:
       return { ...state, unreadCount: action.payload };
+    
+    case NOTIFICATION_ACTIONS.SET_EMERGENCY:
+      return { ...state, emergency: action.payload };
     
     default:
       return state;
@@ -244,10 +249,54 @@ export const NotificationProvider = ({ children }) => {
             type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
             payload: notificationData
           });
+
+          // If urgent/security, raise emergency overlay
+          const isEmergency = String(notificationData.priority).toLowerCase() === 'urgent'
+            || String(notificationData.category).toLowerCase() === 'security'
+            || String(notificationData.type).toLowerCase() === 'security_alert'
+            || String(notificationData.type).toLowerCase() === 'emergency_alert';
+          if (isEmergency) {
+            dispatch({ type: NOTIFICATION_ACTIONS.SET_EMERGENCY, payload: notificationData });
+          }
           
           // Update badge count
           const newBadgeCount = state.notifications.length + 1;
           Notifications.setBadgeCountAsync(newBadgeCount);
+        });
+
+        // Listen for emergency notifications
+        socket.on('emergency_notification', (notification) => {
+          log.info('🚨 EMERGENCY NOTIFICATION received via Socket.IO');
+          
+          // Map emergency notification
+          const notificationData = {
+            id: notification.id || `emergency_${Date.now()}`,
+            title: notification.title || 'Emergency Alert',
+            body: notification.message || notification.body || '',
+            message: notification.message || notification.body || '',
+            data: notification.metadata || {},
+            metadata: notification.metadata || {},
+            isRead: false,
+            createdAt: notification.timestamp || new Date().toISOString(),
+            type: notification.type || 'security_alert',
+            priority: 'urgent',
+            category: 'security',
+            deviceId: notification.metadata?.deviceId,
+            deviceName: notification.metadata?.deviceName,
+            sensorType: notification.metadata?.sensorType,
+            sensorValue: notification.metadata?.sensorValue,
+            threshold: notification.metadata?.threshold,
+            alertType: notification.metadata?.alertType
+          };
+          
+          // Add to local state
+          dispatch({
+            type: NOTIFICATION_ACTIONS.ADD_NOTIFICATION,
+            payload: notificationData
+          });
+
+          // Set as emergency
+          dispatch({ type: NOTIFICATION_ACTIONS.SET_EMERGENCY, payload: notificationData });
         });
 
         socket.on('disconnect', (reason) => {
@@ -633,6 +682,7 @@ export const NotificationProvider = ({ children }) => {
     testApiConnection,
     // expose for manual re-registration if needed
     registerFCMToken,
+    dispatch,
   };
 
   return (

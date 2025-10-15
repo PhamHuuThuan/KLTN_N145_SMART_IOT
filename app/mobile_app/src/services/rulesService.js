@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class RulesService {
   constructor() {
-    // Route rules API via API Gateway
     this.baseURL = environment.getApiUrl('GATEWAY');
   }
 
@@ -20,19 +19,33 @@ class RulesService {
     }
   }
 
+  // Get authentication token from storage
+  async getAuthToken() {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
   // Get all rules for a user
   async getAllRules(ownerId, params = {}) {
     try {
       const queryParams = new URLSearchParams({
-        ownerId,
         ...params
       });
       
-      console.log('Fetching rules from:', `${this.baseURL}/api/rules?${queryParams}`);
-      
+      const token = await this.getAuthToken();
+
       const response = await fetch(`${this.baseURL}/api/rules?${queryParams}`, {
         method: 'GET',
         headers: await this.getAuthHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
       });
 
       console.log('Rules API response status:', response.status);
@@ -60,11 +73,16 @@ class RulesService {
         headers: await this.getAuthHeaders(),
       });
 
+      console.log('Templates API response status:', response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Templates API error response:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('Templates API response data:', data);
       return data;
     } catch (error) {
       console.error('Error fetching rule templates:', error);
@@ -72,43 +90,29 @@ class RulesService {
     }
   }
 
-  // Get rule by ID
-  async getRuleById(ruleId) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
-        method: 'GET',
-        headers: await this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching rule:', error);
-      throw error;
-    }
-  }
-
   // Create new rule
   async createRule(ruleData) {
     try {
-      console.log('Creating rule with data:', ruleData);
-      console.log('API URL:', `${this.baseURL}/api/rules`);
+      const token = await this.getAuthToken();     
       
+      // Ensure ownerId is included in ruleData
+      if (!ruleData.ownerId) {
+        console.warn('⚠️ No ownerId in ruleData, this may cause issues');
+      }
+      
+      console.log('📤 Creating rule with data:', JSON.stringify(ruleData, null, 2));
+
       const response = await fetch(`${this.baseURL}/api/rules`, {
         method: 'POST',
         headers: await this.getAuthHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify(ruleData),
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-
       const responseText = await response.text();
-      console.log('Response text:', responseText);
 
       if (!response.ok) {
         let errorMessage = `HTTP error! status: ${response.status}`;
@@ -130,191 +134,6 @@ class RulesService {
     }
   }
 
-  // Update rule
-  async updateRule(ruleId, updateData) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
-        method: 'PATCH',
-        headers: await this.getAuthHeaders(),
-        body: JSON.stringify(updateData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error updating rule:', error);
-      throw error;
-    }
-  }
-
-  // Delete rule
-  async deleteRule(ruleId) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
-        method: 'DELETE',
-        headers: await this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error deleting rule:', error);
-      throw error;
-    }
-  }
-
-  // Toggle rule status
-  async toggleRuleStatus(ruleId, isActive) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/status`, {
-        method: 'PATCH',
-        headers: await this.getAuthHeaders(),
-        body: JSON.stringify({ isActive }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error toggling rule status:', error);
-      throw error;
-    }
-  }
-
-  // Get rules for a specific device
-  async getDeviceRules(deviceId, isActive = true) {
-    try {
-      const queryParams = new URLSearchParams({
-        isActive: isActive.toString()
-      });
-      
-      const response = await fetch(`${this.baseURL}/api/rules/device/${deviceId}?${queryParams}`, {
-        method: 'GET',
-        headers: await this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching device rules:', error);
-      throw error;
-    }
-  }
-
-  // Get rule execution history
-  async getRuleExecutions(ruleId, params = {}) {
-    try {
-      const queryParams = new URLSearchParams(params);
-      
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/executions?${queryParams}`, {
-        method: 'GET',
-        headers: await this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching rule executions:', error);
-      throw error;
-    }
-  }
-
-  // Get rule statistics
-  async getRuleStats(ruleId, days = 7) {
-    try {
-      const queryParams = new URLSearchParams({
-        days: days.toString()
-      });
-      
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/stats?${queryParams}`, {
-        method: 'GET',
-        headers: await this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching rule stats:', error);
-      throw error;
-    }
-  }
-
-  // Test rule conditions
-  async testRuleConditions(ruleId, sensorData, deviceData) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/test`, {
-        method: 'POST',
-        headers: await this.getAuthHeaders(),
-        body: JSON.stringify({
-          sensorData,
-          deviceData
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error testing rule conditions:', error);
-      throw error;
-    }
-  }
-
-  // Bulk update rules
-  async bulkUpdateRules(ruleIds, updateData) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/bulk/update`, {
-        method: 'PATCH',
-        headers: await this.getAuthHeaders(),
-        body: JSON.stringify({
-          ruleIds,
-          updateData
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error bulk updating rules:', error);
-      throw error;
-    }
-  }
-
   // Create rule from template
   async createRuleFromTemplate(templateId, ownerId, deviceId, customizations = {}) {
     try {
@@ -331,18 +150,12 @@ class RulesService {
         throw new Error('Device ID is required');
       }
 
-      // First get the template
-      console.log('Fetching templates...');
       const templatesResponse = await this.getRuleTemplates();
-      console.log('Templates response:', templatesResponse);
-      
       if (!templatesResponse.success) {
         throw new Error('Failed to fetch templates');
       }
       
-      const template = templatesResponse.data.find(t => t.id === templateId);
-      console.log('Found template:', template);
-      
+      const template = templatesResponse.data.find(t => t.id === templateId);  
       if (!template) {
         throw new Error(`Template with ID ${templateId} not found`);
       }
@@ -353,13 +166,14 @@ class RulesService {
         description: customizations.description || template.description,
         ownerId,
         deviceId,
-        category: template.category,
+        priority: template.priority || 'medium',
+        maxTriggersPerDay: template.maxTriggersPerDay || 10,
+        cooldownPeriod: template.cooldownPeriod || 300000,
+        isActive: template.isActive !== undefined ? template.isActive : true,
         conditions: template.conditions,
         actions: template.actions,
         ...customizations
       };
-
-      console.log('Rule data to create:', ruleData);
 
       // Create the rule
       const result = await this.createRule(ruleData);
@@ -371,32 +185,120 @@ class RulesService {
     }
   }
 
-  // Get rules by category
-  async getRulesByCategory(ownerId, category) {
+  // Update rule
+  async updateRule(ruleId, updateData) {
     try {
-      return await this.getAllRules(ownerId, { category });
+      const token = await this.getAuthToken();
+      
+      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
+        method: 'PATCH',
+        headers: await this.getAuthHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Update rule result:', data);
+      return data;
     } catch (error) {
-      console.error('Error fetching rules by category:', error);
+      console.error('Error updating rule:', error);
       throw error;
     }
   }
 
-  // Get active rules only
-  async getActiveRules(ownerId) {
+  // Delete rule
+  async deleteRule(ruleId) {
     try {
-      return await this.getAllRules(ownerId, { isActive: true });
+      const token = await this.getAuthToken();
+      
+      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
+        method: 'DELETE',
+        headers: await this.getAuthHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Delete rule result:', data);
+      return data;
     } catch (error) {
-      console.error('Error fetching active rules:', error);
+      console.error('Error deleting rule:', error);
       throw error;
     }
   }
 
-  // Get inactive rules only
-  async getInactiveRules(ownerId) {
+  // Toggle rule status
+  async toggleRuleStatus(ruleId, isActive) {
     try {
-      return await this.getAllRules(ownerId, { isActive: false });
+      const token = await this.getAuthToken();
+      
+      const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/status`, {
+        method: 'PATCH',
+        headers: await this.getAuthHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isActive }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Toggle rule status result:', data);
+      return data;
     } catch (error) {
-      console.error('Error fetching inactive rules:', error);
+      console.error('Error toggling rule status:', error);
+      throw error;
+    }
+  }
+
+  // Respond to an alert related to a rule (acknowledged | dismissed | false_alarm)
+  async respondToAlert(ruleId, response, metadata = {}, timeoutMs = undefined) {
+    try {
+      if (!ruleId || !response) {
+        throw new Error('ruleId and response are required');
+      }
+      const valid = ['acknowledged', 'dismissed', 'false_alarm'];
+      if (!valid.includes(response)) {
+        throw new Error('Invalid response type');
+      }
+
+      const token = await this.getAuthToken();
+      const res = await fetch(`${this.baseURL}/api/rules/${ruleId}/respond`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ response, metadata, ...(timeoutMs ? { timeoutMs } : {}) }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+      return await res.json();
+    } catch (error) {
+      console.error('respondToAlert error:', error);
       throw error;
     }
   }

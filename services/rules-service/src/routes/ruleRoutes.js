@@ -6,27 +6,20 @@ import {
   deleteRule,
   toggleRuleStatus,
   getRuleTemplates,
-  getRulesByDevice,
-  getRulesByOwner,
-  getRuleById,
-  createBulkRules,
-  getRuleStats,
+  respondToAlert
 } from '../controllers/ruleController.js';
 import { validateRuleUpdate, validateRuleStatus } from '../middleware/validation.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Rule CRUD operations
-router.get('/', getAllRules);
+router.get('/', authenticateToken, getAllRules);
 router.get('/templates', getRuleTemplates);
-router.post('/', createRule);
-router.patch('/:ruleId', validateRuleUpdate, updateRule);
-router.patch('/:ruleId/status', validateRuleStatus, toggleRuleStatus);
-router.delete('/:ruleId', deleteRule);
-router.get('/stats/:ownerId', getRuleStats);
-router.get('/device/:deviceId', getRulesByDevice);
-router.get('/owner/:ownerId', getRulesByOwner);
-router.get('/:ruleId', getRuleById);
-router.post('/bulk', createBulkRules);
+router.post('/', authenticateToken, createRule);
+router.patch('/:ruleId', authenticateToken, validateRuleUpdate, updateRule);
+router.patch('/:ruleId/status', authenticateToken, validateRuleStatus, toggleRuleStatus);
+router.delete('/:ruleId', authenticateToken, deleteRule);
+router.post('/:ruleId/respond', authenticateToken, respondToAlert);
 
 export default router;

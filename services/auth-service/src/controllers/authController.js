@@ -2,11 +2,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import axios from 'axios';
-import dotenv from "dotenv";
 
-dotenv.config();
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-strong-secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 function signToken(payload) {
@@ -181,7 +178,7 @@ export const login = async (req, res) => {
       token,
       user: {
         id: user._id,
-        email: user.email, // Use user.email instead of email parameter
+        email: user.email,
         name: user.name,
         phone: user.phone,
         avatar: user.avatar,

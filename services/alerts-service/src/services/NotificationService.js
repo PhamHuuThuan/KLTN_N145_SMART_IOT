@@ -42,6 +42,12 @@ class NotificationService {
         expiresAt = null
       } = notificationData;
 
+      // Debug consolidated alert
+      if (type === 'consolidated_alert') {
+        console.log(`🔄 CONSOLIDATED ALERT processing:`, JSON.stringify(notificationData, null, 2));
+        console.log(`🔄 Consolidated alert rules:`, JSON.stringify(metadata?.rules, null, 2));
+      }
+
       // Validate required fields
       if (!userId) {
         throw new Error('userId is required for notification');
@@ -183,8 +189,8 @@ class NotificationService {
         if (preferences.fcm.tokens.length > 0) {
           console.log(`🔥 Calling fcmService for ${preferences.fcm.tokens.length} tokens`);
           
-          // Use sendEmergency for urgent/security notifications
-          if (notification.priority === 'urgent' || notification.category === 'security' || notification.type === 'security_alert') {
+          // Use sendEmergency for urgent/security/consolidated notifications
+          if (notification.priority === 'urgent' || notification.category === 'security' || notification.type === 'security_alert' || notification.type === 'consolidated_alert') {
             console.log(`🚨 Sending emergency FCM notification`);
             result = await this.fcmService.sendEmergency(
               preferences.fcm.tokens,

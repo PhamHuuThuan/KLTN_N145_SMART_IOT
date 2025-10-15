@@ -114,6 +114,12 @@ class NotificationConsumer {
         metadata: metadata || {}
       };
 
+      // Debug consolidated alert
+      if (type === 'consolidated_alert') {
+        console.log(`🔄 CONSOLIDATED ALERT received:`, JSON.stringify(notificationData, null, 2));
+        console.log(`🔄 Consolidated alert metadata:`, JSON.stringify(metadata, null, 2));
+      }
+
       await this.notificationService.sendNotification(notificationData);
       
       logger.notification('Notification request processed', {
