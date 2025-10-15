@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
 
 const CustomizeModal = ({ 
@@ -12,6 +13,7 @@ const CustomizeModal = ({
   onCreate 
 }) => {
   if (!customizeTemplate) return null;
+  const { t } = useTranslation();
 
   // Initialize customFields.conditions if not exists
   React.useEffect(() => {
@@ -42,10 +44,10 @@ const CustomizeModal = ({
 
   const getSensorLabel = (sensor) => {
     const labelMap = {
-      'temperature': 'Temperature',
-      'humidity': 'Humidity', 
-      'gas_ppm': 'Gas',
-      'smoke': 'Smoke'
+      'temperature': t('rules.temperature'),
+      'humidity': t('rules.humidity'), 
+      'gas_ppm': t('rules.gas'),
+      'smoke': t('rules.smoke')
     };
     return labelMap[sensor] || sensor;
   };
@@ -73,7 +75,7 @@ const CustomizeModal = ({
   return (
     <View style={styles.modalContainer}>
       <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Customize Rule</Text>
+        <Text style={styles.modalTitle}>{t('rules.customizeRule')}</Text>
         <TouchableOpacity
           style={styles.closeButton}
           onPress={onClose}
@@ -82,26 +84,26 @@ const CustomizeModal = ({
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
-        <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Rule name</Text>
+        <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.ruleName')}</Text>
         <TextInput
           style={styles.input}
           value={customFields.name}
           onChangeText={(t) => setCustomFields(prev => ({ ...prev, name: t }))}
-          placeholder="Rule name"
+          placeholder={t('rules.ruleNamePlaceholder')}
         />
-        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>Description</Text>
+        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.ruleDescription')}</Text>
         <TextInput
           style={[styles.input, styles.multilineInput]}
           value={customFields.description}
           onChangeText={(t) => setCustomFields(prev => ({ ...prev, description: t }))}
-          placeholder="Description"
+          placeholder={t('rules.descriptionPlaceholder')}
           multiline
           textAlignVertical="top"
         />
         {/* Editable Conditions */}
         {customizeTemplate.conditions && customizeTemplate.conditions.length > 0 && (
           <View style={styles.conditionsSection}>
-            <Text style={styles.sectionTitle}>Conditions (Editable):</Text>
+            <Text style={styles.sectionTitle}>{t('rules.conditionsEditable')}</Text>
             {customizeTemplate.conditions.map((condition, index) => (
               <View key={index} style={styles.conditionEditItem}>
                 <View style={styles.conditionHeader}>
@@ -116,7 +118,7 @@ const CustomizeModal = ({
                 <View style={styles.conditionInputs}>
                   {/* Operator Selector */}
                   <View style={styles.operatorSelector}>
-                    <Text style={styles.inputLabel}>Operator</Text>
+                    <Text style={styles.inputLabel}>{t('rules.operator')}</Text>
                     <View style={styles.operatorButtons}>
                       {['>', '<', '>=', '<=', '==', '!='].map((op) => (
                         <TouchableOpacity
@@ -143,7 +145,7 @@ const CustomizeModal = ({
                   {/* Value Input */}
                   <View style={styles.valueInput}>
                     <Text style={styles.inputLabel}>
-                      Value {getSensorUnit(condition.sensor)}
+                      {t('rules.value')} {getSensorUnit(condition.sensor)}
                       {getValueHint(condition.sensor)}
                     </Text>
                     <TextInput
@@ -164,7 +166,7 @@ const CustomizeModal = ({
           </View>
         )}
 
-        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>Priority</Text>
+        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.priority')}</Text>
         <View style={styles.prioritySelector}>
           {['low', 'medium', 'high', 'urgent'].map((priority) => (
             <TouchableOpacity
@@ -188,7 +190,7 @@ const CustomizeModal = ({
         {/* Cooldown Period - Hidden for urgent priority */}
         {customFields.priority !== 'urgent' && (
           <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>Cooldown Period (minutes)</Text>
+            <Text style={styles.inputLabel}>{t('rules.cooldownPeriod')}</Text>
             <TextInput
               style={styles.input}
               value={customFields.cooldownPeriod ? String(Math.floor(customFields.cooldownPeriod / 60000)) : ''}
@@ -205,7 +207,7 @@ const CustomizeModal = ({
         {/* Max Triggers Per Day - Hidden for urgent priority */}
         {customFields.priority !== 'urgent' && (
           <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>Max Triggers/Day</Text>
+            <Text style={styles.inputLabel}>{t('rules.maxTriggersPerDay')}</Text>
             <TextInput
               style={styles.input}
               value={customFields.maxTriggersPerDay ? String(customFields.maxTriggersPerDay) : ''}
@@ -222,7 +224,7 @@ const CustomizeModal = ({
         {/* Duration - Hidden for urgent priority */}
         {customFields.priority !== 'urgent' && (
           <View style={{ marginTop: 16 }}>
-            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Duration (minutes) - 0 = instant trigger</Text>
+            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.duration')}</Text>
             <TextInput
               style={styles.input}
               value={customFields.duration ? String(Math.floor(customFields.duration / 60000)) : ''}
@@ -241,10 +243,10 @@ const CustomizeModal = ({
           <View style={{ marginTop: 16, padding: 12, backgroundColor: '#F4433622', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F44336' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <MaterialIcons name="priority-high" size={16} color="#F44336" />
-              <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>Emergency Mode</Text>
+              <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>{t('rules.emergencyMode')}</Text>
             </View>
             <Text style={{ color: '#F44336', fontSize: 12 }}>
-              Urgent rules trigger immediately without cooldown or daily limits
+              {t('rules.emergencyModeDescription')}
             </Text>
           </View>
         )}
@@ -263,7 +265,7 @@ const CustomizeModal = ({
           }}
         >
           <MaterialIcons name="check" size={20} color={CONFIG.COLORS.white} />
-          <Text style={styles.createButtonText}>Create with customization</Text>
+          <Text style={styles.createButtonText}>{t('rules.createWithCustomization')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

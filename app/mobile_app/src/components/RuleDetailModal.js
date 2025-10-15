@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Switch } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
 
 const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onSave }) => {
   if (!selectedRule) return null;
+  const { t } = useTranslation();
   const [pausing, setPausing] = useState(false);
   const [unpausing, setUnpausing] = useState(false);
   const [pausedUntilLocal, setPausedUntilLocal] = useState(selectedRule?.pausedUntil || null);
@@ -45,10 +47,10 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
 
   const getSensorLabel = (sensor) => {
     const labelMap = {
-      'temperature': 'Temperature',
-      'humidity': 'Humidity', 
-      'gas_ppm': 'Gas',
-      'smoke': 'Smoke'
+      'temperature': t('rules.temperature'),
+      'humidity': t('rules.humidity'), 
+      'gas_ppm': t('rules.gas'),
+      'smoke': t('rules.smoke')
     };
     return labelMap[sensor] || sensor;
   };
@@ -76,7 +78,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
   return (
     <View style={styles.modalContainer}>
       <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Rule Details</Text>
+        <Text style={styles.modalTitle}>{t('rules.ruleDetails')}</Text>
         <TouchableOpacity
           style={styles.closeButton}
           onPress={onClose}
@@ -88,7 +90,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         {isPaused && (
           <View style={styles.pausedBanner}>
             <MaterialIcons name="pause-circle" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pausedBannerText}>Paused until {pausedUntilText}</Text>
+            <Text style={styles.pausedBannerText}>{t('rules.pausedUntil')} {pausedUntilText}</Text>
             <TouchableOpacity
               disabled={unpausing}
               onPress={async () => {
@@ -103,23 +105,23 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
               }}
               style={styles.unpauseButton}
             >
-              <Text style={styles.unpauseButtonText}>{unpausing ? 'Unpausing...' : 'Unpause now'}</Text>
+              <Text style={styles.unpauseButtonText}>{unpausing ? t('rules.unpausing') : t('rules.unpauseNow')}</Text>
             </TouchableOpacity>
           </View>
         )}
-        <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Rule name</Text>
+        <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.ruleName')}</Text>
         <TextInput
           style={styles.input}
           value={editFields.name}
           onChangeText={(t) => setEditFields(prev => ({ ...prev, name: t }))}
-          placeholder="Rule name"
+          placeholder={t('rules.ruleNamePlaceholder')}
         />
-        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>Description</Text>
+        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.ruleDescription')}</Text>
         <TextInput
           style={[styles.input, styles.multilineInput]}
           value={editFields.description}
           onChangeText={(t) => setEditFields(prev => ({ ...prev, description: t }))}
-          placeholder="Description"
+          placeholder={t('rules.descriptionPlaceholder')}
           multiline
           textAlignVertical="top"
         />
@@ -127,7 +129,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         {/* Editable Conditions */}
         {selectedRule.conditions && selectedRule.conditions.length > 0 && (
           <View style={styles.conditionsSection}>
-            <Text style={styles.sectionTitle}>Conditions (Editable):</Text>
+            <Text style={styles.sectionTitle}>{t('rules.conditionsEditable')}</Text>
             {selectedRule.conditions.map((condition, index) => (
               <View key={index} style={styles.conditionEditItem}>
                 <View style={styles.conditionHeader}>
@@ -142,7 +144,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                 <View style={styles.conditionInputs}>
                   {/* Operator Selector */}
                   <View style={styles.operatorSelector}>
-                    <Text style={styles.inputLabel}>Operator</Text>
+                    <Text style={styles.inputLabel}>{t('rules.operator')}</Text>
                     <View style={styles.operatorButtons}>
                       {['>', '<', '>=', '<=', '==', '!='].map((op) => (
                         <TouchableOpacity
@@ -169,7 +171,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                   {/* Value Input */}
                   <View style={styles.valueInput}>
                     <Text style={styles.inputLabel}>
-                      Value {getSensorUnit(condition.sensor)}
+                      {t('rules.value')} {getSensorUnit(condition.sensor)}
                       {getValueHint(condition.sensor)}
                     </Text>
                     <TextInput
@@ -191,7 +193,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         )}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
           <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Priority</Text>
+            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.priority')}</Text>
             <View style={styles.prioritySelector}>
               {['low', 'medium', 'high', 'urgent'].map((priority) => (
                 <TouchableOpacity
@@ -214,7 +216,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             </View>
           </View>
           <View style={{ alignItems: 'center' }}>
-            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Active</Text>
+            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.active')}</Text>
             <Switch
               value={editFields.isActive}
               onValueChange={(val) => setEditFields(prev => ({ ...prev, isActive: val }))}
@@ -227,7 +229,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         {/* Cooldown Period - Hidden for urgent priority */}
         {editFields.priority !== 'urgent' && (
           <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>Cooldown Period (minutes)</Text>
+            <Text style={styles.inputLabel}>{t('rules.cooldownPeriod')}</Text>
             <TextInput
               style={styles.input}
               value={editFields.cooldownPeriod ? String(Math.floor(editFields.cooldownPeriod / 60000)) : ''}
@@ -244,7 +246,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         {/* Max Triggers Per Day - Hidden for urgent priority */}
         {editFields.priority !== 'urgent' && (
           <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>Max Triggers/Day</Text>
+            <Text style={styles.inputLabel}>{t('rules.maxTriggersPerDay')}</Text>
             <TextInput
               style={styles.input}
               value={editFields.maxTriggersPerDay ? String(editFields.maxTriggersPerDay) : ''}
@@ -261,7 +263,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         {/* Duration - Hidden for urgent priority */}
         {editFields.priority !== 'urgent' && (
           <View style={{ marginTop: 16 }}>
-            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>Duration (minutes) - 0 = instant trigger</Text>
+            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.duration')}</Text>
             <TextInput
               style={styles.input}
               value={editFields.duration ? String(Math.floor(editFields.duration / 60000)) : ''}
@@ -280,10 +282,10 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           <View style={{ marginTop: 16, padding: 12, backgroundColor: '#F4433622', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F44336' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <MaterialIcons name="priority-high" size={16} color="#F44336" />
-              <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>Emergency Mode</Text>
+              <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>{t('rules.emergencyMode')}</Text>
             </View>
             <Text style={{ color: '#F44336', fontSize: 12 }}>
-              Urgent rules trigger immediately without cooldown or daily limits
+              {t('rules.emergencyModeDescription')}
             </Text>
           </View>
         )}
@@ -303,11 +305,28 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           }}
         >
           <MaterialIcons name="save" size={20} color={CONFIG.COLORS.white} />
-          <Text style={styles.createButtonText}>Save changes</Text>
+          <Text style={styles.createButtonText}>{t('rules.saveChanges')}</Text>
         </TouchableOpacity>
 
-        {/* Quick actions: pause rule without toggling off */}
+        {/* Quick actions: acknowledge, pause rule without toggling off */}
         <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+          <TouchableOpacity
+            disabled={pausing}
+            onPress={async () => {
+              try {
+                setPausing(true);
+                const rulesService = (await import('../services/rulesService')).default;
+                await rulesService.respondToAlert(selectedRule._id, 'acknowledged', { ruleName: selectedRule.name });
+                onClose && onClose();
+              } finally {
+                setPausing(false);
+              }
+            }}
+            style={[styles.pauseButton, { backgroundColor: '#4CAF50' }]}
+          >
+            <MaterialIcons name="check-circle" size={20} color={CONFIG.COLORS.white} />
+            <Text style={styles.pauseButtonText}>{t('rules.acknowledged')}</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             disabled={pausing}
             onPress={async () => {
@@ -323,7 +342,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             style={[styles.pauseButton, { backgroundColor: '#FFB020' }]}
           >
             <MaterialIcons name="pause-circle" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>Pause 1h</Text>
+            <Text style={styles.pauseButtonText}>{t('rules.pause1h')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             disabled={pausing}
@@ -340,7 +359,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             style={[styles.pauseButton, { backgroundColor: '#E53935' }]}
           >
             <MaterialIcons name="block" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>Pause 24h</Text>
+            <Text style={styles.pauseButtonText}>{t('rules.pause24h')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

@@ -1,21 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
 
 const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
+  const { t } = useTranslation();
+  
   const getPriorityInfo = (priority) => {
     const priorityMap = {
-      'low': { label: 'Low', color: '#4CAF50', icon: 'keyboard-arrow-down' },
-      'medium': { label: 'Medium', color: '#FF9800', icon: 'remove' },
-      'high': { label: 'High', color: '#FF5722', icon: 'keyboard-arrow-up' },
-      'urgent': { label: 'Urgent', color: '#F44336', icon: 'priority-high' }
+      'low': { label: t('rules.low'), color: '#4CAF50', icon: 'keyboard-arrow-down' },
+      'medium': { label: t('rules.medium'), color: '#FF9800', icon: 'remove' },
+      'high': { label: t('rules.high'), color: '#FF5722', icon: 'keyboard-arrow-up' },
+      'urgent': { label: t('rules.urgent'), color: '#F44336', icon: 'priority-high' }
     };
     return priorityMap[priority] || priorityMap['medium'];
   };
 
   const formatCooldown = (cooldownMs) => {
-    if (!cooldownMs) return 'None';
+    if (!cooldownMs) return t('rules.none');
     const minutes = Math.floor(cooldownMs / 60000);
     const hours = Math.floor(minutes / 60);
     if (hours > 0) return `${hours}h`;
@@ -34,10 +37,10 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
 
   const getSensorLabel = (sensor) => {
     const labelMap = {
-      'temperature': 'Temperature',
-      'humidity': 'Humidity', 
-      'gas_ppm': 'Gas',
-      'smoke': 'Smoke'
+      'temperature': t('rules.temperature'),
+      'humidity': t('rules.humidity'), 
+      'gas_ppm': t('rules.gas'),
+      'smoke': t('rules.smoke')
     };
     return labelMap[sensor] || sensor;
   };
@@ -70,7 +73,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
           {/* Conditions Display */}
           {rule.conditions && rule.conditions.length > 0 && (
             <View style={styles.conditionsContainer}>
-              <Text style={styles.conditionsLabel}>Conditions:</Text>
+              <Text style={styles.conditionsLabel}>{t('rules.conditions')}</Text>
               {rule.conditions.map((condition, index) => (
                 <View key={index} style={styles.conditionItem}>
                   <MaterialIcons 
@@ -95,7 +98,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                   <View style={styles.statItem}>
                     <MaterialIcons name="timer" size={12} color={CONFIG.COLORS.gray} />
                     <Text style={styles.statText}>
-                      Cooldown: {formatCooldown(rule.cooldownPeriod)}
+                      {t('rules.cooldown')} {formatCooldown(rule.cooldownPeriod)}
                     </Text>
                   </View>
                 )}
@@ -103,7 +106,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                   <View style={styles.statItem}>
                     <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
                     <Text style={styles.statText}>
-                      Max/day: {rule.maxTriggersPerDay || '∞'}
+                      {t('rules.maxPerDay')} {rule.maxTriggersPerDay || '∞'}
                     </Text>
                   </View>
                 )}
@@ -111,7 +114,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                   <View style={styles.statItem}>
                     <MaterialIcons name="priority-high" size={12} color="#F44336" />
                     <Text style={[styles.statText, { color: '#F44336', fontWeight: 'bold' }]}>
-                      Emergency Mode
+                      {t('rules.emergencyModeLabel')}
                     </Text>
                   </View>
                 )}
@@ -120,13 +123,13 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                 <View style={styles.statItem}>
                   <MaterialIcons name="flash-on" size={12} color={CONFIG.COLORS.gray} />
                   <Text style={styles.statText}>
-                    Triggered: {rule.triggerCount || 0}
+                    {t('rules.triggered')} {rule.triggerCount || 0}
                   </Text>
                 </View>
                 <View style={styles.statItem}>
                   <MaterialIcons name="schedule" size={12} color={CONFIG.COLORS.gray} />
                   <Text style={styles.statText}>
-                    Duration: {formatCooldown(rule.duration)}
+                    {t('rules.durationLabel')} {formatCooldown(rule.duration)}
                   </Text>
                 </View>
               </View>
@@ -151,7 +154,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
           activeOpacity={0.85}
         >
           <MaterialIcons name="edit" size={16} color={CONFIG.COLORS.white} />
-          <Text style={styles.editButtonText}>Edit</Text>
+          <Text style={styles.editButtonText}>{t('rules.edit')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
@@ -159,7 +162,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
           activeOpacity={0.85}
         >
           <MaterialIcons name="delete" size={16} color={CONFIG.COLORS.white} />
-          <Text style={styles.deleteButtonText}>Delete</Text>
+          <Text style={styles.deleteButtonText}>{t('rules.delete')}</Text>
         </TouchableOpacity>
         </View>
       </View>
