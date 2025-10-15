@@ -6,6 +6,9 @@ import connectDB from './config/database.js';
 import ruleRoutes from './routes/ruleRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import RuleConsumer from './consumers/RuleConsumer.js';
+import { createLogger } from './utils/logger.js';
+
+const logger = createLogger('rules-service');
 
 dotenv.config();
 
@@ -31,7 +34,7 @@ function createServer() {
 async function bootstrap() {
   try {
     await connectDB();
-    console.log('📦 MongoDB connected to Rules Service');
+    logger.info('MongoDB connected to Rules Service');
 
     const ruleConsumer = new RuleConsumer();
     await ruleConsumer.start();
@@ -40,23 +43,23 @@ async function bootstrap() {
     const port = process.env.PORT || 3003;
 
     const server = app.listen(port, () => {
-      console.log(`🚀 Rules Service listening on port ${port}`);
-      console.log(`📊 Health check: http://localhost:${port}/health`);
-      console.log(`📋 Rules API: http://localhost:${port}/api/rules`);
+      logger.info(`Rules Service listening on port ${port}`);
+      logger.info(`Health check: http://localhost:${port}/health`);
+      logger.info(`Rules API: http://localhost:${port}/api/rules`);
     });
 
     const gracefulShutdown = async (signal) => {
-      console.log(`\n${signal} received, shutting down gracefully`);
+      logger.info(`${signal} received, shutting down gracefully`);
       try {
         await ruleConsumer.stop();
         
         server.close(() => {
-          console.log('✅ HTTP server closed');
+          logger.info('HTTP server closed');
         });
-        console.log('✅ Graceful shutdown completed');
+        logger.info('Graceful shutdown completed');
         process.exit(0);
       } catch (error) {
-        console.error('❌ Error during shutdown:', error);
+        logger.error('Error during shutdown:', error);
         process.exit(1);
       }
     };
@@ -65,11 +68,11 @@ async function bootstrap() {
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+      logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
     });
     
     process.on('uncaughtException', (error) => {
-      console.error('❌ Uncaught Exception:', error);
+      logger.error('Uncaught Exception:', error);
     });
   } catch (error) {
     process.exit(1);
