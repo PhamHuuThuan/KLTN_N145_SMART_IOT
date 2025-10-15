@@ -1,22 +1,11 @@
 import Rule from '../models/Rule.js';
-import { Kafka } from 'kafkajs';
+import RuleEvaluationService from '../services/RuleEvaluationService.js';
+import { createLogger } from '../utils/logger.js';
 
-// Kafka producer for sending user responses
-const kafka = new Kafka({
-  clientId: 'rules-service-controller',
-  brokers: [process.env.KAFKA_BROKERS || 'localhost:9092']
-});
-const producer = kafka.producer();
+const logger = createLogger('ruleController');
 
-// Initialize producer
-let producerConnected = false;
-const initProducer = async () => {
-  if (!producerConnected) {
-    await producer.connect();
-    producerConnected = true;
-    console.log('✅ Rules Controller Kafka producer connected');
-  }
-};
+// Delegate messaging to RuleEvaluationService to reuse its Kafka producer
+const ruleEvaluationService = new RuleEvaluationService();
 
 // Get all rules for a user
 export const getAllRules = async (req, res) => {
@@ -236,7 +225,7 @@ export const getRuleTemplates = async (req, res) => {
         actions: [
           {
             type: 'send_alert',
-            message: 'Gas leak detected! Emergency mode activated.'
+            message: '🚨 Gas leak detected! Current level: {sensorValue} ppm (Threshold: {threshold} ppm). Emergency mode activated - evacuate immediately!'
           }
         ]
       },
@@ -260,7 +249,7 @@ export const getRuleTemplates = async (req, res) => {
         actions: [
           {
             type: 'send_notification',
-            message: 'Smoke detected! Please check if it\'s from cooking or if there\'s a real fire.'
+            message: '⚠️ Smoke detected! Level: {sensorValue} (Threshold: {threshold}). Please check if it\'s from cooking or if there\'s a real fire. Location: {deviceId}'
           }
         ]
       },
@@ -284,7 +273,7 @@ export const getRuleTemplates = async (req, res) => {
         actions: [
           {
             type: 'send_notification',
-            message: 'High temperature detected!'
+            message: '🌡️ High temperature detected! Current: {sensorValue}°C (Threshold: {threshold}°C). Check ventilation and cooling systems. Device: {deviceId}'
           }
         ]
       },
@@ -308,7 +297,7 @@ export const getRuleTemplates = async (req, res) => {
         actions: [
           {
             type: 'send_notification',
-            message: 'High humidity detected! Consider ventilation.'
+            message: '💧 High humidity detected! Current: {sensorValue}% (Threshold: {threshold}%). Consider ventilation or dehumidifier. Device: {deviceId}'
           }
         ]
       }
@@ -334,103 +323,24 @@ export const respondToAlert = async (req, res) => {
     const { response, metadata = {}, timeoutMs } = req.body || {};
     const userId = req.user?.userId || req.user?.sub;
 
-    if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Unauthorized - user ID required' 
-      });
-    }
-
-    if (!ruleId || !response) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'ruleId and response are required' 
-      });
-    }
-
-    // Validate response type
-    const validResponses = ['acknowledged', 'dismissed', 'false_alarm'];
-    if (!validResponses.includes(response)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Invalid response. Must be one of: ${validResponses.join(', ')}` 
-      });
-    }
-
-    // Find the rule
-    const rule = await Rule.findById(ruleId);
-    if (!rule) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Rule not found' 
-      });
-    }
-
-    // Check if user owns the rule
-    if (rule.ownerId.toString() !== userId) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied - you can only respond to your own rules' 
-      });
-    }
-
-    console.log(`👤 User ${userId} responded to rule ${rule.name}: ${response}`);
-
-    // Send response to alerts-service via Kafka
-    const responseMessage = {
-      type: response,
-      userId: userId,
-      ruleId: ruleId,
-      ruleName: rule.name,
-      deviceId: rule.deviceId,
-      priority: rule.priority,
-      timestamp: new Date(),
-      metadata: {
-        ...metadata,
-        responseTime: Date.now(),
-        userAction: response
-      }
-    };
-
-    // Send response to alerts-service via Kafka
-    try {
-      await initProducer();
-      await producer.send({
-        topic: 'notification-requests',
-        messages: [{
-          key: userId,
-          value: JSON.stringify(responseMessage)
-        }]
-      });
-      console.log(`📤 User response sent to alerts-service: ${response}`);
-    } catch (kafkaError) {
-      console.error('❌ Failed to send user response to alerts-service:', kafkaError);
-      // Don't fail the request, just log the error
-    }
-
-    // Log the response
-    console.log(`📤 User response sent:`, {
-      ruleId,
-      ruleName: rule.name,
-      response,
+    const result = await ruleEvaluationService.handleUserResponse({
       userId,
-      timestamp: new Date()
+      ruleId,
+      response,
+      metadata,
+      timeoutMs
     });
 
     res.json({
       success: true,
       message: `Response '${response}' recorded successfully`,
-      data: {
-        ruleId,
-        ruleName: rule.name,
-        response,
-        timestamp: new Date()
-      }
+      data: result
     });
 
   } catch (error) {
-    console.error('Error handling user response:', error);
-    res.status(500).json({
+    logger.error('Error handling user response:', error);
+    const status = error.statusCode || (error.message?.includes('Unauthorized') ? 401 : 500);
+    res.status(status).json({
       success: false,
       message: 'Failed to process user response',
       error: error.message
