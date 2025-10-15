@@ -2,6 +2,9 @@ import Rule from '../models/Rule.js';
 import mongoose from 'mongoose';
 import { Kafka } from 'kafkajs';
 import RulePriorityService from './RulePriorityService.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('RuleEvaluationService');
 
 class RuleEvaluationService {
   constructor() {
@@ -18,15 +21,72 @@ class RuleEvaluationService {
     
     this.priorityService = new RulePriorityService();
     
-    // Anti-spam: track last evaluation time per device
     this.lastEvaluationTime = new Map();
     this.evaluationCooldown = 5000; // 5 seconds minimum between evaluations
+  }
+
+  // Extract sensor info from rule + sensorData
+  getSensorInfo(rule, sensorData) {
+    let sensorType = 'unknown';
+    let sensorValue = 0;
+    let threshold = 0;
+    let operator = '>';
+
+    for (const condition of rule.conditions) {
+      if (condition.type === 'sensor' && condition.sensor) {
+        sensorType = condition.sensor;
+        operator = condition.operator || '>';
+        threshold = condition.value || 0;
+        switch (condition.sensor) {
+          case 'temperature':
+            sensorValue = sensorData.temp;
+            break;
+          case 'humidity':
+            sensorValue = sensorData.humid;
+            break;
+          case 'gas_ppm':
+            sensorValue = sensorData.gas_ppm;
+            break;
+          case 'smoke':
+            sensorValue = sensorData.smoke;
+            break;
+          default:
+            break;
+        }
+        break;
+      }
+    }
+
+    return { sensorType, sensorValue, threshold, operator };
+  }
+
+  // Compute severity elevation based on sensor
+  shouldElevateSecurity(sensorType, sensorValue) {
+    const isGasLeak = sensorType === 'gas_ppm';
+    const isSmoke = sensorType === 'smoke';
+    const tempHigh = sensorType === 'temperature' && Number(sensorValue) >= 80;
+    return isGasLeak || (isSmoke && Number(sensorValue) === 1) || tempHigh;
+  }
+
+  // Default title by sensor type
+  getDefaultTitle(sensorType) {
+    switch (sensorType) {
+      case 'temperature':
+        return 'Cảnh báo nhiệt độ';
+      case 'humidity':
+        return 'Cảnh báo độ ẩm';
+      case 'gas_ppm':
+        return 'Cảnh báo khí gas';
+      case 'smoke':
+        return 'Cảnh báo khói';
+      default:
+        return `Cảnh báo ${sensorType}`;
+    }
   }
 
   // Đánh giá tất cả rules cho một device khi nhận dữ liệu sensor
   async evaluateRules(deviceId, sensorData, ownerId = null) {
     try {
-      // Anti-spam: check if we evaluated this device recently
       const now = Date.now();
       const lastTime = this.lastEvaluationTime.get(deviceId);
       if (lastTime && (now - lastTime) < this.evaluationCooldown) {
@@ -36,7 +96,6 @@ class RuleEvaluationService {
       this.lastEvaluationTime.set(deviceId, now);
 
       // 🔎 1. Lấy danh sách rule đang hoạt động
-      // If no ownerId, try to get from existing rules for this device
       let finalOwnerId = ownerId;
       
       if (!finalOwnerId) {
@@ -59,15 +118,6 @@ class RuleEvaluationService {
       if (!rules.length) {
         return;
       }
-      
-      console.log(`📋 Rules:`, rules.map(r => ({ 
-        name: r.name, 
-        priority: r.priority, 
-        conditions: r.conditions.map(c => `${c.sensor} ${c.operator} ${c.value}`),
-        cooldown: r.cooldownPeriod,
-        dailyLimit: `${r.triggerCount}/${r.maxTriggersPerDay}`,
-        lastTriggered: r.lastTriggered
-      })));
   
       // ⚙️ 2. Đánh giá tất cả rule
       const triggeredRules = await Promise.all(
@@ -82,31 +132,40 @@ class RuleEvaluationService {
   
       // 📢 3. Xử lý kết quả theo priority
       if (triggeredRules.length > 1) {
-        console.log(`🔄 Multiple rules triggered: ${triggeredRules.map(r => r.name).join(', ')}`);
+        logger.info(`Multiple rules triggered: ${triggeredRules.map(r => r.name).join(', ')}`);
         
         // Sắp xếp theo priority: urgent → high → medium → low
         const sortedRules = this.priorityService.sortByPriority(triggeredRules);
         
-        // Tạo consolidated notification
-        const incident = this.priorityService.createIncidentReport(sortedRules, { ...sensorData, deviceId });
-        const consolidatedMessage = this.priorityService.buildConsolidatedNotification(incident, finalOwnerId);
+        // Nhóm rules theo priority level để gộp thông báo
+        const groupedRules = this.priorityService.groupRulesByPriority(sortedRules);
         
-        await this.sendToAlertsService(consolidatedMessage);
-        console.log(`📤 Consolidated alert sent - Priority: ${incident.severity}`);
+        // Gửi thông báo cho từng nhóm priority
+        for (const [priorityLevel, rules] of Object.entries(groupedRules)) {
+          if (rules.length > 1) {
+            // Gộp nhiều rules cùng priority
+            const incident = this.priorityService.createIncidentReport(rules, { ...sensorData, deviceId });
+            const consolidatedMessage = this.priorityService.buildDetailedConsolidatedNotification(incident, finalOwnerId, sensorData);
+            
+            await this.sendToAlertsService(consolidatedMessage);
+            logger.info(`Consolidated alert sent for ${priorityLevel} priority - ${rules.length} rules`);
+          } else {
+            // Gửi individual notification cho rule đơn lẻ
+            await this.executeActions(rules[0], sensorData).catch(err => {});
+            logger.info(`Individual alert sent for ${priorityLevel} priority - ${rules[0].name}`);
+          }
+        }
         
       } else if (triggeredRules.length === 1) {
-        console.log(`✅ Single rule triggered: ${triggeredRules[0].name}`);
+        logger.info(`Single rule triggered: ${triggeredRules[0].name}`);
         
-        // Send notification for single rule
+        // Send individual notification for single rule
         const rule = triggeredRules[0];
-        const incident = this.priorityService.createIncidentReport([rule], { ...sensorData, deviceId });
-        const singleRuleMessage = this.priorityService.buildConsolidatedNotification(incident, finalOwnerId);
-        
-        await this.sendToAlertsService(singleRuleMessage);
-        console.log(`📤 Single rule alert sent - Priority: ${incident.severity}`);
+        await this.executeActions(rule, sensorData).catch(err => {});
+        logger.info(`Single rule alert sent - Rule: ${rule.name}`);
       }
     } catch (err) {
-      console.error(`❌ evaluateRules() error for device ${deviceId}:`, err);
+      logger.error(`evaluateRules() error for device ${deviceId}:`, err);
     }
   }  
 
@@ -115,16 +174,14 @@ class RuleEvaluationService {
     try {
       const { name } = rule;
 
-      // Special handling for gas leak - always trigger regardless of cooldown/limits
-      const isGasLeak = rule.conditions.some(condition => 
-        condition.type === 'sensor' && condition.sensor === 'gas_ppm'
-      );
+      // Special handling for urgent rules - always trigger regardless of cooldown/limits
+      const isUrgent = rule.priority === 'urgent';
       
-      if (!isGasLeak) {
+      if (!isUrgent) {
         // Check if rule can trigger (active, not paused, not in cooldown, not reached daily limit)
         const canTrigger = await rule.canTrigger();
         if (!canTrigger) {
-          console.log(`⏸️ ${name}: cooldown/daily limit`);
+          logger.debug(`${name}: cooldown/daily limit`);
           return false;
         }
       }
@@ -149,8 +206,9 @@ class RuleEvaluationService {
         }
       }
       
-      // Increment trigger count and update last triggered time (except for gas leak)
-      if (!isGasLeak) {
+      // Increment trigger count and update last triggered time (skip for urgent rules)
+      const isUrgentRule = rule.priority === 'urgent';
+      if (!isUrgentRule) {
         await rule.incrementTriggerCount();
       }
       
@@ -164,7 +222,7 @@ class RuleEvaluationService {
 
       return true;
     } catch (err) {
-      console.error(`❌ evaluateRule() error for ${rule.name}:`, err);
+      logger.error(`evaluateRule() error for ${rule.name}:`, err);
       return false;
     }
   }
@@ -185,7 +243,7 @@ class RuleEvaluationService {
     if (condition.type === 'sensor') {
       return this.evaluateSensorCondition(condition, sensorData);
     }
-    console.warn(`⚠️ Unknown condition type: ${condition.type}`);
+    logger.warn(`Unknown condition type: ${condition.type}`);
     return false;
   }
 
@@ -209,28 +267,17 @@ class RuleEvaluationService {
         sensorValue = sensorData.smoke;
         break;
       default:
-        console.log(`⚠️ Unknown sensor type: ${sensor}`);
+        logger.warn(`Unknown sensor type: ${sensor}`);
         return false;
     }
 
     if (sensorValue === undefined || sensorValue === null) {
-      console.log(`⚠️ Sensor value not available: ${sensor}`);
+      logger.warn(`Sensor value not available: ${sensor}`);
       return false;
     }
 
-    // So sánh giá trị với ngưỡng
-    const result = this.compareValues(sensorValue, operator, value);
-    
-    console.log(`🔍 Sensor condition: ${sensor} ${operator} ${value}, actual: ${sensorValue}, result: ${result}`);
-    console.log(`📊 Full sensor data:`, JSON.stringify(sensorData, null, 2));
-    
-    if (result) {
-      console.log(`✅ CONDITION MET: ${sensor} ${operator} ${value} (${sensorValue})`);
-    } else {
-      console.log(`❌ CONDITION NOT MET: ${sensor} ${operator} ${value} (${sensorValue})`);
-    }
-    
-    return result;
+    // So sánh giá trị với ngưỡng (no verbose logging)
+    return this.compareValues(sensorValue, operator, value);
   }
 
   /**
@@ -260,7 +307,7 @@ class RuleEvaluationService {
         }
         return false;
       default:
-        console.log(`⚠️ Unknown operator: ${operator}`);
+        logger.warn(`Unknown operator: ${operator}`);
         return false;
     }
   }
@@ -268,36 +315,24 @@ class RuleEvaluationService {
   // Thực thi các actions của rule
   async executeActions(rule, sensorData) {
     try {
-      console.log(`🎯 Executing ${rule.actions.length} actions for rule: ${rule.name}`);
-      
-      // Đảm bảo Kafka producer đã kết nối
-      if (!this.producerConnected) {
-        try {
-          await this.producer.connect();
-          this.producerConnected = true;
-          console.log('✅ Kafka producer connected');
-        } catch (connectError) {
-          console.error(`❌ Failed to connect Kafka producer:`, connectError);
-          return;
-        }
-      }
+      logger.info(`Executing ${rule.actions.length} actions for rule: ${rule.name}`);
 
       for (const action of rule.actions) {
         try {
           await this.executeAction(action, rule, sensorData);
         } catch (actionError) {
-          console.error(`❌ Error executing action ${action.type} for rule ${rule.name}:`, actionError);
+          logger.error(`Error executing action ${action.type} for rule ${rule.name}:`, actionError);
         }
       }
     } catch (error) {
-      console.error(`❌ Error executing actions for rule ${rule.name}:`, error);
+      logger.error(`Error executing actions for rule ${rule.name}:`, error);
     }
   }
 
   // Thực thi một action cụ thể
   async executeAction(action, rule, sensorData) {
     try {
-      console.log(`🎯 Executing action: ${action.type} for rule: ${rule.name}`);
+      logger.info(`Executing action: ${action.type} for rule: ${rule.name}`);
 
       switch (action.type) {
         case 'send_notification':
@@ -307,99 +342,74 @@ class RuleEvaluationService {
           await this.sendAlertAction(action, rule, sensorData);
           break;
         default:
-          console.log(`⚠️ Unknown action type: ${action.type}`);
+          logger.warn(`Unknown action type: ${action.type}`);
       }
 
     } catch (error) {
-      console.error(`❌ Error executing action ${action.type}:`, error);
+      logger.error(`Error executing action ${action.type}:`, error);
     }
   }
 
   // Gửi notification action
   async sendNotificationAction(action, rule, sensorData) {
     try {
-      let sensorType = 'unknown';
-      let sensorValue = 0;
-      let threshold = 0;
-      let operator = '>';
-      
-      // Tìm sensor condition
-      for (const condition of rule.conditions) {
-        if (condition.type === 'sensor' && condition.sensor) {
-          sensorType = condition.sensor;
-          operator = condition.operator || '>';
-          threshold = condition.value || 0;
-          
-          switch (condition.sensor) {
-            case 'temperature':
-              sensorValue = sensorData.temp;
-              break;
-            case 'humidity':
-              sensorValue = sensorData.humid;
-              break;
-            case 'gas_ppm':
-              sensorValue = sensorData.gas_ppm;
-              break;
-            case 'smoke':
-              sensorValue = sensorData.smoke;
-              break;
-          }
-          break;
-        }
-      }
+      const { sensorType, sensorValue, threshold, operator } = this.getSensorInfo(rule, sensorData);
       
       let detailedMessage = action.message;
       if (!detailedMessage) {
-        // Tạo message chi tiết dựa trên sensor type
+        const sustainedNote = rule.duration > 0 ? ` trong ${Math.round(rule.duration / 1000)} giây` : '';
+        const unit = sensorType === 'temperature' ? '°C' : (sensorType === 'humidity' ? '%' : (sensorType === 'gas_ppm' ? ' ppm' : ''));
+        let deltaText = '';
+        const isNumber = typeof sensorValue === 'number';
+        if (isNumber) {
+          if (operator === 'between' && Array.isArray(threshold)) {
+            const [min, max] = threshold;
+            if (typeof min === 'number' && sensorValue < min) {
+              deltaText = ` Chênh ${Math.abs(min - sensorValue)}${unit} dưới ngưỡng thấp.`;
+            } else if (typeof max === 'number' && sensorValue > max) {
+              deltaText = ` Vượt ${Math.abs(sensorValue - max)}${unit} trên ngưỡng cao.`;
+            }
+          } else if (typeof threshold === 'number') {
+            if (operator === '<' || operator === '<=') {
+              deltaText = ` Thấp hơn ${Math.abs(threshold - sensorValue)}${unit}.`;
+            } else {
+              deltaText = ` Vượt ${Math.abs(sensorValue - threshold)}${unit}.`;
+            }
+          }
+        }
+        // Tạo message chi tiết, dễ hiểu và có khuyến nghị hành động
         switch (sensorType) {
           case 'temperature':
-            detailedMessage = `Cảm biến nhiệt độ đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}°C, Ngưỡng: ${threshold}°C`;
+            detailedMessage = `🌡️ Nhiệt độ cao: ${sensorValue}°C (ngưỡng: ${threshold}°C).` +
+              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''} Khuyến nghị: kiểm tra nguồn nhiệt, bật quạt/điều hòa, giảm tải thiết bị.`;
             break;
           case 'humidity':
-            detailedMessage = `Cảm biến độ ẩm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}%, Ngưỡng: ${threshold}%`;
+            detailedMessage = `💧 Độ ẩm cao: ${sensorValue}% (ngưỡng: ${threshold}%).` +
+              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''} Khuyến nghị: bật thông gió/khử ẩm, kiểm tra rò rỉ nước.`;
             break;
           case 'gas_ppm':
-            detailedMessage = `Cảm biến gas_ppm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`;
+            detailedMessage = `🛑 Khí gas vượt ngưỡng: ${sensorValue} ppm (ngưỡng: ${threshold} ppm).` +
+              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''} Hành động ngay: mở cửa thông gió, tránh dùng thiết bị điện, kiểm tra nguồn gas.`;
             break;
           case 'smoke':
-            detailedMessage = `Cảm biến khói đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`;
+            detailedMessage = `⚠️ Phát hiện khói: mức ${sensorValue} (ngưỡng: ${threshold}).` +
+              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''} Khuyến nghị: kiểm tra khu vực, chuẩn bị phương án an toàn.`;
             break;
           default:
-            detailedMessage = `Rule "${rule.name}" has been triggered. Sensor: ${sensorType}, Value: ${sensorValue}, Threshold: ${threshold}`;
+            detailedMessage = `📊 ${rule.name}: ${sensorType} = ${sensorValue} (ngưỡng: ${threshold}).` +
+              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''}`;
         }
       } else {
         detailedMessage = this.replacePlaceholders(detailedMessage, sensorData, sensorType, sensorValue, threshold, operator);
       }
 
-      // Determine risk level - Gas leak is most dangerous, smoke is less urgent
-      const isGasLeak = sensorType === 'gas_ppm';
-      const isSmoke = sensorType === 'smoke';
-      const tempHigh = sensorType === 'temperature' && Number(sensorValue) >= 80;
-      const elevateSecurity = isGasLeak || (isSmoke && Number(sensorValue) === 1) || tempHigh;
+      const elevateSecurity = this.shouldElevateSecurity(sensorType, sensorValue);
 
       // Tạo title với placeholder replacement
-      let title = action.title;
-      if (!title) {
-        switch (sensorType) {
-          case 'temperature':
-            title = `Cảnh báo nhiệt độ`;
-            break;
-          case 'humidity':
-            title = `Cảnh báo độ ẩm`;
-            break;
-          case 'gas_ppm':
-            title = `Cảnh báo khí gas`;
-            break;
-          case 'smoke':
-            title = `Cảnh báo khói`;
-            break;
-          default:
-            title = `Cảnh báo ${sensorType}`;
-        }
-      }
+      let title = action.title || this.getDefaultTitle(sensorType);
       title = this.replacePlaceholders(title, sensorData, sensorType, sensorValue, threshold, operator);
       if (!rule.ownerId) {
-        console.error(`❌ Rule ${rule.name} has no ownerId, skipping notification`);
+        logger.error(`Rule ${rule.name} has no ownerId, skipping notification`);
         return;
       }
 
@@ -422,54 +432,15 @@ class RuleEvaluationService {
           operator: operator
         }
       };
-
-      try {
-        const result = await this.producer.send({
-          topic: 'notification-requests',
-          messages: [{
-            key: rule.ownerId.toString(),
-            value: JSON.stringify(message)
-          }]
-        });
-
-        console.log(`✅ Notification sent for rule: ${rule.name}`);
-      } catch (kafkaError) {
-        console.error(`❌ Kafka send error for rule ${rule.name}:`, kafkaError);
-      }
+      await this.sendToAlertsService(message);
     } catch (error) {
-      console.error(`❌ Error sending notification for rule ${rule.name}:`, error);
+      logger.error(`Error sending notification for rule ${rule.name}:`, error);
     }
   }
 
   // Gửi alert action
   async sendAlertAction(action, rule, sensorData) {
-    let sensorType = 'unknown';
-    let sensorValue = 0;
-    let threshold = 0;
-    
-    // Find sensor condition
-    for (const condition of rule.conditions) {
-      if (condition.type === 'sensor' && condition.sensor) {
-        sensorType = condition.sensor;
-        threshold = condition.value || 0;
-        
-        switch (condition.sensor) {
-          case 'temperature':
-            sensorValue = sensorData.temp;
-            break;
-          case 'humidity':
-            sensorValue = sensorData.humid;
-            break;
-          case 'gas_ppm':
-            sensorValue = sensorData.gas_ppm;
-            break;
-          case 'smoke':
-            sensorValue = sensorData.smoke;
-            break;
-        }
-        break;
-      }
-    }
+    const { sensorType, sensorValue, threshold } = this.getSensorInfo(rule, sensorData);
     const isGasLeak = sensorType === 'gas_ppm';
     const isSmoke = sensorType === 'smoke';
     const tempHigh = sensorType === 'temperature' && Number(sensorValue) >= 80;
@@ -477,7 +448,7 @@ class RuleEvaluationService {
 
     // Validate required fields
     if (!rule.ownerId) {
-      console.error(`❌ Rule ${rule.name} has no ownerId, skipping alert`);
+      logger.error(`Rule ${rule.name} has no ownerId, skipping alert`);
       return;
     }
 
@@ -497,6 +468,16 @@ class RuleEvaluationService {
     };
 
     try {
+      if (!this.producerConnected) {
+        try {
+          await this.producer.connect();
+          this.producerConnected = true;
+          logger.info('Kafka producer connected');
+        } catch (connectError) {
+          logger.error('Failed to connect Kafka producer:', connectError);
+          return;
+        }
+      }
       await this.producer.send({
         topic: 'device-alerts',
         messages: [{
@@ -505,22 +486,24 @@ class RuleEvaluationService {
         }]
       });
 
-      console.log(`🚨 Alert sent for rule: ${rule.name}`);
+      logger.info(`Alert sent for rule: ${rule.name}`);
     } catch (kafkaError) {
-      console.error(`❌ Kafka alert send error for rule ${rule.name}:`, kafkaError);
+      logger.error(`Kafka alert send error for rule ${rule.name}:`, kafkaError);
     }
   }
 
   // Gửi message đến alerts-service qua Kafka
   async sendToAlertsService(message) {
     try {
-      console.log(`📤 Attempting to send to alerts-service:`, JSON.stringify(message, null, 2));
-      
       if (!this.producerConnected) {
-        console.log(`🔌 Connecting Kafka producer...`);
-        await this.producer.connect();
-        this.producerConnected = true;
-        console.log('✅ Kafka producer connected');
+        try {
+          await this.producer.connect();
+          this.producerConnected = true;
+          logger.info('Kafka producer connected');
+        } catch (connectError) {
+          logger.error('Failed to connect Kafka producer:', connectError);
+          return;
+        }
       }
 
       const kafkaMessage = {
@@ -530,15 +513,13 @@ class RuleEvaluationService {
           value: JSON.stringify(message) 
         }]
       };
-      
-      console.log(`📤 Sending Kafka message:`, JSON.stringify(kafkaMessage, null, 2));
-      
+
       const result = await this.producer.send(kafkaMessage);
-      console.log(`✅ Message sent successfully to alerts-service:`, result);
+      logger.info(`Message sent successfully to alerts-service:`, result);
       
     } catch (error) {
-      console.error(`❌ Error sending to alerts-service:`, error);
-      console.error(`❌ Error details:`, error.message, error.stack);
+      logger.error(`Error sending to alerts-service:`, error);
+      logger.error(`Error details:`, error.message, error.stack);
     }
   }
 
@@ -570,7 +551,8 @@ class RuleEvaluationService {
       .replace(/\{sensorValue\}/g, sensorValue !== undefined ? sensorValue : 'N/A')
       .replace(/\{threshold\}/g, threshold !== undefined ? threshold : 'N/A')
       .replace(/\{operator\}/g, operator || '>')
-      .replace(/\{sensorType\}/g, sensorType || 'unknown');
+      .replace(/\{sensorType\}/g, sensorType || 'unknown')
+      .replace(/\{deviceId\}/g, sensorData.deviceId || 'Unknown Device');
 
     // Replace sensor-specific placeholders
     switch (sensorType) {
@@ -588,6 +570,80 @@ class RuleEvaluationService {
         break;
     }
     return result;
+  }
+
+  // Xử lý phản hồi của người dùng với alert/rule
+  async handleUserResponse({ userId, ruleId, response, metadata = {} }) {
+    try {
+      if (!userId) {
+        throw new Error('Unauthorized - user ID required');
+      }
+      if (!ruleId || !response) {
+        throw new Error('ruleId and response are required');
+      }
+
+      const validResponses = ['acknowledged', 'dismissed', 'false_alarm'];
+      if (!validResponses.includes(response)) {
+        throw new Error(`Invalid response. Must be one of: ${validResponses.join(', ')}`);
+      }
+
+      const rule = await Rule.findById(ruleId);
+      if (!rule) {
+        const err = new Error('Rule not found');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      if (rule.ownerId.toString() !== String(userId)) {
+        const err = new Error('Access denied - you can only respond to your own rules');
+        err.statusCode = 403;
+        throw err;
+      }
+
+      logger.info(`User ${userId} responded to rule ${rule.name}: ${response}`);
+
+      // Handle rule pausing based on response
+      if (response === 'dismissed') {
+        rule.pausedUntil = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        await rule.save();
+        logger.info(`Rule ${rule.name} paused for 1 hour`);
+      } else if (response === 'false_alarm') {
+        rule.pausedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        await rule.save();
+        logger.info(`Rule ${rule.name} paused for 24 hours`);
+      }
+
+      const responseMessage = {
+        type: response,
+        userId: String(userId),
+        ruleId: String(ruleId),
+        ruleName: rule.name,
+        deviceId: rule.deviceId,
+        priority: rule.priority,
+        timestamp: new Date(),
+        metadata: {
+          ...metadata,
+          responseTime: Date.now(),
+          userAction: response
+        }
+      };
+
+      try {
+        await this.sendToAlertsService({ userId, ...responseMessage });
+        logger.info(`User response sent to alerts-service: ${response}`);
+      } catch (kafkaError) {
+        logger.error('Failed to send user response to alerts-service:', kafkaError);
+      }
+
+      return {
+        ruleId: String(ruleId),
+        ruleName: rule.name,
+        response,
+        timestamp: new Date()
+      };
+    } catch (error) {
+      throw error;
+    }
   }
 }
 

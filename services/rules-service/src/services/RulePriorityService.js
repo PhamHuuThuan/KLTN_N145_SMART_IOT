@@ -136,7 +136,7 @@ class RulePriorityService {
   }
 
   /**
-   * Thực thi một rule cụ thể (chỉ log, không execute vì đã execute rồi)
+   * Thực thi một rule cụ thể
    */
   async executeRule(rule, sensorData) {
     console.log(`🎯 Rule already executed: ${rule.name} (${rule.priority})`);
@@ -149,24 +149,87 @@ class RulePriorityService {
     };
   }
 
-  /**
-   * Tạo thông báo hợp nhất để gửi qua alerts-service
+    /**
+   * Nhóm rules theo priority level
    */
-  buildConsolidatedNotification(incident, userId) {
-    const { severity, summary, rules } = incident;
+    groupRulesByPriority(rules) {
+      const groups = {
+        urgent: [],
+        high: [],
+        medium: [],
+        low: []
+      };
+      
+      rules.forEach(rule => {
+        if (groups[rule.priority]) {
+          groups[rule.priority].push(rule);
+        }
+      });
+      
+      // Chỉ trả về các nhóm có rules
+      return Object.fromEntries(
+        Object.entries(groups).filter(([priority, rules]) => rules.length > 0)
+      );
+    }
+
+  /**
+   * Tạo thông báo hợp nhất chi tiết với thông tin từng rule
+   */
+  buildDetailedConsolidatedNotification(incident, userId, sensorData) {
+    const { severity, rules, deviceId } = incident;
     
     let title, message;
     
     if (severity === 'critical') {
       title = '🚨 EMERGENCY ALERT';
-      message = `Multiple critical hazards detected: ${summary}`;
     } else if (severity === 'high') {
       title = '⚠️ SAFETY ALERT';
-      message = `Safety concerns detected: ${summary}`;
     } else {
       title = 'ℹ️ SYSTEM ALERT';
-      message = `Multiple alerts: ${summary}`;
     }
+    
+    // Tạo message chi tiết cho từng rule
+    const detailedMessages = rules.map(rule => {
+      const condition = rule.conditions[0];
+      const sensorType = condition.sensor;
+      const threshold = condition.value;
+      const operator = condition.operator;
+      
+      // Lấy giá trị sensor hiện tại
+      let sensorValue;
+      switch (sensorType) {
+        case 'temperature':
+          sensorValue = sensorData.temp;
+          break;
+        case 'humidity':
+          sensorValue = sensorData.humid;
+          break;
+        case 'gas_ppm':
+          sensorValue = sensorData.gas_ppm;
+          break;
+        case 'smoke':
+          sensorValue = sensorData.smoke;
+          break;
+        default:
+          sensorValue = 'N/A';
+      }
+      
+      // Tạo message cho từng rule
+      switch (sensorType) {
+        case 'temperature':
+          return `🌡️ ${rule.name}: Current ${sensorValue}°C (Threshold: ${threshold}°C)`;
+        case 'humidity':
+          return `💧 ${rule.name}: Current ${sensorValue}% (Threshold: ${threshold}%)`;
+        case 'gas_ppm':
+          return `🚨 ${rule.name}: Current ${sensorValue} ppm (Threshold: ${threshold} ppm)`;
+        case 'smoke':
+          return `⚠️ ${rule.name}: Level ${sensorValue} (Threshold: ${threshold})`;
+        default:
+          return `📊 ${rule.name}: ${sensorType} ${operator} ${threshold}`;
+      }
+    });
+    
+    message = detailedMessages.join('\n\n');
     
     // Map severity to priority
     const priorityMap = {
@@ -187,7 +250,7 @@ class RulePriorityService {
         incidentId: incident.id,
         totalRules: rules.length,
         severity,
-        deviceId: incident.deviceId,
+        deviceId: deviceId,
         rules: rules.map(r => ({ id: r.id, name: r.name, priority: r.priority }))
       }
     };
