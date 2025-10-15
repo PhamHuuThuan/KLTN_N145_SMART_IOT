@@ -169,6 +169,7 @@ class RulesService {
         priority: template.priority || 'medium',
         maxTriggersPerDay: template.maxTriggersPerDay || 10,
         cooldownPeriod: template.cooldownPeriod || 300000,
+        duration: template.duration || 0,
         isActive: template.isActive !== undefined ? template.isActive : true,
         conditions: template.conditions,
         actions: template.actions,

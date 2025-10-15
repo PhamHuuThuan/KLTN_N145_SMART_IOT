@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import DeviceSelector from '../components/DeviceSelector';
 import RuleCard from '../components/RuleCard';
@@ -12,6 +13,7 @@ import { useRuleActions } from '../hooks/useRuleActions';
 import CONFIG from '../constants/config';
 
 const RulesScreen = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
@@ -24,8 +26,6 @@ const RulesScreen = () => {
     maxTriggersPerDay: 10,
     cooldownPeriod: 300000,
     sensorValue: '',
-    timeHour: '',
-    timeMinute: '',
   });
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedRule, setSelectedRule] = useState(null);
@@ -38,8 +38,6 @@ const RulesScreen = () => {
     maxTriggersPerDay: 10,
     cooldownPeriod: 300000,
     sensorValue: '',
-    timeHour: '',
-    timeMinute: '',
   });
   const { rules, templates, devices, loading, refreshing, loadRules, onRefresh } = useRulesData();
   const { creatingRule, creatingTemplateId, toggleRuleStatus, deleteRule, createRuleFromTemplate, updateRule } = useRuleActions(loadRules);
@@ -67,8 +65,6 @@ const RulesScreen = () => {
       duration: template.duration || 0,
       conditions: template.conditions || [],
       sensorValue: template?.conditions?.[0]?.type === 'sensor' ? `${template.conditions[0].value}` : '',
-      timeHour: template?.conditions?.[0]?.type === 'time' ? `${template.conditions[0]?.timeCondition?.hour ?? ''}` : '',
-      timeMinute: template?.conditions?.[0]?.type === 'time' ? `${template.conditions[0]?.timeCondition?.minute ?? ''}` : '',
     });
     setCustomizeVisible(true);
   };
@@ -105,8 +101,6 @@ const RulesScreen = () => {
       duration: rule.duration || 0,
       conditions: rule.conditions || [],
       sensorValue: rule?.conditions?.[0]?.type === 'sensor' ? String(rule.conditions[0].value) : '',
-      timeHour: rule?.conditions?.[0]?.type === 'time' ? String(rule.conditions[0]?.timeCondition?.hour ?? '') : '',
-      timeMinute: rule?.conditions?.[0]?.type === 'time' ? String(rule.conditions[0]?.timeCondition?.minute ?? '') : '',
     });
     setDetailVisible(true);
   };
@@ -161,7 +155,7 @@ const RulesScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading rules...</Text>
+        <Text style={styles.loadingText}>{t('rules.loading')}</Text>
       </View>
     );
   }
@@ -169,7 +163,7 @@ const RulesScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Rules Management</Text>
+        <Text style={styles.title}>{t('rules.rulesManagement')}</Text>
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => setShowTemplatesModal(true)}
@@ -193,7 +187,7 @@ const RulesScreen = () => {
       <View style={styles.rulesCard}>
         <View style={styles.rulesHeader}>
           <MaterialIcons name="rule" size={20} color={CONFIG.THEME.primary} />
-          <Text style={styles.sectionTitle}>Rule Data</Text>
+          <Text style={styles.sectionTitle}>{t('rules.ruleData')}</Text>
         </View>
 
         <FlatList
@@ -209,9 +203,9 @@ const RulesScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <MaterialIcons name="rule" size={48} color={CONFIG.THEME.gray} />
-              <Text style={styles.emptyText}>No rules yet</Text>
+              <Text style={styles.emptyText}>{t('rules.noRulesYet')}</Text>
               <Text style={styles.emptySubtext}>
-                Create your first rule from available templates
+                {t('rules.createFirstRule')}
               </Text>
             </View>
           }
@@ -226,7 +220,7 @@ const RulesScreen = () => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Rule Templates</Text>
+            <Text style={styles.modalTitle}>{t('rules.ruleTemplates')}</Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowTemplatesModal(false)}
@@ -238,9 +232,9 @@ const RulesScreen = () => {
           {templates.length === 0 ? (
             <View style={styles.emptyContainer}>
               <MaterialIcons name="library-books" size={64} color={CONFIG.THEME.gray} />
-              <Text style={styles.emptyText}>No Templates Available</Text>
+              <Text style={styles.emptyText}>{t('rules.noTemplatesAvailable')}</Text>
               <Text style={styles.emptySubtext}>
-                Rule templates are not loaded. Please check your connection and try again.
+                {t('rules.templatesNotLoaded')}
               </Text>
             </View>
           ) : (
@@ -253,7 +247,7 @@ const RulesScreen = () => {
           )}
           {creatingRule && (
             <View style={styles.loadingOverlay}>
-              <Text style={styles.loadingText}>Creating...</Text>
+              <Text style={styles.loadingText}>{t('rules.creating')}</Text>
             </View>
           )}
         </View>
@@ -274,7 +268,7 @@ const RulesScreen = () => {
         />
         {busyAction === 'save' && (
           <View style={styles.loadingOverlay}>
-            <Text style={styles.loadingText}>Saving...</Text>
+            <Text style={styles.loadingText}>{t('common.saving')}</Text>
           </View>
         )}
       </Modal>
