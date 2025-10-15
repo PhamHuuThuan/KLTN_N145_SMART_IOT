@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import rulesService from '../services/rulesService';
 import apiService from '../services/apiService';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('useRulesData');
 
 export const useRulesData = () => {
   const { user } = useAuth();
@@ -20,7 +22,7 @@ export const useRulesData = () => {
       setDevices(deviceIds);
       return deviceIds;
     } catch (e) {
-      console.error('Failed to load devices for RulesScreen:', e);
+      log.error('Failed to load devices for RulesScreen:', e);
       setDevices([]);
       return [];
     }
@@ -28,40 +30,40 @@ export const useRulesData = () => {
 
   const loadRules = async (selectedDevice) => {
     try {
-      console.log('Loading rules for user:', user?.id);
+      log.info('Loading rules for user:', user?.id);
       const params = selectedDevice ? { deviceId: selectedDevice } : {};
       const response = await rulesService.getAllRules(user?.id, params);
-      console.log('Rules response:', response);
+      log.debug('Rules response:', response);
       
       if (response.success) {
         const items = response.data || [];
         setRules(items);
-        console.log('Rules loaded successfully:', response.data?.length || 0, 'rules');
+        log.info('Rules loaded successfully:', response.data?.length || 0, 'rules');
       } else {
-        console.error('Failed to load rules:', response.message);
+        log.error('Failed to load rules:', response.message);
         setRules([]);
       }
     } catch (error) {
-      console.error('Error loading rules:', error);
+      log.error('Error loading rules:', error);
       setRules([]);
     }
   };
 
   const loadTemplates = async () => {
     try {
-      console.log('Loading rule templates...');
+      log.info('Loading rule templates...');
       const response = await rulesService.getRuleTemplates();
-      console.log('Templates response:', response);
+      log.debug('Templates response:', response);
       
       if (response.success) {
         setTemplates(response.data || []);
-        console.log('Templates loaded successfully:', response.data?.length || 0, 'templates');
+        log.info('Templates loaded successfully:', response.data?.length || 0, 'templates');
       } else {
-        console.error('Failed to load templates:', response.message);
+        log.error('Failed to load templates:', response.message);
         setTemplates([]);
       }
     } catch (error) {
-      console.error('Error loading templates:', error);
+      log.error('Error loading templates:', error);
       setTemplates([]);
     }
   };
@@ -74,8 +76,8 @@ export const useRulesData = () => {
         loadTemplates()
       ]);
     } catch (error) {
-      console.error('Error loading data:', error);
-      Alert.alert('Error', 'Failed to load rules data');
+      log.error('Error loading data:', error);
+      log.error('Failed to load rules data');
     } finally {
       setLoading(false);
     }

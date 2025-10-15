@@ -1,8 +1,13 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import rulesService from '../services/rulesService';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('useRuleActions');
 
 export const useRuleActions = (loadRules) => {
+  const { t } = useTranslation();
   const [creatingRule, setCreatingRule] = useState(false);
   const [creatingTemplateId, setCreatingTemplateId] = useState(null);
 
@@ -13,18 +18,18 @@ export const useRuleActions = (loadRules) => {
         await loadRules();
       }
     } catch (error) {
-      console.error('Error toggling rule status:', error);
+      log.error('Error toggling rule status:', error);
     }
   };
 
   const deleteRule = async (ruleId, ruleName) => {
     Alert.alert(
-      'Delete Rule',
-      `Are you sure you want to delete "${ruleName}"?`,
+      t('rules.deleteRule'),
+      t('rules.deleteRuleConfirm', { ruleName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('rules.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -33,7 +38,7 @@ export const useRuleActions = (loadRules) => {
                 await loadRules();
               }
             } catch (error) {
-              console.error('Error deleting rule:', error);
+              log.error('Error deleting rule:', error);
             }
           }
         }
@@ -50,15 +55,15 @@ export const useRuleActions = (loadRules) => {
       
       const userId = user?.id || user?.userId || user?._id;
       if (!userId) {
-        console.error('User ID is required to create a rule. User object:', user);
+        log.error('User ID is required to create a rule. User object:', user);
         return;
       }
       if (!selectedDevice) {
-        console.error('Device selection is required to create a rule');
+        log.error('Device selection is required to create a rule');
         return;
       }
 
-      console.log('Creating rule from template:', template);
+      log.info('Creating rule from template:', template);
 
       const response = await rulesService.createRuleFromTemplate(
         template.id,
@@ -71,12 +76,12 @@ export const useRuleActions = (loadRules) => {
         await loadRules();
         return true;
       } else {
-        console.error('Failed to create rule from template:', response.message);
+        log.error('Failed to create rule from template:', response.message);
         return false;
       }
     } catch (error) {
-      console.error('Error creating rule from template:', error);
-      console.error('Create rule failed:', error.message);
+      log.error('Error creating rule from template:', error);
+      log.error('Create rule failed:', error.message);
       return false;
     } finally {
       setCreatingRule(false);
@@ -91,11 +96,11 @@ export const useRuleActions = (loadRules) => {
         await loadRules();
         return true;
       } else {
-        console.error('Failed to update rule:', response.message || 'Unknown error');
+        log.error('Failed to update rule:', response.message || 'Unknown error');
         return false;
       }
     } catch (error) {
-      console.error('Error updating rule:', error.message);
+      log.error('Error updating rule:', error.message);
       return false;
     }
   };
