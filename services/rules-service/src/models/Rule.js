@@ -121,8 +121,8 @@ ruleSchema.statics.findActiveRulesForDevice = async function (deviceId, ownerId 
 
 // find by owner
 ruleSchema.statics.findByOwner = async function (ownerId, options = {}) {
-  const { deviceId, category, isActive, limit = 50, page = 1 } = options;
-  const query = { ownerId, ...(deviceId && { deviceId }), ...(category && { category }), ...(isActive !== undefined && { isActive }) };
+  const { deviceId, isActive, limit = 50, page = 1 } = options;
+  const query = { ownerId, ...(deviceId && { deviceId }), ...(isActive !== undefined && { isActive }) };
 
   const rules = await this.find(query)
     .sort({ createdAt: -1 })
