@@ -2,16 +2,10 @@ import logger from '../utils/logger.js';
 
 class InAppService {
   constructor() {
-    this.activeConnections = new Map(); // Store WebSocket connections
+    this.activeConnections = new Map();
   }
 
-  /**
-   * Send in-app notification
-   * @param {string} userId - User ID
-   * @param {string} title - Notification title
-   * @param {string} message - Notification message
-   * @param {Object} metadata - Additional metadata
-   */
+
   async send(userId, title, message, metadata = {}, type = undefined, category = undefined, priority = undefined) {
     try {
       const notification = {
@@ -21,37 +15,23 @@ class InAppService {
         message,
         metadata,
         timestamp: new Date().toISOString(),
-        // Preserve semantic fields so client can render consistently
         ...(type ? { type } : {}),
         ...(category ? { category } : {}),
         ...(priority ? { priority } : {})
       };
 
-      // Send via WebSocket if user is connected
       if (this.activeConnections.has(userId)) {
         const connection = this.activeConnections.get(userId);
         this._sendViaWebSocket(connection, notification);
       }
 
-      // Send via Socket.IO if available
       if (global.io) {
-        console.log(`🔌 Sending notification via Socket.IO to user_${userId}:`, notification);
-        
-        // Check if this is an emergency notification
         const isEmergency = priority === 'urgent' || category === 'security' || type === 'security_alert' || type === 'consolidated_alert';
         
-        // Debug consolidated alert
-        if (type === 'consolidated_alert') {
-          console.log(`🔄 CONSOLIDATED ALERT InAppService:`, JSON.stringify(notification, null, 2));
-          console.log(`🔄 Consolidated alert isEmergency: ${isEmergency}`);
-        }
-        
         if (isEmergency) {
-          console.log(`🚨 EMERGENCY NOTIFICATION - Broadcasting to all users`);
-          // For emergency, broadcast to all connected users
+          logger.info(`Emergency notification - Broadcasting to all users`);
           global.io.emit('emergency_notification', notification);
         } else {
-          // Regular notification - send to specific user
           global.io.to(`user_${userId}`).emit('notification', notification);
         }
         
@@ -63,12 +43,11 @@ class InAppService {
           priority,
           category
         });
-        console.log(`✅ Socket.IO notification sent to user_${userId} (emergency: ${isEmergency})`);
+        logger.info(`Socket.IO notification sent to user_${userId} (emergency: ${isEmergency})`);
       } else {
-        console.log('❌ Socket.IO not available (global.io is null)');
+        logger.error('Socket.IO not available (global.io is null)');
       }
 
-      // Store in database (this will be handled by the main notification service)
       logger.info('In-app notification created', { 
         userId, 
         title, 
@@ -82,13 +61,9 @@ class InAppService {
     }
   }
 
-  /**
-   * Send notification via WebSocket
-   * @private
-   */
   _sendViaWebSocket(connection, notification) {
     try {
-      if (connection && connection.readyState === 1) { // WebSocket.OPEN
+      if (connection && connection.readyState === 1) {
         connection.send(JSON.stringify({
           type: 'notification',
           data: notification
@@ -104,21 +79,14 @@ class InAppService {
     }
   }
 
-  /**
-   * Add WebSocket connection for user
-   * @param {string} userId - User ID
-   * @param {WebSocket} connection - WebSocket connection
-   */
   addConnection(userId, connection) {
     this.activeConnections.set(userId, connection);
     
-    // Handle connection close
     connection.on('close', () => {
       this.activeConnections.delete(userId);
       logger.info('WebSocket connection closed', { userId });
     });
 
-    // Handle connection error
     connection.on('error', (error) => {
       logger.error('WebSocket connection error:', error);
       this.activeConnections.delete(userId);
@@ -127,10 +95,6 @@ class InAppService {
     logger.info('WebSocket connection added', { userId });
   }
 
-  /**
-   * Remove WebSocket connection for user
-   * @param {string} userId - User ID
-   */
   removeConnection(userId) {
     if (this.activeConnections.has(userId)) {
       const connection = this.activeConnections.get(userId);
@@ -140,26 +104,14 @@ class InAppService {
     }
   }
 
-  /**
-   * Get active connections count
-   */
   getActiveConnectionsCount() {
     return this.activeConnections.size;
   }
 
-  /**
-   * Get active user IDs
-   */
   getActiveUserIds() {
     return Array.from(this.activeConnections.keys());
   }
 
-  /**
-   * Send notification to all connected users
-   * @param {string} title - Notification title
-   * @param {string} message - Notification message
-   * @param {Object} metadata - Additional metadata
-   */
   async broadcast(title, message, metadata = {}) {
     try {
       const notification = {

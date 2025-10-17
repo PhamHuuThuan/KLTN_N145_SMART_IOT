@@ -13,7 +13,6 @@ export const createDeviceLog = async (req, res) => {
       metadata
     } = req.body;
     
-    // Validate required fields
     if (!deviceId || !topic || !payload) {
       return res.status(400).json({
         success: false,
@@ -21,7 +20,6 @@ export const createDeviceLog = async (req, res) => {
       });
     }
     
-    // Validate and sanitize payload data
     const sanitizedPayload = {
       ts: Number(payload.ts) || Date.now(),
       temp: payload.temp !== null && payload.temp !== undefined ? Number(payload.temp) : 0,
@@ -37,7 +35,6 @@ export const createDeviceLog = async (req, res) => {
       }
     };
 
-    // Create device log and save to MongoDB
     const deviceLog = new DeviceLog({
       type,
       deviceId,
@@ -48,29 +45,6 @@ export const createDeviceLog = async (req, res) => {
     });
     
     await deviceLog.save();
-    
-    // TODO: Re-enable device validation when MongoDB is properly configured
-    // const device = await Device.findOne({ deviceId });
-    // if (device) {
-    //   device.lastSeenAt = new Date();
-    //   device.status = 'online';
-    //   await device.save();
-    // }
-    
-    // Check for emergency conditions (simplified)
-    try {
-      // Simple emergency check without DeviceLog model
-      const payload = deviceLog.payload;
-      if (payload.temp > 60 || payload.smoke > 100 || payload.gas_ppm > 1000) {
-        console.log(`🚨 EMERGENCY DETECTED: temp=${payload.temp}, smoke=${payload.smoke}, gas=${payload.gas_ppm}`);
-      }
-    } catch (error) {
-      console.error('❌ Emergency check failed:', error.message);
-    }
-    
-    // TODO: Re-enable Kafka when properly configured
-    // Publish emergency event to Kafka
-    // Publish telemetry data to Kafka
     
     res.status(201).json({
       success: true,
@@ -96,7 +70,6 @@ export const getDeviceLogs = async (req, res) => {
     if (type) query.type = type;
     if (severity) query.severity = severity;
     
-    // Add date range filter if provided
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
@@ -195,97 +168,6 @@ export const getTelemetryHistory = async (req, res) => {
   }
 };
 
-// Process unprocessed logs (for background processing)
-export const processUnprocessedLogs = async (req, res) => {
-  try {
-    const unprocessedLogs = await DeviceLog.findUnprocessed();
-    
-    let processedCount = 0;
-    let emergencyCount = 0;
-    
-    for (const log of unprocessedLogs) {
-      // Check for emergency conditions
-      const emergencyCheck = log.checkEmergencyConditions();
-      if (emergencyCheck.emergency) {
-        const device = await Device.findOne({ deviceId: log.deviceId });
-        if (device) {
-          device.enterEmergencyMode();
-          await device.save();
-          
-          // Publish emergency event
-          await producer.send({
-            topic: 'device.emergency',
-            messages: [{
-              key: log.deviceId,
-              value: JSON.stringify({
-                deviceId: log.deviceId,
-                action: 'emergency_mode_activated',
-                reason: emergencyCheck.reason,
-                timestamp: new Date(),
-                telemetry: log.payload
-              })
-            }]
-          });
-          
-          emergencyCount++;
-        }
-      }
-      
-      // Mark as processed
-      log.markAsProcessed();
-      await log.save();
-      processedCount++;
-    }
-    
-    res.json({
-      success: true,
-      message: 'Unprocessed logs processed successfully',
-      processed: processedCount,
-      emergencies: emergencyCount
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error processing unprocessed logs',
-      error: error.message
-    });
-  }
-};
-
-// Get emergency logs
-export const getEmergencyLogs = async (req, res) => {
-  try {
-    const { deviceId, limit = 50, page = 1 } = req.query;
-    
-    let query = { severity: { $in: ['high', 'critical'] } };
-    if (deviceId) query.deviceId = deviceId;
-    
-    const logs = await DeviceLog.find(query)
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .sort({ createdAt: -1 });
-    
-    const total = await DeviceLog.countDocuments(query);
-    
-    res.json({
-      success: true,
-      data: logs,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching emergency logs',
-      error: error.message
-    });
-  }
-};
-
 // Delete old logs (cleanup)
 export const deleteOldLogs = async (req, res) => {
   try {
@@ -296,6 +178,7 @@ export const deleteOldLogs = async (req, res) => {
     const result = await DeviceLog.deleteMany({
       createdAt: { $lt: cutoffDate }
     });
+    
     
     res.json({
       success: true,

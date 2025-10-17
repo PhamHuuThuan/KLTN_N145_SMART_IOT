@@ -58,8 +58,8 @@ class NotificationConsumer {
         }
       };
 
-      console.log(`🚨 Device alert notification data:`, notificationData);
-      console.log(`🚨 Emergency check: category=${effectiveCategory}, priority=${effectivePriority}, type=${effectiveCategory === 'security' ? 'security_alert' : 'device_alert'}`);
+      logger.info(`Device alert notification data:`, notificationData);
+      logger.info(`Emergency check: category=${effectiveCategory}, priority=${effectivePriority}, type=${effectiveCategory === 'security' ? 'security_alert' : 'device_alert'}`);
       
       await this.notificationService.sendNotification(notificationData);
       
@@ -114,12 +114,6 @@ class NotificationConsumer {
         metadata: metadata || {}
       };
 
-      // Debug consolidated alert
-      if (type === 'consolidated_alert') {
-        console.log(`🔄 CONSOLIDATED ALERT received:`, JSON.stringify(notificationData, null, 2));
-        console.log(`🔄 Consolidated alert metadata:`, JSON.stringify(metadata, null, 2));
-      }
-
       await this.notificationService.sendNotification(notificationData);
       
       logger.notification('Notification request processed', {
@@ -168,14 +162,7 @@ class NotificationConsumer {
       
       let notificationData;
       
-      // Handle outlet toggle specifically - DISABLED
-      if (action === 'outlet_toggled') {
-        console.log(`🔌 Outlet toggle: ${outletName} -> ${status} -> ${action} - NOTIFICATION DISABLED`);
-        
-        // Skip outlet notifications completely
-        console.log(`⏭️ Skipping outlet notification - disabled by user request`);
-        return;
-      } else if (action === 'emergency_mode_activated') {
+      if (action === 'emergency_mode_activated') {
         notificationData = {
           userId,
           title: 'Emergency Mode Activated',
@@ -222,7 +209,6 @@ class NotificationConsumer {
           }
         };
       } else {
-        // Handle other user actions
         notificationData = {
           userId,
           title: 'Device Action Completed',
@@ -239,31 +225,23 @@ class NotificationConsumer {
         };
       }
   
-      console.log(`📤 Sending notification for action: ${action}`, notificationData);
-      console.log(`📤 About to call notificationService.sendNotification for userId: ${userId}`);
       await this.notificationService.sendNotification(notificationData);
-      console.log(`📤 notificationService.sendNotification completed for userId: ${userId}`);
       
       logger.notification('User action notification sent', {
         userId,
         action,
         deviceId
       });
-      console.log(`✅ Notification sent successfully for action: ${action}`);
     } catch (error) {
       logger.error('Error handling user action:', error);
     }
   }
 
-  /**
-   * Handle system event messages
-   */
   async handleSystemEvent(topic, message) {
     try {
       const { eventType, message: eventMessage, affectedUsers, metadata } = message;
       
       if (affectedUsers && affectedUsers.length > 0) {
-        // Filter out invalid userIds
         const validUserIds = affectedUsers.filter(userId => 
           userId && mongoose.Types.ObjectId.isValid(userId)
         );
@@ -301,10 +279,6 @@ class NotificationConsumer {
     }
   }
 
-  /**
-   * Get alert title based on alert type and sensor type
-   * @private
-   */
   _getAlertTitle(alertType, sensorType) {
     const sensorNames = {
       temperature: 'Nhiệt độ',
@@ -331,10 +305,6 @@ class NotificationConsumer {
     }
   }
 
-  /**
-   * Get alert message based on alert type and values
-   * @private
-   */
   _getAlertMessage(alertType, sensorType, sensorValue, threshold) {
     const sensorNames = {
       temp: 'nhiệt độ',
@@ -359,10 +329,6 @@ class NotificationConsumer {
     }
   }
 
-  /**
-   * Get alert priority based on alert type
-   * @private
-   */
   _getAlertPriority(alertType, sensorType, sensorValue, threshold) {
     // Elevate to urgent for dangerous sensors or severe breaches
     if (alertType === 'threshold_exceeded') {
@@ -391,10 +357,6 @@ class NotificationConsumer {
     }
   }
 
-  /**
-   * Get action message based on action and result
-   * @private
-   */
   _getActionMessage(action, deviceName, result) {
     const actionNames = {
       ON: 'bật',
@@ -407,10 +369,7 @@ class NotificationConsumer {
     return `Hành động ${actionName} thiết bị ${deviceName} ${status}.`;
   }
 
-  /**
-   * Get system event title based on event type
-   * @private
-   */
+
   _getSystemEventTitle(eventType) {
     const eventTitles = {
       maintenance: 'Bảo trì hệ thống',
@@ -423,10 +382,6 @@ class NotificationConsumer {
     return eventTitles[eventType] || 'Sự kiện hệ thống';
   }
 
-  /**
-   * Get system event priority based on event type
-   * @private
-   */
   _getSystemEventPriority(eventType) {
     switch (eventType) {
       case 'security':

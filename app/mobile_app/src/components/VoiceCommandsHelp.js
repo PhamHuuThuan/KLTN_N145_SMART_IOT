@@ -41,9 +41,6 @@ const VoiceCommandsHelp = ({ visible, onClose }) => {
     }
   ];
 
-  // Debug: Log commands to see if they're being loaded
-  console.log('VoiceCommandsHelp commands:', commands);
-
   return (
     <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
       <View style={[styles.container, { backgroundColor: colors.surface }]}>

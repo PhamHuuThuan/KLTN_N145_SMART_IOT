@@ -392,45 +392,6 @@ class NotificationController {
       });
     }
   }
-
-  /**
-   * Test notification
-   */
-  async testNotification(req, res) {
-    try {
-      const { userId } = req.params;
-      const { methods = ['inApp'] } = req.body;
-      
-      const testNotification = {
-        userId,
-        title: 'Test Notification',
-        message: 'This is a test notification from Smart IoT Kitchen',
-        type: 'system_notification',
-        category: 'system',
-        priority: 'medium',
-        metadata: {
-          test: true,
-          timestamp: new Date().toISOString()
-        }
-      };
-      
-      const notification = await this.notificationService.sendNotification(testNotification);
-      
-      res.status(200).json({
-        success: true,
-        message: 'Test notification sent successfully',
-        data: notification
-      });
-    } catch (error) {
-      logger.error('Error in testNotification controller:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
-
   /**
    * Add FCM token for user
    */

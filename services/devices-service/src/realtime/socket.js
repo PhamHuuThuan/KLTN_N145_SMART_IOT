@@ -9,7 +9,6 @@ export function setupSocket(server) {
   });
 
   ioInstance.on('connection', (socket) => {
-    // Connection established
     socket.emit('connection_ack', { ok: true });
   });
 

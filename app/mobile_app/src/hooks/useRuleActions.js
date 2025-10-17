@@ -58,8 +58,6 @@ export const useRuleActions = (loadRules) => {
         return;
       }
 
-      console.log('Creating rule from template:', template);
-
       const response = await rulesService.createRuleFromTemplate(
         template.id,
         userId,
