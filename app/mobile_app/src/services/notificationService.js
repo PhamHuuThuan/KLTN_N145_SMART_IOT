@@ -9,33 +9,29 @@ class NotificationService {
     const gatewayUrl = environment.getApiUrl('GATEWAY');
     this.baseUrl = `${gatewayUrl}/api/notifications`;
     this.authToken = null;
-    this.client = null; // Cache axios client
+    this.client = null;
     
-    // Minimal init log
     log.info('Initialized', this.baseUrl);
   }
 
-  // Set auth token (should be called from AuthContext)
+  // Set auth token
   setAuthToken(token) {
     this.authToken = token;
-    this.client = null; // Reset client to recreate with new token
+    this.client = null;
     log.debug('Auth token set');
   }
 
   // Clear auth token
   clearAuthToken() {
     this.authToken = null;
-    this.client = null; // Reset client
+    this.client = null;
     log.debug('Auth token cleared');
   }
 
   getApiClient() {
-    // Return cached client if exists and token hasn't changed
     if (this.client) {
       return this.client;
     }
-    
-    // Create axios client
     
     this.client = axios.create({
       baseURL: this.baseUrl,
@@ -76,14 +72,11 @@ class NotificationService {
   }
 
   getAuthToken() {
-    // Try to get token from various sources
     try {
-      // First try the instance token
       if (this.authToken) {
         return this.authToken;
       }
       
-      // Check if we have access to auth context
       if (typeof window !== 'undefined' && window.authToken) {
         return window.authToken;
       }
@@ -283,103 +276,8 @@ class NotificationService {
     }
   }
 
-  // Test notification
-  async testNotification(userId, methods = ['inApp']) {
-    
-    try {
-      const url = `/user/${userId}/test`;
-      
-      const response = await this.getApiClient().post(url, { methods });
-      return {
-        success: true,
-        data: response.data
-      };
-    } catch (error) {
-      log.error('testNotification error', error?.message || error);
-      return {
-        success: false,
-        message: error.message,
-        data: null
-      };
-    }
-  }
-
-  // Create demo notifications for testing
   createDemoNotifications() {
     return [
-      {
-        id: 'demo-1',
-        title: 'Cảnh báo nhiệt độ',
-        message: 'Nhiệt độ trong bếp đã vượt quá 35°C. Hãy kiểm tra thiết bị.',
-        type: 'device_alert',
-        category: 'sensor',
-        priority: 'high',
-        isRead: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
-        metadata: {
-          deviceName: 'Cảm biến nhiệt độ bếp',
-          sensorType: 'temperature',
-          sensorValue: 36.5,
-          threshold: 35,
-        },
-      },
-      {
-        id: 'demo-2',
-        title: 'Thiết bị đã tắt',
-        message: 'Ổ cắm thông minh "Quạt bếp" đã được tắt thành công.',
-        type: 'system_notification',
-        category: 'outlet',
-        priority: 'low',
-        isRead: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-        metadata: {
-          deviceName: 'Quạt bếp',
-          action: 'turn_off',
-        },
-      },
-      {
-        id: 'demo-3',
-        title: 'Bảo trì hệ thống',
-        message: 'Hệ thống sẽ được bảo trì vào lúc 02:00 - 04:00 ngày mai.',
-        type: 'maintenance',
-        category: 'system',
-        priority: 'medium',
-        isRead: true,
-        readAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(), // 6 hours ago
-        metadata: {},
-      },
-      {
-        id: 'demo-4',
-        title: 'Cảnh báo khí gas',
-        message: 'Phát hiện khí gas rò rỉ! Hãy kiểm tra ngay lập tức.',
-        type: 'security_alert',
-        category: 'security',
-        priority: 'urgent',
-        isRead: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 10).toISOString(), // 10 minutes ago
-        metadata: {
-          deviceName: 'Cảm biến khí gas',
-          sensorType: 'gas',
-          sensorValue: 85,
-          threshold: 50,
-        },
-      },
-      {
-        id: 'demo-5',
-        title: 'Quy tắc tự động kích hoạt',
-        message: 'Quy tắc "Tự động bật quạt khi nhiệt độ cao" đã được kích hoạt.',
-        type: 'system_notification',
-        category: 'rule',
-        priority: 'low',
-        isRead: true,
-        readAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(), // 12 hours ago
-        metadata: {
-          ruleId: 'rule-001',
-          ruleName: 'Tự động bật quạt khi nhiệt độ cao',
-        },
-      },
     ];
   }
 }

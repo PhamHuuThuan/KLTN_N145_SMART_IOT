@@ -148,23 +148,18 @@ const useVoiceControl = () => {
       }
     }
     
-    // Build outlet name if device name and number are found
     if (location && number) {
       outletName = `${location}_${number}`;
     } else if (location) {
-      // If only device name without number, use device name as outlet name
       outletName = location;
     } else if (number) {
-      // Map number to outlet ID format (o1, o2, o3, etc.)
       outletName = `o${number}`;
     }
     
-    // Default to outlet if no target specified
     if (!target) {
       target = 'outlet';
     }
-    
-    console.log('Parsed command:', { action, target, number, location, outletName, originalText: transcript });
+  
     
     return { 
       action, 

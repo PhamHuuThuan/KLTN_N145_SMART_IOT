@@ -257,26 +257,6 @@ class ApiService {
     }
   }
 
-  async getDeviceStatus(deviceId) {
-    try {
-      const url = CONFIG.ENDPOINTS.DEVICE_STATUS.replace(':deviceId', deviceId);
-      const response = await apiClient.get(url);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch device status: ${error.message}`);
-    }
-  }
-
-
-  // Test connection
-  async testConnection() {
-    try {
-      const response = await apiClient.get(CONFIG.ENDPOINTS.DEVICES);
-      return response.status === 200;
-    } catch (error) {
-      return false;
-    }
-  }
 }
 
 // Export singleton instance

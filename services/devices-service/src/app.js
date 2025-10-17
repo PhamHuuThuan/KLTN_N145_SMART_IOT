@@ -53,16 +53,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 //   next();
 // });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Devices Service is running',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
 // API routes
 app.use('/api/devices', deviceRoutes);
 app.use('/api/logs', deviceLogRoutes);

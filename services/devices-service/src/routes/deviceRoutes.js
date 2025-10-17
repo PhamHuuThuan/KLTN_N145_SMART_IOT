@@ -16,15 +16,15 @@ import { authenticateToken, checkDeviceOwnership } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Device management routes - all require authentication
+// Device management routes
 router.get('/', authenticateToken, getAllDevices);
-router.get('/status', authenticateToken, getAllDevices); // General status endpoint
+router.get('/status', authenticateToken, getAllDevices); 
 router.get('/:deviceId', authenticateToken, checkDeviceOwnership, getDeviceById);
 router.post('/', authenticateToken, createDevice);
 router.put('/:deviceId', authenticateToken, checkDeviceOwnership, updateDevice);
 router.delete('/:deviceId', authenticateToken, checkDeviceOwnership, deleteDevice);
 
-// Device control routes - all require authentication and ownership check
+// Device control routes 
 router.get('/:deviceId/status', authenticateToken, checkDeviceOwnership, getDeviceStatus);
 router.put('/:deviceId/outlets/:outletId/toggle', authenticateToken, checkDeviceOwnership, toggleOutlet);
 router.put('/:deviceId/outlets/:outletId', authenticateToken, checkDeviceOwnership, updateOutletSettings);
