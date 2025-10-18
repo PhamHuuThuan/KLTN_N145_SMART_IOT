@@ -62,9 +62,7 @@ export const useRuleActions = (loadRules) => {
         log.error('Device selection is required to create a rule');
         return;
       }
-
       log.info('Creating rule from template:', template);
-
       const response = await rulesService.createRuleFromTemplate(
         template.id,
         userId,

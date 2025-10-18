@@ -1,6 +1,6 @@
 import { Kafka } from 'kafkajs';
 import Device from '../models/Device.js';
-import config from '../config/database.js';
+import logger from '../utils/logger.js';
 
 const VERBOSE = process.env.LOG_VERBOSE === 'true';
 const kafka = new Kafka({
@@ -22,9 +22,7 @@ const consumer = kafka.consumer({
 async function startDeviceStatusConsumer() {
   try {
     await consumer.connect();
-    // Device status consumer connected to Kafka
 
-    // Subscribe to device status update topics
     await consumer.subscribe({ 
       topics: [
         'device.status.updated'
@@ -37,21 +35,21 @@ async function startDeviceStatusConsumer() {
       autoCommitInterval: 5000,
       eachMessage: async ({ topic, partition, message }) => {
         try {
-          if (VERBOSE) console.log(`📨 DeviceStatusConsumer received message from topic: ${topic}`);
+          if (VERBOSE) logger.info(`DeviceStatusConsumer received message from topic: ${topic}`);
           const messageData = JSON.parse(message.value.toString());
-          if (VERBOSE) console.log(`📋 Message data`);
+          if (VERBOSE) logger.info(`Message data`);
 
           switch (topic) {
             case 'device.status.updated':
-              if (VERBOSE) console.log(`🔄 Handling device status update`);
+              if (VERBOSE) logger.info(`Handling device status update`);
               await handleDeviceStatusUpdate(messageData);
               break;
             default:
-              if (VERBOSE) console.log(`⚠️ Unknown topic: ${topic}`);
+              if (VERBOSE) logger.info(`Unknown topic: ${topic}`);
           }
         } catch (error) {
-          console.error('❌ Error processing device status message:', error);
-          console.error('📋 Error details:', {
+          logger.error('Error processing device status message:', error);
+          logger.error('Error details:', {
             message: error.message,
             stack: error.stack,
             topic,
@@ -59,10 +57,8 @@ async function startDeviceStatusConsumer() {
             messageValue: message.value.toString()
           });
           
-          // Don't throw error to prevent consumer from stopping
-          if (VERBOSE) console.log(`⚠️ Continuing to process next message...`);
+          if (VERBOSE) logger.info(`Continuing to process next message...`);
           
-          // Mark message as processed even if failed to prevent infinite retry
           try {
             await consumer.commitOffsets([{
               topic,
@@ -70,7 +66,7 @@ async function startDeviceStatusConsumer() {
               offset: message.offset
             }]);
           } catch (commitError) {
-            console.error('❌ Error committing offset:', commitError);
+            logger.error('Error committing offset:', commitError);
           }
         }
       },
@@ -78,7 +74,7 @@ async function startDeviceStatusConsumer() {
 
     // Device status consumer started successfully
   } catch (error) {
-    console.error('❌ Error starting device status consumer:', error);
+    logger.error('Error starting device status consumer:', error);
   }
 }
 
@@ -86,15 +82,14 @@ async function handleDeviceStatusUpdate(data) {
   try {
     const { deviceId, outletId, status, action } = data;
     
-  if (VERBOSE) console.log(`🔄 Processing device status update: ${deviceId}/${outletId} -> ${status}`);
+  if (VERBOSE) logger.info(`Processing device status update: ${deviceId}/${outletId} -> ${status}`);
 
     const device = await Device.findOne({ deviceId });
     if (!device) {
-      console.error(`❌ Device not found: ${deviceId}`);
+      logger.error(`Device not found: ${deviceId}`);
       return;
     }
 
-    // Update outlet status
     const outlet = device.outlets.find(o => o.id === outletId);
     if (outlet) {
       const oldStatus = outlet.status;
@@ -102,11 +97,11 @@ async function handleDeviceStatusUpdate(data) {
       outlet.lastToggleAt = new Date();
       await device.save();
     } else {
-      console.error(`❌ Outlet not found: ${outletId}`);
+      logger.error(`Outlet not found: ${outletId}`);
     }
   } catch (error) {
-    console.error('❌ Error handling device status update:', error);
-    console.error('📋 Error details:', {
+    logger.error('Error handling device status update:', error);
+    logger.error('Error details:', {
       message: error.message,
       stack: error.stack,
       data
@@ -118,11 +113,11 @@ async function handleOutletToggle(data) {
   try {
     const { deviceId, outletId, status } = data;
     
-    console.log(`🔌 Processing outlet toggle: ${deviceId}/${outletId} -> ${status}`);
+    logger.info(`Processing outlet toggle: ${deviceId}/${outletId} -> ${status}`);
 
     const device = await Device.findOne({ deviceId });
     if (!device) {
-      console.error(`❌ Device not found: ${deviceId}`);
+      logger.error(`Device not found: ${deviceId}`);
       return;
     }
 
@@ -133,13 +128,13 @@ async function handleOutletToggle(data) {
       outlet.status = status;
       outlet.lastToggleAt = new Date();
       await device.save();
-      if (VERBOSE) console.log(`✅ Outlet toggle processed: ${outletId} ${oldStatus} -> ${status}`);
+      if (VERBOSE) logger.info(`Outlet toggle processed: ${outletId} ${oldStatus} -> ${status}`);
     } else {
-      console.error(`❌ Outlet not found: ${outletId}`);
+      logger.error(`Outlet not found: ${outletId}`);
     }
   } catch (error) {
-    console.error('❌ Error handling outlet toggle:', error);
-    console.error('📋 Error details:', {
+    logger.error('Error handling outlet toggle:', error);
+    logger.error('Error details:', {
       message: error.message,
       stack: error.stack,
       data
@@ -147,9 +142,7 @@ async function handleOutletToggle(data) {
   }
 }
 
-// Graceful shutdown
 process.on('SIGINT', async () => {
-  // Shutting down device status consumer
   await consumer.disconnect();
   process.exit(0);
 });

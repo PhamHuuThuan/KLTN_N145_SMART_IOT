@@ -45,22 +45,16 @@ const NotificationSettingsScreen = ({ navigation }) => {
     
     setPrefs({ ...prefs, fcm: { enabled } });
     
-    // If enabling FCM, register the token
     if (enabled && user?.id) {
       try {
         log.info('Registering FCM token for user', user.id);
         await registerFCMToken(user.id);
         log.info('FCM token registered after enabling push notifications');
         
-        // Don't call save() here because addFCMToken API already handles the token storage
-        // and save() would overwrite the tokens array
-        
         setFeedback({ visible: true, type: 'success', message: t('settings.pushNotificationsEnabled') });
       } catch (error) {
         log.error('Failed to register FCM token', error?.message || error);
-        // Revert the toggle on error
         setPrefs({ ...prefs, fcm: { enabled: false } });
-        // Show error feedback
         let errorMessage = t('settings.pushTokenError');
         if (error.response?.data?.message) {
           errorMessage = error.response.data.message;
@@ -69,7 +63,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
       }
     } else {
       log.debug('FCM toggle to disabled or no user ID, skipping token registration');
-      // When disabling FCM, save preferences to update fcm.enabled = false
       if (user?.id) {
         log.info('Saving preferences to database...');
         await save();
@@ -183,7 +176,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
 
     const safeStart = async (action, params) => {
       try {
-        console.log('Opening settings intent:', action, params);
         await IntentLauncher.startActivityAsync(action, params);
         return true;
       } catch {

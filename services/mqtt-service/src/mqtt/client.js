@@ -38,23 +38,22 @@ function startMqtt() {
 
   mqttClient.on('connect', () => {
     mqttConnected = true;
-    console.log('✅ MQTT connected');
-    // Subscribe to all device topics using wildcards
+    logger.info('MQTT connected');
     mqttClient.subscribe(['iot/+/telemetry', 'iot/+/ack']);
   });
 
   mqttClient.on('close', () => {
     mqttConnected = false;
-    console.log('❌ MQTT connection closed');
+    logger.error('MQTT connection closed');
   });
 
   mqttClient.on('error', (error) => {
-    console.error(`🚨 MQTT error: ${error.message}`);
-    console.error('🚨 MQTT error details:', error);
+    logger.error(`MQTT error: ${error.message}`);
+    logger.error('MQTT error details:', error);
   });
 
   mqttClient.on('reconnect', () => {
-    console.log('🔄 MQTT reconnecting...');
+    logger.info('MQTT reconnecting...');
   });
 
   mqttClient.on('offline', () => {
@@ -301,7 +300,7 @@ async function updateDeviceOutletSettings(deviceId, outletId, settings) {
 
     return true;
   } catch (error) {
-    console.error('❌ Error updating outlet settings:', error);
+    logger.error('Error updating outlet settings:', error);
     return false;
   }
 }

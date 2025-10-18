@@ -95,7 +95,7 @@
     "exitEmergency": "Exit Emergency",
     "deviceDetails": "Device Details",
     "removeDevice": "Remove Device",
-    "removeDeviceConfirm": "Are you sure you want to remove \"{{deviceId}}\" from your account? This will unassign the device but keep it in the system.",
+    "removeDeviceConfirm": "Are you sure you want to remove \"{{deviceId}}\" from your account?",
     "deviceRemoved": "Device removed successfully",
     "deviceRemovedError": "Failed to remove device",
     "connectedDevices": "Connected Devices",

@@ -95,7 +95,7 @@
     "exitEmergency": "Tắt khẩn cấp",
     "deviceDetails": "Chi tiết thiết bị",
     "removeDevice": "Xóa thiết bị",
-    "removeDeviceConfirm": "Bạn có chắc chắn muốn xóa \"{{deviceId}}\" khỏi tài khoản? Điều này sẽ hủy gán thiết bị nhưng vẫn giữ nó trong hệ thống.",
+    "removeDeviceConfirm": "Bạn có chắc chắn muốn xóa \"{{deviceId}}\" khỏi tài khoản?",
     "deviceRemoved": "Đã xóa thiết bị thành công",
     "deviceRemovedError": "Không thể xóa thiết bị",
     "connectedDevices": "Thiết bị đã kết nối",

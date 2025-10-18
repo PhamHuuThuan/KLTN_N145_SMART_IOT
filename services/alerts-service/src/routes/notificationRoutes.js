@@ -79,12 +79,6 @@ router.delete('/user/:userId/fcm-token',
   (req, res) => notificationController.removeFCMToken(req, res)
 );
 
-// Test notification
-router.post('/user/:userId/test',
-  authenticateToken,
-  (req, res) => notificationController.testNotification(req, res)
-);
-
 // Health check endpoint
 router.get('/health', (req, res) => {
   res.status(200).json({

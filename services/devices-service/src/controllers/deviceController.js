@@ -3,7 +3,7 @@ import DeviceLog from '../models/DeviceLog.js';
 import { producer } from '../config/kafka.js';
 import logger from '../utils/logger.js';
 
-// Helper function to check device ownership
+// Check device ownership
 const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
   const device = await Device.findOne({ deviceId });
   if (!device) {
@@ -17,7 +17,7 @@ const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
   return { success: true, device };
 };
 
-// Get all devices for the authenticated user
+// Get all devices
 export const getAllDevices = async (req, res) => {
   try {
     const userId = req.user.sub;
@@ -25,12 +25,10 @@ export const getAllDevices = async (req, res) => {
     
     logger.info(`Getting devices for user ${userId}`);
     
-    // Only get devices owned by the authenticated user (unless admin)
     let query = {};
     if (req.user.role !== 'admin' && req.user.role !== 'service') {
       query.ownerId = userId;
     } else if (req.query.ownerId) {
-      // Admin can filter by ownerId
       query.ownerId = req.query.ownerId;
     }
     
@@ -118,10 +116,8 @@ export const createDevice = async (req, res) => {
     
     logger.info(`Creating device ${deviceId} for user ${userId}`);
     
-    // Check if device already exists
     const existingDevice = await Device.findOne({ deviceId });
     if (existingDevice) {
-      // If device exists and already has an owner
       if (existingDevice.ownerId) {
         return res.status(400).json({
           success: false,
@@ -129,12 +125,10 @@ export const createDevice = async (req, res) => {
         });
       }
       
-      // If device exists but has no owner, assign it to current user
       existingDevice.ownerId = userId;
       existingDevice.name = name || existingDevice.name;
       await existingDevice.save();
       
-      // Publish device assignment event to Kafka
       producer.send({
         topic: 'device.assigned',
         messages: [{
@@ -157,7 +151,7 @@ export const createDevice = async (req, res) => {
       });
     }
     
-    // Create default outlets if not provided
+    // Create default outlets
     const defaultOutlets = outlets || [
       { id: 'o1', type: 'kitchen', name: 'Kitchen Outlet 1' },
       { id: 'o2', type: 'kitchen', name: 'Kitchen Outlet 2' },
@@ -168,14 +162,13 @@ export const createDevice = async (req, res) => {
     
     const device = new Device({
       deviceId,
-      ownerId: userId, // Set ownerId from JWT token
+      ownerId: userId,
       name,
       outlets: defaultOutlets
     });
     
     await device.save();
     
-    // Publish device creation event to Kafka (non-blocking)
     producer.send({
       topic: 'device.created',
       messages: [{
@@ -189,7 +182,6 @@ export const createDevice = async (req, res) => {
       }]
     }).catch((kafkaError) => {
       logger.error('Failed to publish device creation event to Kafka:', kafkaError);
-      // Don't throw error - device creation was successful
     });
     
     res.status(201).json({
@@ -199,13 +191,6 @@ export const createDevice = async (req, res) => {
     });
   } catch (error) {
     logger.error('Error creating device:', error);
-    logger.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      userId,
-      deviceId,
-      name
-    });
     res.status(500).json({
       success: false,
       message: 'Error creating device',
@@ -233,7 +218,6 @@ export const updateDevice = async (req, res) => {
       });
     }
     
-    // Publish device update event to Kafka (non-blocking)
     producer.send({
       topic: 'device.updated',
       messages: [{
@@ -271,7 +255,6 @@ export const deleteDevice = async (req, res) => {
     
     logger.info(`Deleting device ${deviceId} for user ${userId}`);
     
-    // Check ownership first
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
     if (!ownershipCheck.success) {
       return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
@@ -288,7 +271,6 @@ export const deleteDevice = async (req, res) => {
       });
     }
     
-    // Publish device deletion event to Kafka (non-blocking)
     producer.send({
       topic: 'device.deleted',
       messages: [{
@@ -322,12 +304,9 @@ export const toggleOutlet = async (req, res) => {
     const { deviceId, outletId } = req.params;
     let { status } = req.body;
     
-    // Convert string status to boolean
     if (typeof status === 'string') {
       status = status.toLowerCase() === 'true' || status.toLowerCase() === 'on' || status === '1';
     }
-    
-    console.log(`🔌 Toggle outlet request: ${deviceId}/${outletId} -> ${status ? 'ON' : 'OFF'}`);
     
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -337,7 +316,6 @@ export const toggleOutlet = async (req, res) => {
       });
     }
     
-    // Check if device is online
     if (!device.isOnline()) {
       return res.status(400).json({
         success: false,
@@ -345,7 +323,6 @@ export const toggleOutlet = async (req, res) => {
       });
     }
     
-    // Toggle outlet
     const success = device.toggleOutlet(outletId, status);
     if (!success) {
       return res.status(400).json({
@@ -355,13 +332,10 @@ export const toggleOutlet = async (req, res) => {
     }
     
     await device.save();
-    
-    // Get outlet info for notification
+
     const outlet = device.outlets.find(o => o.id === outletId);
     const outletName = outlet ? outlet.name : outletId;
     
-    // Publish outlet toggle event to Kafka with userId (ownerId) in a timeout-guarded promise
-    console.log(`📤 Publishing outlet toggle to Kafka: ${deviceId}/${outletId} by user ${device.ownerId}`);
     const sendPromise = producer.send({
       topic: 'outlet.toggled',
       messages: [{
@@ -380,13 +354,12 @@ export const toggleOutlet = async (req, res) => {
       }]
     });
 
-    // Timeout safeguard to avoid hanging the HTTP request if Kafka is slow
     const timeoutMs = Number(process.env.KAFKA_SEND_TIMEOUT_MS || 1500);
     await Promise.race([
       sendPromise,
       new Promise((resolve) => setTimeout(() => resolve('timeout'), timeoutMs))
     ]).catch((err) => {
-      console.error('❌ Kafka send error (non-fatal):', err?.message || err);
+      logger.error('Kafka send error (non-fatal):', err?.message || err);
     });
     
     res.json({
@@ -395,9 +368,8 @@ export const toggleOutlet = async (req, res) => {
       message: `Outlet ${outletId} ${status ? 'turned on' : 'turned off'} successfully`
     });
   } catch (error) {
-    console.error('❌ Error toggling outlet:', error);
+    logger.error('Error toggling outlet:', error);
     
-    // Publish failure event to Kafka if we have device info
     try {
       const { deviceId, outletId } = req.params;
       const device = await Device.findOne({ deviceId });
@@ -421,7 +393,7 @@ export const toggleOutlet = async (req, res) => {
         });
       }
     } catch (kafkaError) {
-      console.error('❌ Error publishing failure event:', kafkaError);
+      logger.error('Error publishing failure event:', kafkaError);
     }
     
     res.status(500).json({
@@ -444,20 +416,16 @@ export const enterEmergencyMode = async (req, res) => {
         message: 'Device not found'
       });
     }
-
-    console.log('Device found:', device);
     
-    // Enter emergency mode
     device.enterEmergencyMode();
     await device.save();
     
-  // Dispatch real device commands via Kafka so mqtt-service can act
   try {
     const timeoutMs = Number(process.env.KAFKA_SEND_TIMEOUT_MS || 1500);
     const sendTasks = device.outlets.map((o) => {
       const outletId = o.id;
       const outletName = o.name;
-      const status = !!o.status; // true = ON, false = OFF
+      const status = !!o.status;
       const sendPromise = producer.send({
         topic: 'outlet.toggled',
         messages: [{
@@ -480,15 +448,14 @@ export const enterEmergencyMode = async (req, res) => {
         sendPromise,
         new Promise((resolve) => setTimeout(() => resolve('timeout'), timeoutMs))
       ]).catch((err) => {
-        console.error('❌ Kafka send error in emergency dispatch (non-fatal):', err?.message || err);
+        logger.error('Kafka send error in emergency dispatch (non-fatal):', err?.message || err);
       });
     });
     await Promise.all(sendTasks);
   } catch (dispatchError) {
-    console.error('❌ Error dispatching emergency outlet toggles:', dispatchError);
+    logger.error('Error dispatching emergency outlet toggles:', dispatchError);
   }
   
-    // Publish emergency mode event to Kafka (non-blocking)
     producer.send({
       topic: 'user-actions',
       messages: [{
@@ -534,11 +501,9 @@ export const exitEmergencyMode = async (req, res) => {
       });
     }
     
-    // Exit emergency mode
     device.exitEmergencyMode();
     await device.save();
     
-    // Publish emergency mode exit event to Kafka (non-blocking)
     producer.send({
       topic: 'user-actions',
       messages: [{
@@ -583,7 +548,6 @@ export const getDeviceStatus = async (req, res) => {
       });
     }
     
-    // Get latest telemetry data
     const latestLog = await DeviceLog.findOne({ deviceId })
       .sort({ createdAt: -1 });
     const status = {
@@ -611,7 +575,7 @@ export const getDeviceStatus = async (req, res) => {
   }
 };
 
-// Remove device ownership (unassign device from user)
+// Remove device ownership 
 export const removeDeviceOwnership = async (req, res) => {
   try {
     const { deviceId } = req.params;
@@ -629,11 +593,9 @@ export const removeDeviceOwnership = async (req, res) => {
     
     const device = ownershipCheck.device;
     
-    // Clear ownerId
     device.ownerId = null;
     await device.save();
     
-    // Publish device unassignment event to Kafka
     producer.send({
       topic: 'device.unassigned',
       messages: [{
@@ -685,7 +647,6 @@ export const updateOutletSettings = async (req, res) => {
       });
     }
     
-    // Find and update outlet
     const outlet = device.outlets.find(o => o.id === outletId);
     if (!outlet) {
       return res.status(404).json({
@@ -694,13 +655,11 @@ export const updateOutletSettings = async (req, res) => {
       });
     }
     
-    // Update outlet settings
     if (name) outlet.name = name;
     if (type) outlet.type = type;
     
     await device.save();
     
-    // Publish outlet settings update event to Kafka (non-blocking)
     producer.send({
       topic: 'user-actions',
       messages: [{

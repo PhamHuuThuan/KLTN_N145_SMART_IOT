@@ -42,23 +42,14 @@ class NotificationService {
         expiresAt = null
       } = notificationData;
 
-      // Debug consolidated alert
-      if (type === 'consolidated_alert') {
-        console.log(`🔄 CONSOLIDATED ALERT processing:`, JSON.stringify(notificationData, null, 2));
-        console.log(`🔄 Consolidated alert rules:`, JSON.stringify(metadata?.rules, null, 2));
-      }
-
-      // Validate required fields
       if (!userId) {
         throw new Error('userId is required for notification');
       }
 
-      // Validate userId format (MongoDB ObjectId)
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         throw new Error('userId must be a valid MongoDB ObjectId');
       }
 
-      // Create notification record with timeout
       const notification = new Notification({
         userId,
         title,
@@ -71,7 +62,6 @@ class NotificationService {
         expiresAt
       });
 
-      // Add timeout to prevent hanging
       const savePromise = notification.save();
       const saveTimeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Notification save timeout')), 10000)
@@ -79,8 +69,6 @@ class NotificationService {
 
       await Promise.race([savePromise, saveTimeoutPromise]);
 
-      // Get user preferences with timeout
-      console.log(`🔍 Getting user preferences for userId: ${userId}`);
       const preferencesPromise = UserNotificationPreferences.getUserPreferences(userId);
       const preferencesTimeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('User preferences fetch timeout')), 5000)
@@ -89,21 +77,17 @@ class NotificationService {
       const preferences = await Promise.race([preferencesPromise, preferencesTimeoutPromise]);
       if (!preferences) {
         logger.warn(`No notification preferences found for user ${userId}`);
-        console.log(`⚠️ No preferences found for user ${userId}, skipping channel delivery`);
         return notification;
       }
-      console.log(`✅ User preferences found for userId: ${userId}`);
 
-      // Check if notification should be sent immediately or scheduled
       if (scheduledFor && scheduledFor > new Date()) {
         logger.info(`Notification scheduled for ${scheduledFor}`, { notificationId: notification._id });
         return notification;
       }
 
-      // Send through enabled channels
-      console.log(`📡 Sending notification through channels for userId: ${userId}`);
+      logger.info(`Sending notification through channels for userId: ${userId}`);
       await this._sendThroughChannels(notification, preferences);
-      console.log(`✅ Notification sent through all channels for userId: ${userId}`);
+      logger.info(`Notification sent through all channels for userId: ${userId}`);
 
       return notification;
     } catch (error) {
@@ -112,38 +96,28 @@ class NotificationService {
     }
   }
 
-  /**
-   * Send notification through all enabled channels
-   * @private
-   */
   async _sendThroughChannels(notification, preferences) {
     const { category, priority } = notification;
     const channels = ['inApp', 'email', 'sms', 'fcm'];
 
     for (const channel of channels) {
       try {
-        console.log(`🔍 Checking channel ${channel} for category ${category}, priority ${priority}`);
+        logger.info(`Checking channel ${channel} for category ${category}, priority ${priority}`);
         if (preferences.shouldSendNotification(channel, priority)) {
-          console.log(`📤 Sending notification through ${channel}`);
+          logger.info(`Sending notification through ${channel}`);
           await this._sendThroughChannel(notification, preferences, channel);
-          console.log(`✅ Notification sent through ${channel}`);
+          logger.info(`Notification sent through ${channel}`);
         } else {
-          console.log(`⏭️ Skipping channel ${channel} - not enabled or not matching criteria`);
+          logger.info(`Skipping channel ${channel} - not enabled or not matching criteria`);
         }
       } catch (error) {
         logger.error(`Error sending notification through ${channel}:`, error);
-        console.error(`❌ Error in channel ${channel}:`, error.message);
-        // Update delivery status with error
         notification.deliveryStatus[channel].error = error.message;
         await notification.save();
       }
     }
   }
 
-  /**
-   * Send notification through specific channel
-   * @private
-   */
   async _sendThroughChannel(notification, preferences, channel) {
     const { userId, title, message, metadata } = notification;
     const deliveryStatus = notification.deliveryStatus[channel];
@@ -151,8 +125,6 @@ class NotificationService {
     let result;
     switch (channel) {
       case 'inApp':
-        console.log(`📱 Calling inAppService.send for userId: ${userId}`);
-        // Pass type/category/priority to ensure socket payload is fully enriched
         result = await this.inAppService.send(
           userId,
           title,
@@ -162,36 +134,30 @@ class NotificationService {
           notification.category,
           notification.priority
         );
-        console.log(`📱 inAppService.send result:`, result);
+        logger.info(`inAppService.send result:`, result);
         break;
       case 'email':
-        console.log(`📧 Calling emailService.send to: ${preferences.email.address}`);
         result = await this.emailService.send(
           preferences.email.address,
           title,
           message,
           metadata
         );
-        console.log(`📧 emailService.send result:`, result);
+        logger.info(`emailService.send result:`, result);
         break;
       case 'sms':
         if (preferences.sms.phoneNumber) {
-          console.log(`📱 Calling smsService.send to: ${preferences.sms.phoneNumber}`);
           result = await this.smsService.send(
             preferences.sms.phoneNumber,
             message,
             metadata
           );
-          console.log(`📱 smsService.send result:`, result);
+          logger.info(`smsService.send result:`, result);
         }
         break;
       case 'fcm':
         if (preferences.fcm.tokens.length > 0) {
-          console.log(`🔥 Calling fcmService for ${preferences.fcm.tokens.length} tokens`);
-          
-          // Use sendEmergency for urgent/security/consolidated notifications
           if (notification.priority === 'urgent' || notification.category === 'security' || notification.type === 'security_alert' || notification.type === 'consolidated_alert') {
-            console.log(`🚨 Sending emergency FCM notification`);
             result = await this.fcmService.sendEmergency(
               preferences.fcm.tokens,
               title,
@@ -206,7 +172,6 @@ class NotificationService {
               }
             );
           } else {
-            console.log(`📱 Sending regular FCM notification`);
             result = await this.fcmService.send(
               preferences.fcm.tokens,
               title,
@@ -214,7 +179,7 @@ class NotificationService {
               metadata
             );
           }
-          console.log(`🔥 fcmService result:`, result);
+          logger.info(`fcmService result:`, result);
         }
         break;
     }
@@ -225,7 +190,6 @@ class NotificationService {
       deliveryStatus.error = null;
     }
 
-    // Save notification with timeout
     const savePromise = notification.save();
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Notification update timeout')), 5000)
@@ -234,10 +198,6 @@ class NotificationService {
     await Promise.race([savePromise, timeoutPromise]);
   }
 
-  /**
-   * Send bulk notifications to multiple users
-   * @param {Array} notifications - Array of notification data
-   */
   async sendBulkNotifications(notifications) {
     const results = [];
     
@@ -254,11 +214,6 @@ class NotificationService {
     return results;
   }
 
-  /**
-   * Get user notifications with pagination and filters
-   * @param {string} userId - User ID
-   * @param {Object} options - Query options
-   */
   async getUserNotifications(userId, options = {}) {
     try {
       const notifications = await Notification.getUserNotifications(userId, options);
@@ -277,11 +232,6 @@ class NotificationService {
     }
   }
 
-  /**
-   * Mark notification as read
-   * @param {string} notificationId - Notification ID
-   * @param {string} userId - User ID
-   */
   async markAsRead(notificationId, userId) {
     try {
       const notification = await Notification.findOne({
@@ -301,10 +251,6 @@ class NotificationService {
     }
   }
 
-  /**
-   * Mark all notifications as read for user
-   * @param {string} userId - User ID
-   */
   async markAllAsRead(userId) {
     try {
       const result = await Notification.updateMany(
@@ -342,10 +288,6 @@ class NotificationService {
     }
   }
 
-  /**
-   * Get notification statistics for user
-   * @param {string} userId - User ID
-   */
   async getNotificationStats(userId) {
     try {
       const stats = await Notification.aggregate([
@@ -382,7 +324,6 @@ class NotificationService {
 
       const result = stats[0];
       
-      // Process by type
       const byType = {};
       result.byType.forEach(item => {
         if (!byType[item.type]) {
@@ -392,7 +333,6 @@ class NotificationService {
         if (!item.isRead) byType[item.type].unread++;
       });
 
-      // Process by category
       const byCategory = {};
       result.byCategory.forEach(item => {
         if (!byCategory[item.category]) {
@@ -414,9 +354,6 @@ class NotificationService {
     }
   }
 
-  /**
-   * Process scheduled notifications
-   */
   async processScheduledNotifications() {
     try {
       const now = new Date();
@@ -438,9 +375,6 @@ class NotificationService {
     }
   }
 
-  /**
-   * Clean up expired notifications
-   */
   async cleanupExpiredNotifications() {
     try {
       const now = new Date();

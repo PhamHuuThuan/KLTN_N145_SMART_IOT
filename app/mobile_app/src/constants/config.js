@@ -11,7 +11,6 @@ export const CONFIG = {
   // API Endpoints - Updated for devices-service
   ENDPOINTS: {
     DEVICES: '/api/devices',                    // GET all devices
-    STATUS: '/api/devices/status',              // GET general status
     DEVICE_STATUS: '/api/devices/:deviceId/status', // GET device status
     DEVICE_DETAIL: '/api/devices/:deviceId',    // GET device by id (full info)
     OUTLET_TOGGLE: '/api/devices/:deviceId/outlets/:outletId/toggle', // PUT toggle outlet

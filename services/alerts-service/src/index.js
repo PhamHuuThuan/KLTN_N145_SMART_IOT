@@ -35,35 +35,25 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Alerts service is running',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    version: process.env.npm_package_version || '1.0.0'
-  });
-});
 
 // API routes
 app.use('/api/notifications', notificationRoutes);
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
-  console.log('🔌 WebSocket client connected:', socket.id);
+  logger.info('WebSocket client connected:', socket.id);
   
   // Handle user authentication
   socket.on('authenticate', (data) => {
     if (data.userId) {
       socket.userId = data.userId;
       socket.join(`user_${data.userId}`);
-      console.log(`🔌 User ${data.userId} joined WebSocket room`);
+      logger.info(`User ${data.userId} joined WebSocket room`);
     }
   });
   
   socket.on('disconnect', () => {
-    console.log('🔌 WebSocket client disconnected:', socket.id);
+    logger.info('WebSocket client disconnected:', socket.id);
   });
 });
 
@@ -111,17 +101,16 @@ const initializeServices = async () => {
         [TOPICS.OUTLET_TOGGLED]: (topic, message) => notificationConsumer.handleUserAction(topic, message)
       };
       
-      // Start consuming messages
       await consumeMessages((topic, message) => {
-        console.log(`📨 Alerts-service received message from topic: ${topic}`);
-        console.log(`📋 Message content:`, JSON.stringify(message, null, 2));
+        logger.info(`Alerts-service received message from topic: ${topic}`);
+        logger.info(`Message content:`, JSON.stringify(message, null, 2));
         
         const handler = messageHandlers[topic];
         if (handler) {
           try {
-            console.log(`🔄 Calling handler for topic: ${topic}`);
+            logger.info(`Calling handler for topic: ${topic}`);
             handler(topic, message);
-            console.log(`✅ Handler completed for topic: ${topic}`);
+            logger.info(`Handler completed for topic: ${topic}`);
           } catch (error) {
             logger.error('Error in message handler:', {
               topic,
@@ -129,12 +118,10 @@ const initializeServices = async () => {
               stack: error.stack,
               message: message
             });
-            console.error(`❌ Error in handler for topic ${topic}:`, error.message);
-            // Don't throw error to prevent consumer from stopping
+            logger.error(`Error in handler for topic ${topic}:`, error.message);
           }
         } else {
           logger.warn('No handler found for topic', { topic });
-          console.warn(`⚠️ No handler found for topic: ${topic}`);
         }
       });
       
