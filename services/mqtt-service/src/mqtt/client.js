@@ -3,6 +3,7 @@ const { EventEmitter } = require('events');
 const config = require('../config');
 const { publishTelemetryLog, publishEventLog } = require('../config/kafka');
 const deviceService = require('../services/deviceService');
+const { logger } = require('../utils/logger');
 
 const mqttEvents = new EventEmitter();
 
