@@ -47,7 +47,7 @@ export const useRuleActions = (loadRules) => {
   };
 
   const createRuleFromTemplate = async (template, user, selectedDevice, overrides = {}) => {
-    if (creatingTemplateId) return;
+    if (creatingRule) return;
     
     try {
       setCreatingRule(true);
@@ -64,7 +64,7 @@ export const useRuleActions = (loadRules) => {
       }
       log.info('Creating rule from template:', template);
       const response = await rulesService.createRuleFromTemplate(
-        template.id,
+        template,
         userId,
         selectedDevice,
         overrides

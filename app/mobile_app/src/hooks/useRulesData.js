@@ -3,11 +3,14 @@ import { useAuth } from '../contexts/AuthContext';
 import rulesService from '../services/rulesService';
 import apiService from '../services/apiService';
 import { createLogger } from '../utils/logger';
+import { getRuleTemplates } from '../constants/ruleTemplates';
+import { useLanguage } from './useLanguage';
 
 const log = createLogger('useRulesData');
 
 export const useRulesData = () => {
   const { user } = useAuth();
+  const { language } = useLanguage();
   const [rules, setRules] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [devices, setDevices] = useState([]);
@@ -51,17 +54,14 @@ export const useRulesData = () => {
 
   const loadTemplates = async () => {
     try {
-      log.info('Loading rule templates...');
-      const response = await rulesService.getRuleTemplates();
-      log.debug('Templates response:', response);
-      
-      if (response.success) {
-        setTemplates(response.data || []);
-        log.info('Templates loaded successfully:', response.data?.length || 0, 'templates');
-      } else {
-        log.error('Failed to load templates:', response.message);
-        setTemplates([]);
-      }
+      log.info('Loading rule templates from frontend...');
+      const templatesData = getRuleTemplates(language);
+      const templatesArray = Object.entries(templatesData).map(([key, template]) => ({
+        ...template,
+        key // Add key for reference
+      }));
+      setTemplates(templatesArray);
+      log.info('Templates loaded successfully:', templatesArray.length, 'templates');
     } catch (error) {
       log.error('Error loading templates:', error);
       setTemplates([]);
@@ -92,7 +92,7 @@ export const useRulesData = () => {
   useEffect(() => {
     loadData();
     fetchDevices();
-  }, []);
+  }, [language]); // Reload when language changes
 
   return {
     rules,
