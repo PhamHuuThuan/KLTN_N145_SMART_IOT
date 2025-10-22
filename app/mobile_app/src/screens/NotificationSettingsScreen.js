@@ -124,14 +124,50 @@ const NotificationSettingsScreen = ({ navigation }) => {
     }
   };
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const phoneRegex = /^(\+?[1-9]\d{1,14}|0\d{9,10})$/;
+
+  const emailExists = (email) => prefs.email.addresses.some(e => e.address.trim().toLowerCase() === email.trim().toLowerCase());
+  const phoneExists = (phone) => prefs.sms.phoneNumbers.some(p => p.phoneNumber.trim() === phone.trim());
+
   const validateForm = () => {
-    if (prefs.email.enabled && prefs.email.addresses.length === 0) {
-      setFeedback({ visible: true, type: 'error', message: t('settings.emailRequired') });
-      return false;
+    if (prefs.email.enabled) {
+      if (prefs.email.addresses.length === 0) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.emailRequired') });
+        return false;
+      }
+      const seenEmails = new Set();
+      for (const addr of prefs.email.addresses) {
+        if (!addr?.address || !emailRegex.test(addr.address)) {
+          setFeedback({ visible: true, type: 'error', message: t('settings.invalidEmail') });
+          return false;
+        }
+        const key = addr.address.trim().toLowerCase();
+        if (seenEmails.has(key)) {
+          setFeedback({ visible: true, type: 'error', message: t('settings.duplicateEmail') });
+          return false;
+        }
+        seenEmails.add(key);
+      }
     }
-    if (prefs.sms.enabled && prefs.sms.phoneNumbers.length === 0) {
-      setFeedback({ visible: true, type: 'error', message: t('settings.phoneRequired') });
-      return false;
+    if (prefs.sms.enabled) {
+      if (prefs.sms.phoneNumbers.length === 0) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.phoneRequired') });
+        return false;
+      }
+      const seenPhones = new Set();
+      for (const pn of prefs.sms.phoneNumbers) {
+        if (!pn?.phoneNumber || !phoneRegex.test(pn.phoneNumber)) {
+          setFeedback({ visible: true, type: 'error', message: t('settings.invalidPhone') });
+          return false;
+        }
+        const key = pn.phoneNumber.trim();
+        if (seenPhones.has(key)) {
+          setFeedback({ visible: true, type: 'error', message: t('settings.duplicatePhone') });
+          return false;
+        }
+        seenPhones.add(key);
+      }
     }
     return true;
   };
@@ -258,13 +294,17 @@ const NotificationSettingsScreen = ({ navigation }) => {
   // Save new contact from modal
   const saveNewContact = () => {
     if (!newContact.name.trim() || (!newContact.address.trim() && !newContact.phoneNumber.trim())) {
-      setFeedback({ visible: true, type: 'error', message: 'Vui lòng nhập đầy đủ thông tin' });
+      setFeedback({ visible: true, type: 'error', message: t('common.error') });
       return;
     }
 
     if (addModalType === 'email') {
-      if (!newContact.address.trim()) {
-        setFeedback({ visible: true, type: 'error', message: 'Vui lòng nhập email' });
+      if (!newContact.address.trim() || !emailRegex.test(newContact.address.trim())) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.invalidEmail') });
+        return;
+      }
+      if (emailExists(newContact.address)) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.duplicateEmail') });
         return;
       }
       
@@ -282,8 +322,12 @@ const NotificationSettingsScreen = ({ navigation }) => {
         }
       });
     } else {
-      if (!newContact.phoneNumber.trim()) {
-        setFeedback({ visible: true, type: 'error', message: 'Vui lòng nhập số điện thoại' });
+      if (!newContact.phoneNumber.trim() || !phoneRegex.test(newContact.phoneNumber.trim())) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.invalidPhone') });
+        return;
+      }
+      if (phoneExists(newContact.phoneNumber)) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.duplicatePhone') });
         return;
       }
       
@@ -547,7 +591,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
                             style={[
                               styles.input, 
                               styles.emailInput, 
-                              { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }
+                              { borderColor: colors.border, backgroundColor: colors.background, color: colors.text}
                             ]}
                             placeholder={t('settings.enterName')}
                             placeholderTextColor={colors.textSecondary}
