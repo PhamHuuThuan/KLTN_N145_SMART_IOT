@@ -185,7 +185,7 @@ class RulePriorityService {
     } else if (severity === 'high') {
       title = '⚠️ SAFETY ALERT';
     } else {
-      title = 'ℹ️ SYSTEM ALERT';
+      title = '📊 MULTIPLE ALERTS';
     }
     
     // Tạo message chi tiết cho từng rule

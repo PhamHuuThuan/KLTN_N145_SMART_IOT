@@ -186,8 +186,8 @@ class RuleEvaluationService {
         }
       }
 
-      // Đánh giá tất cả conditions
-      const conditionsMet = await this.evaluateConditions(rule.conditions, sensorData);
+      // Đánh giá tất cả conditions với logic
+      const conditionsMet = await this.evaluateConditions(rule.conditions, sensorData, rule.conditionLogic);
       if (!conditionsMet) {
         // Reset duration tracking if conditions not met
         if (rule.duration > 0) {
@@ -218,8 +218,7 @@ class RuleEvaluationService {
         await rule.save();
       }
       
-      await this.executeActions(rule, sensorData).catch(err => {});
-
+      // Don't execute actions here - let evaluateRules handle it
       return true;
     } catch (err) {
       logger.error(`evaluateRule() error for ${rule.name}:`, err);
@@ -227,15 +226,25 @@ class RuleEvaluationService {
     }
   }
 
-  // Đánh giá tất cả conditions của rule
-  async evaluateConditions(conditions, sensorData) {
+  // Đánh giá tất cả conditions của rule với logic AND/OR
+  async evaluateConditions(conditions, sensorData, conditionLogic = 'AND') {
+    if (!conditions || conditions.length === 0) {
+      return true;
+    }
+
+    const results = [];
     for (const condition of conditions) {
       const conditionMet = await this.evaluateCondition(condition, sensorData);
-      if (!conditionMet) {
-        return false;
-      }
+      results.push(conditionMet);
     }
-    return true;
+
+    // Apply logic
+    if (conditionLogic === 'OR') {
+      return results.some(result => result === true);
+    } else {
+      // Default to AND
+      return results.every(result => result === true);
+    }
   }
 
   // Đánh giá một condition cụ thể
@@ -357,47 +366,22 @@ class RuleEvaluationService {
       
       let detailedMessage = action.message;
       if (!detailedMessage) {
-        const sustainedNote = rule.duration > 0 ? ` trong ${Math.round(rule.duration / 1000)} giây` : '';
-        const unit = sensorType === 'temperature' ? '°C' : (sensorType === 'humidity' ? '%' : (sensorType === 'gas_ppm' ? ' ppm' : ''));
-        let deltaText = '';
-        const isNumber = typeof sensorValue === 'number';
-        if (isNumber) {
-          if (operator === 'between' && Array.isArray(threshold)) {
-            const [min, max] = threshold;
-            if (typeof min === 'number' && sensorValue < min) {
-              deltaText = ` Chênh ${Math.abs(min - sensorValue)}${unit} dưới ngưỡng thấp.`;
-            } else if (typeof max === 'number' && sensorValue > max) {
-              deltaText = ` Vượt ${Math.abs(sensorValue - max)}${unit} trên ngưỡng cao.`;
-            }
-          } else if (typeof threshold === 'number') {
-            if (operator === '<' || operator === '<=') {
-              deltaText = ` Thấp hơn ${Math.abs(threshold - sensorValue)}${unit}.`;
-            } else {
-              deltaText = ` Vượt ${Math.abs(sensorValue - threshold)}${unit}.`;
-            }
-          }
-        }
-        // Tạo message chi tiết, dễ hiểu và có khuyến nghị hành động
+        // Tạo message chi tiết dựa trên sensor type
         switch (sensorType) {
           case 'temperature':
-            detailedMessage = `🌡️ Nhiệt độ cao: ${sensorValue}°C (ngưỡng: ${threshold}°C).` +
-              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''} Khuyến nghị: kiểm tra nguồn nhiệt, bật quạt/điều hòa, giảm tải thiết bị.`;
+            detailedMessage = `Cảm biến nhiệt độ đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}°C, Ngưỡng: ${threshold}°C`;
             break;
           case 'humidity':
-            detailedMessage = `💧 Độ ẩm cao: ${sensorValue}% (ngưỡng: ${threshold}%).` +
-              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''} Khuyến nghị: bật thông gió/khử ẩm, kiểm tra rò rỉ nước.`;
+            detailedMessage = `Cảm biến độ ẩm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}%, Ngưỡng: ${threshold}%`;
             break;
           case 'gas_ppm':
-            detailedMessage = `🛑 Khí gas vượt ngưỡng: ${sensorValue} ppm (ngưỡng: ${threshold} ppm).` +
-              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''} Hành động ngay: mở cửa thông gió, tránh dùng thiết bị điện, kiểm tra nguồn gas.`;
+            detailedMessage = `Cảm biến gas_ppm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`;
             break;
           case 'smoke':
-            detailedMessage = `⚠️ Phát hiện khói: mức ${sensorValue} (ngưỡng: ${threshold}).` +
-              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''} Khuyến nghị: kiểm tra khu vực, chuẩn bị phương án an toàn.`;
+            detailedMessage = `Cảm biến khói đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`;
             break;
           default:
-            detailedMessage = `📊 ${rule.name}: ${sensorType} = ${sensorValue} (ngưỡng: ${threshold}).` +
-              `${deltaText}${sustainedNote ? ` Duy trì${sustainedNote}.` : ''}`;
+            detailedMessage = `Rule "${rule.name}" has been triggered. Sensor: ${sensorType}, Value: ${sensorValue}, Threshold: ${threshold}`;
         }
       } else {
         detailedMessage = this.replacePlaceholders(detailedMessage, sensorData, sensorType, sensorValue, threshold, operator);
@@ -405,9 +389,16 @@ class RuleEvaluationService {
 
       const elevateSecurity = this.shouldElevateSecurity(sensorType, sensorValue);
 
+      // Enrich sensorData with device identifiers to avoid "Unknown Device"
+      const enrichedSensorData = {
+        ...sensorData,
+        deviceId: sensorData.deviceId || rule.deviceId,
+        deviceName: sensorData.deviceName || `Device ${rule.deviceId}`
+      };
+
       // Tạo title với placeholder replacement
       let title = action.title || this.getDefaultTitle(sensorType);
-      title = this.replacePlaceholders(title, sensorData, sensorType, sensorValue, threshold, operator);
+      title = this.replacePlaceholders(title, enrichedSensorData, sensorType, sensorValue, threshold, operator);
       if (!rule.ownerId) {
         logger.error(`Rule ${rule.name} has no ownerId, skipping notification`);
         return;
@@ -424,6 +415,7 @@ class RuleEvaluationService {
           ruleId: rule._id.toString(),
           ruleName: rule.name,
           deviceId: rule.deviceId,
+          deviceName: enrichedSensorData.deviceName,
           sensorData: sensorData,
           actionType: action.type,
           sensorType: sensorType,
@@ -552,7 +544,8 @@ class RuleEvaluationService {
       .replace(/\{threshold\}/g, threshold !== undefined ? threshold : 'N/A')
       .replace(/\{operator\}/g, operator || '>')
       .replace(/\{sensorType\}/g, sensorType || 'unknown')
-      .replace(/\{deviceId\}/g, sensorData.deviceId || 'Unknown Device');
+      .replace(/\{deviceId\}/g, sensorData.deviceId || 'Unknown Device')
+      .replace(/\{deviceName\}/g, sensorData.deviceName || (sensorData.deviceId ? `Device ${sensorData.deviceId}` : 'Unknown Device'));
 
     // Replace sensor-specific placeholders
     switch (sensorType) {
