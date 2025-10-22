@@ -30,13 +30,13 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
   return (
     <View style={styles.templateCard}>
       <View style={styles.templateHeader}>
-        <Text style={styles.templateName}>{template.name}</Text>
+        <Text style={styles.templateName}>{t(template.name)}</Text>
         <View style={[styles.priorityBadge, { backgroundColor: priorityInfo.color }]}>
           <MaterialIcons name={priorityInfo.icon} size={12} color="white" />
           <Text style={styles.priorityText}>{priorityInfo.label}</Text>
         </View>
       </View>
-      <Text style={styles.templateDescription}>{template.description}</Text>
+      <Text style={styles.templateDescription}>{t(template.description)}</Text>
       
       {/* Template Stats */}
       <View style={styles.templateMeta}>

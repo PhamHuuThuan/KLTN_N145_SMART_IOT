@@ -21,6 +21,19 @@ const CustomizeModal = ({
     }
   }, [customizeTemplate?.conditions, customFields.conditions, setCustomFields]);
 
+  // Auto-set conditionLogic based on number of conditions
+  React.useEffect(() => {
+    if (customFields.conditions) {
+      if (customFields.conditions.length === 1) {
+        // Nếu chỉ có 1 điều kiện, set conditionLogic thành null
+        setCustomFields(prev => ({ ...prev, conditionLogic: null }));
+      } else if (customFields.conditions.length > 1 && !customFields.conditionLogic) {
+        // Nếu có nhiều điều kiện nhưng chưa có conditionLogic, set mặc định là AND
+        setCustomFields(prev => ({ ...prev, conditionLogic: 'AND' }));
+      }
+    }
+  }, [customFields.conditions, customFields.conditionLogic, setCustomFields]);
+
   const getPriorityColor = (priority) => {
     const priorityMap = {
       'low': '#4CAF50',
@@ -186,7 +199,7 @@ const CustomizeModal = ({
                   }}
                 >
                   <MaterialIcons name="add" size={16} color="white" />
-                  <Text style={styles.addConditionText}>Thêm</Text>
+                  <Text style={styles.addConditionText}>{t('rules.add')}</Text>
                 </TouchableOpacity>
                 {customFields.conditions && customFields.conditions.length > 1 && (
                   <TouchableOpacity
@@ -199,7 +212,7 @@ const CustomizeModal = ({
                     }}
                   >
                     <MaterialIcons name="remove" size={16} color="white" />
-                    <Text style={styles.addConditionText}>Bớt</Text>
+                    <Text style={styles.addConditionText}>{t('rules.remove')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -218,13 +231,13 @@ const CustomizeModal = ({
                 <View style={styles.conditionInputs}>
                   {/* Sensor Type Selector */}
                   <View style={styles.operatorSelector}>
-                    <Text style={styles.inputLabel}>Loại cảm biến</Text>
+                    <Text style={styles.inputLabel}>{t('rules.sensorType')}</Text>
                     <View style={styles.sensorButtons}>
                       {[
-                        { key: 'temperature', label: '🌡️', fullLabel: 'Nhiệt độ' },
-                        { key: 'humidity', label: '💧', fullLabel: 'Độ ẩm' },
-                        { key: 'gas_ppm', label: '🚨', fullLabel: 'Khí gas' },
-                        { key: 'smoke', label: '🔥', fullLabel: 'Khói' }
+                        { key: 'temperature', label: '🌡️', fullLabel: t('rules.temperature') },
+                        { key: 'humidity', label: '💧', fullLabel: t('rules.humidity') },
+                        { key: 'gas_ppm', label: '🚨', fullLabel: t('rules.gas') },
+                        { key: 'smoke', label: '🔥', fullLabel: t('rules.smoke') }
                       ].map((sensor) => (
                         <TouchableOpacity
                           key={sensor.key}
@@ -246,10 +259,13 @@ const CustomizeModal = ({
                             styles.sensorButtonText,
                             customFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonTextSelected
                           ]}>{sensor.label}</Text>
-                          <Text style={[
-                            styles.sensorButtonLabel,
-                            customFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonLabelSelected
-                          ]}>{sensor.fullLabel}</Text>
+                          <Text 
+                            style={[
+                              styles.sensorButtonLabel,
+                              customFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonLabelSelected
+                            ]}
+                            numberOfLines={2}
+                          >{sensor.fullLabel}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -305,7 +321,7 @@ const CustomizeModal = ({
           </View>
         )}
 
-        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.priority')}</Text>
+        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.priorityLabel')}</Text>
         <View style={styles.prioritySelector}>
           {['low', 'medium', 'high', 'urgent'].map((priority) => (
             <TouchableOpacity
@@ -320,41 +336,36 @@ const CustomizeModal = ({
             >
               <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(priority) }]} />
               <Text style={[styles.priorityLabel, customFields.priority === priority && { color: getPriorityColor(priority), fontWeight: '700' }]}>
-                {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                {t(`rules.priority.${priority}`)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Condition Logic - Always show for clarity */}
-        <View style={{ marginTop: 16 }}>
-          <Text style={styles.inputLabel}>
-            Logic điều kiện {customFields.conditions && customFields.conditions.length > 1 ? '(nhiều điều kiện)' : '(1 điều kiện)'}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {['AND', 'OR'].map((logic) => (
-              <TouchableOpacity
-                key={logic}
-                activeOpacity={0.85}
-                style={[
-                  styles.priorityChip,
-                  customFields.conditionLogic === logic && [styles.priorityChipSelected, { borderColor: '#2196F3', backgroundColor: '#2196F322' }],
-                  { borderColor: '#2196F3' }
-                ]}
-                onPress={() => setCustomFields(prev => ({ ...prev, conditionLogic: logic }))}
-              >
-                <Text style={[styles.priorityLabel, customFields.conditionLogic === logic && { color: '#2196F3', fontWeight: '700' }]}>
-                  {logic === 'AND' ? 'VÀ (tất cả)' : 'HOẶC (một trong)'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {/* Condition Logic (only show if multiple conditions) */}
+        {customFields.conditions && customFields.conditions.length > 1 && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.inputLabel}>{t('rules.conditionLogic')}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {['AND', 'OR'].map((logic) => (
+                <TouchableOpacity
+                  key={logic}
+                  activeOpacity={0.85}
+                  style={[
+                    styles.priorityChip,
+                    customFields.conditionLogic === logic && [styles.priorityChipSelected, { borderColor: '#2196F3', backgroundColor: '#2196F322' }],
+                    { borderColor: '#2196F3' }
+                  ]}
+                  onPress={() => setCustomFields(prev => ({ ...prev, conditionLogic: logic }))}
+                >
+                  <Text style={[styles.priorityLabel, customFields.conditionLogic === logic && { color: '#2196F3', fontWeight: '700' }]}>
+                    {logic === 'AND' ? t('rules.andAll') : t('rules.orOne')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-          {customFields.conditions && customFields.conditions.length === 1 && (
-            <Text style={[styles.inputLabel, { fontSize: 12, color: CONFIG.THEME.gray, marginTop: 4 }]}>
-              💡 Với 1 điều kiện, logic AND/OR không có tác dụng. Thêm điều kiện để sử dụng logic này.
-            </Text>
-          )}
-        </View>
+        )}
 
         {/* Cooldown Period - Hidden for urgent priority */}
         {customFields.priority !== 'urgent' && (
@@ -538,7 +549,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   priorityLabel: {
-    fontSize: 13,
+    fontSize: 10,
     color: CONFIG.COLORS.gray,
   },
   inputLabel: {
@@ -648,12 +659,13 @@ const styles = StyleSheet.create({
   sensorButton: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: CONFIG.THEME.border,
     backgroundColor: CONFIG.THEME.surface,
+    minHeight: 50,
   },
   sensorButtonSelected: {
     backgroundColor: CONFIG.THEME.primary,
@@ -667,9 +679,11 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   sensorButtonLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: CONFIG.THEME.gray,
     textAlign: 'center',
+    lineHeight: 11,
+    numberOfLines: 2,
   },
   sensorButtonLabelSelected: {
     color: 'white',

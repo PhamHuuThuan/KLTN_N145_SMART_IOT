@@ -333,7 +333,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         )}
         <View style={{ marginTop: 12 }}>
           <View>
-            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.priority')}</Text>
+            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.priorityLabel')}</Text>
             <View style={styles.prioritySelector}>
               {['low', 'medium', 'high', 'urgent'].map((priority) => (
                 <TouchableOpacity
@@ -349,7 +349,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                     styles.priorityOptionText,
                     editFields.priority === priority && { color: getPriorityColor(priority) }
                   ]}>
-                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                    {t(`rules.priority.${priority}`)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   priorityOptionText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '500',
     color: CONFIG.COLORS.gray,
   },

@@ -25,6 +25,45 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
     return `${minutes}m`;
   };
 
+  // Function to get translated rule name and description
+  const getTranslatedRuleName = (ruleName) => {
+    // Check if rule name is a template key
+    const templateKeys = ['gasLeakDetection', 'smokeDetection', 'highTemperature', 'lowHumidity', 'flameDetection'];
+    
+    if (templateKeys.includes(ruleName)) {
+      return t(`rules.templates.${ruleName}.name`);
+    }
+    
+    // Check if rule name matches any translated template name
+    for (const key of templateKeys) {
+      const translatedName = t(`rules.templates.${key}.name`);
+      if (ruleName === translatedName) {
+        return translatedName; // Return current language version
+      }
+    }
+    
+    return ruleName;
+  };
+
+  const getTranslatedRuleDescription = (ruleDescription) => {
+    // Check if rule description is a template key
+    const templateKeys = ['gasLeakDetection', 'smokeDetection', 'highTemperature', 'lowHumidity', 'flameDetection'];
+    
+    if (templateKeys.includes(ruleDescription)) {
+      return t(`rules.templates.${ruleDescription}.description`);
+    }
+    
+    // Check if rule description matches any translated template description
+    for (const key of templateKeys) {
+      const translatedDescription = t(`rules.templates.${key}.description`);
+      if (ruleDescription === translatedDescription) {
+        return translatedDescription; // Return current language version
+      }
+    }
+    
+    return ruleDescription;
+  };
+
   const getSensorIcon = (sensor) => {
     const iconMap = {
       'temperature': 'device-thermostat',
@@ -66,9 +105,9 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
       <View style={styles.ruleHeader}>
         <View style={styles.ruleInfo}>
           <View style={styles.ruleTitleRow}>
-            <Text style={styles.ruleName} numberOfLines={1} ellipsizeMode="tail">{rule.name}</Text>
+            <Text style={styles.ruleName} numberOfLines={1} ellipsizeMode="tail">{getTranslatedRuleName(rule.name)}</Text>
           </View>
-          <Text style={styles.ruleDescription}>{rule.description}</Text>
+          <Text style={styles.ruleDescription}>{getTranslatedRuleDescription(rule.description)}</Text>
           
           {/* Conditions Display */}
           {rule.conditions && rule.conditions.length > 0 && (
