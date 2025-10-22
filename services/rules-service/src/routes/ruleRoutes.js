@@ -5,7 +5,6 @@ import {
   updateRule,
   deleteRule,
   toggleRuleStatus,
-  getRuleTemplates,
   respondToAlert
 } from '../controllers/ruleController.js';
 import { validateRuleUpdate, validateRuleStatus } from '../middleware/validation.js';
@@ -15,7 +14,6 @@ const router = express.Router();
 
 // Rule CRUD operations
 router.get('/', authenticateToken, getAllRules);
-router.get('/templates', getRuleTemplates);
 router.post('/', authenticateToken, createRule);
 router.patch('/:ruleId', authenticateToken, validateRuleUpdate, updateRule);
 router.patch('/:ruleId/status', authenticateToken, validateRuleStatus, toggleRuleStatus);
