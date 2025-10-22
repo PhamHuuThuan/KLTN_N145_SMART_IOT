@@ -46,8 +46,9 @@ class NotificationService {
         throw new Error('userId is required for notification');
       }
 
-      if (!mongoose.Types.ObjectId.isValid(userId)) {
-        throw new Error('userId must be a valid MongoDB ObjectId');
+      // Validate userId format (can be ObjectId or custom string)
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('userId must be a valid string');
       }
 
       const notification = new Notification({
@@ -81,13 +82,13 @@ class NotificationService {
       }
 
       if (scheduledFor && scheduledFor > new Date()) {
-        logger.info(`Notification scheduled for ${scheduledFor}`, { notificationId: notification._id });
+        logger.info(`Notification scheduled for ${scheduledFor}`, { notificationId: notification.notificationId });
         return notification;
       }
 
-      logger.info(`Sending notification through channels for userId: ${userId}`);
+      logger.info(`Sending notification through channels for userId: ${userId}`, { notificationId: notification.notificationId });
       await this._sendThroughChannels(notification, preferences);
-      logger.info(`Notification sent through all channels for userId: ${userId}`);
+      logger.info(`Notification sent through all channels for userId: ${userId}`, { notificationId: notification.notificationId });
 
       return notification;
     } catch (error) {
@@ -235,7 +236,7 @@ class NotificationService {
   async markAsRead(notificationId, userId) {
     try {
       const notification = await Notification.findOne({
-        _id: notificationId,
+        notificationId: notificationId,
         userId
       });
 
@@ -273,7 +274,7 @@ class NotificationService {
   async deleteNotification(notificationId, userId) {
     try {
       const notification = await Notification.findOneAndDelete({
-        _id: notificationId,
+        notificationId: notificationId,
         userId
       });
 
@@ -281,6 +282,7 @@ class NotificationService {
         throw new Error('Notification not found');
       }
 
+      logger.info(`Notification deleted: ${notificationId} for user: ${userId}`);
       return notification;
     } catch (error) {
       logger.error('Error deleting notification:', error);
@@ -291,7 +293,7 @@ class NotificationService {
   async getNotificationStats(userId) {
     try {
       const stats = await Notification.aggregate([
-        { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+        { $match: { userId: userId } },
         {
           $group: {
             _id: null,

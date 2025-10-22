@@ -24,6 +24,11 @@ class NotificationController {
 
       const notification = await this.notificationService.sendNotification(notificationData);
       
+      logger.info(`Notification sent successfully`, { 
+        notificationId: notification.notificationId, 
+        userId: notificationData.userId 
+      });
+      
       res.status(201).json({
         success: true,
         message: 'Notification sent successfully',
