@@ -13,7 +13,7 @@ export const getAllRules = async (req, res) => {
     const { deviceId, isActive, limit = 50, page = 1 } = req.query;
     const ownerId = req.user.userId;
 
-    const query = { ownerId };
+    const query = { ownerId, deletedAt: null }; // Loại trừ rule đã bị soft delete
     if (deviceId) query.deviceId = deviceId;
     if (isActive !== undefined) query.isActive = isActive === 'true';
 
@@ -122,8 +122,8 @@ export const updateRule = async (req, res) => {
     const { ruleId } = req.params;
     const { _id, createdAt, updatedAt, ownerId, ...updateData } = req.body;
 
-    // Kiểm tra rule thuộc quyền user
-    const rule = await Rule.findOne({ _id: ruleId, ownerId: req.user.userId });
+    // Kiểm tra rule thuộc quyền user và chưa bị soft delete
+    const rule = await Rule.findOne({ _id: ruleId, ownerId: req.user.userId, deletedAt: null });
     if (!rule) {
       return res.status(404).json({
         success: false,
@@ -152,23 +152,27 @@ export const updateRule = async (req, res) => {
   }
 };
 
-// Delete rule
+// Delete rule (soft delete)
 export const deleteRule = async (req, res) => {
   try {
     const { ruleId } = req.params;
 
-    // Xóa rule nếu thuộc quyền sở hữu user
-    const deletedRule = await Rule.findOneAndDelete({
+    // Tìm rule thuộc quyền sở hữu user
+    const rule = await Rule.findOne({
       _id: ruleId,
-      ownerId: req.user.userId
+      ownerId: req.user.userId,
+      deletedAt: null // Chỉ tìm rule chưa bị xóa mềm
     });
 
-    if (!deletedRule) {
+    if (!rule) {
       return res.status(404).json({
         success: false,
         message: 'Rule not found or access denied',
       });
     }
+
+    // Soft delete rule
+    await rule.softDelete();
 
     res.json({
       success: true,
@@ -189,9 +193,9 @@ export const toggleRuleStatus = async (req, res) => {
     const { ruleId } = req.params;
     const { isActive } = req.body;
 
-    // Cập nhật rule chỉ khi thuộc về user
+    // Cập nhật rule chỉ khi thuộc về user và chưa bị soft delete
     const updatedRule = await Rule.findOneAndUpdate(
-      { _id: ruleId, ownerId: req.user.userId },
+      { _id: ruleId, ownerId: req.user.userId, deletedAt: null },
       { isActive: !!isActive, updatedAt: new Date() },
       { new: true }
     );
