@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
@@ -191,10 +191,47 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         />
 
         {/* Editable Conditions */}
-        {selectedRule.conditions && selectedRule.conditions.length > 0 && (
+        {editFields.conditions && editFields.conditions.length > 0 && (
           <View style={styles.conditionsSection}>
-            <Text style={styles.sectionTitle}>{t('rules.conditionsEditable')}</Text>
-            {selectedRule.conditions.map((condition, index) => (
+            <View style={styles.conditionsHeader}>
+              <Text style={styles.sectionTitle}>{t('rules.conditionsEditable')}</Text>
+              <View style={styles.conditionButtons}>
+                <TouchableOpacity
+                  style={[styles.addConditionButton, { backgroundColor: '#4CAF50' }]}
+                  onPress={() => {
+                    const newCondition = {
+                      type: 'sensor',
+                      sensor: 'temperature',
+                      operator: '>',
+                      value: 0,
+                      unit: '°C'
+                    };
+                    setEditFields(prev => ({
+                      ...prev,
+                      conditions: [...(prev.conditions || []), newCondition]
+                    }));
+                  }}
+                >
+                  <MaterialIcons name="add" size={16} color="white" />
+                  <Text style={styles.addConditionText}>Thêm</Text>
+                </TouchableOpacity>
+                {editFields.conditions && editFields.conditions.length > 1 && (
+                  <TouchableOpacity
+                    style={[styles.addConditionButton, { backgroundColor: '#F44336' }]}
+                    onPress={() => {
+                      setEditFields(prev => ({
+                        ...prev,
+                        conditions: prev.conditions.slice(0, -1)
+                      }));
+                    }}
+                  >
+                    <MaterialIcons name="remove" size={16} color="white" />
+                    <Text style={styles.addConditionText}>Bớt</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+            {editFields.conditions.map((condition, index) => (
               <View key={index} style={styles.conditionEditItem}>
                 <View style={styles.conditionHeader}>
                   <MaterialIcons 
@@ -206,6 +243,45 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                 </View>
                 
                 <View style={styles.conditionInputs}>
+                  {/* Sensor Type Selector */}
+                  <View style={styles.operatorSelector}>
+                    <Text style={styles.inputLabel}>Loại cảm biến</Text>
+                    <View style={styles.sensorButtons}>
+                      {[
+                        { key: 'temperature', label: '🌡️', fullLabel: 'Nhiệt độ' },
+                        { key: 'humidity', label: '💧', fullLabel: 'Độ ẩm' },
+                        { key: 'gas_ppm', label: '🚨', fullLabel: 'Khí gas' },
+                        { key: 'smoke', label: '🔥', fullLabel: 'Khói' }
+                      ].map((sensor) => (
+                        <TouchableOpacity
+                          key={sensor.key}
+                          style={[
+                            styles.sensorButton,
+                            editFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonSelected
+                          ]}
+                          onPress={() => {
+                            const newConditions = [...editFields.conditions];
+                            newConditions[index] = { 
+                              ...newConditions[index], 
+                              sensor: sensor.key,
+                              unit: sensor.key === 'temperature' ? '°C' : sensor.key === 'humidity' ? '%' : sensor.key === 'gas_ppm' ? 'ppm' : ''
+                            };
+                            setEditFields(prev => ({ ...prev, conditions: newConditions }));
+                          }}
+                        >
+                          <Text style={[
+                            styles.sensorButtonText,
+                            editFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonTextSelected
+                          ]}>{sensor.label}</Text>
+                          <Text style={[
+                            styles.sensorButtonLabel,
+                            editFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonLabelSelected
+                          ]}>{sensor.fullLabel}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
                   {/* Operator Selector */}
                   <View style={styles.operatorSelector}>
                     <Text style={styles.inputLabel}>{t('rules.operator')}</Text>
@@ -255,8 +331,8 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             ))}
           </View>
         )}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-          <View style={{ flex: 1, marginRight: 12 }}>
+        <View style={{ marginTop: 12 }}>
+          <View>
             <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.priority')}</Text>
             <View style={styles.prioritySelector}>
               {['low', 'medium', 'high', 'urgent'].map((priority) => (
@@ -278,15 +354,6 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.active')}</Text>
-            <Switch
-              value={editFields.isActive}
-              onValueChange={(val) => setEditFields(prev => ({ ...prev, isActive: val }))}
-              trackColor={{ false: CONFIG.COLORS.gray, true: CONFIG.COLORS.success }}
-              thumbColor={CONFIG.COLORS.white}
-            />
           </View>
         </View>
 
@@ -417,7 +484,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         </TouchableOpacity>
 
         {/* Quick actions: acknowledge, pause rule without toggling off */}
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
           <TouchableOpacity
             disabled={pausing}
             onPress={async () => {
@@ -432,8 +499,8 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             }}
             style={[styles.pauseButton, { backgroundColor: '#4CAF50' }]}
           >
-            <MaterialIcons name="check-circle" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>{t('rules.acknowledged')}</Text>
+            <MaterialIcons name="check-circle" size={16} color={CONFIG.COLORS.white} />
+            <Text style={styles.pauseButtonText}>Xác nhận</Text>
           </TouchableOpacity>
           <TouchableOpacity
             disabled={pausing}
@@ -449,8 +516,8 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             }}
             style={[styles.pauseButton, { backgroundColor: '#FFB020' }]}
           >
-            <MaterialIcons name="pause-circle" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>{t('rules.pause1h')}</Text>
+            <MaterialIcons name="pause-circle" size={16} color={CONFIG.COLORS.white} />
+            <Text style={styles.pauseButtonText}>Tạm dừng 1h</Text>
           </TouchableOpacity>
           <TouchableOpacity
             disabled={pausing}
@@ -466,8 +533,8 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             }}
             style={[styles.pauseButton, { backgroundColor: '#E53935' }]}
           >
-            <MaterialIcons name="block" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>{t('rules.pause24h')}</Text>
+            <MaterialIcons name="block" size={16} color={CONFIG.COLORS.white} />
+            <Text style={styles.pauseButtonText}>Tạm dừng 24h</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -530,15 +597,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 6,
   },
   pauseButtonText: {
     color: CONFIG.COLORS.white,
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   pausedBanner: {
     flexDirection: 'row',
@@ -680,6 +747,66 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     color: CONFIG.COLORS.gray,
     fontSize: 14,
+  },
+  conditionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  conditionButtons: {
+    flexDirection: 'row',
+    gap: 4,
+    flexShrink: 0,
+  },
+  addConditionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    gap: 2,
+    minWidth: 50,
+  },
+  addConditionText: {
+    color: 'white',
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  sensorButtons: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  sensorButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: CONFIG.THEME.border,
+    backgroundColor: CONFIG.THEME.surface,
+  },
+  sensorButtonSelected: {
+    backgroundColor: CONFIG.THEME.primary,
+    borderColor: CONFIG.THEME.primary,
+  },
+  sensorButtonText: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  sensorButtonTextSelected: {
+    color: 'white',
+  },
+  sensorButtonLabel: {
+    fontSize: 10,
+    color: CONFIG.THEME.gray,
+    textAlign: 'center',
+  },
+  sensorButtonLabelSelected: {
+    color: 'white',
+    fontWeight: '600',
   },
 });
 
