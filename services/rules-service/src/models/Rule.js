@@ -46,7 +46,16 @@ const ruleSchema = new mongoose.Schema({
       enum: ['>', '<', '>=', '<=', '==', '!=', 'between']
     },
     value: mongoose.Schema.Types.Mixed,
+    unit: {
+      type: String,
+      default: ''
+    }
   }],
+  conditionLogic: {
+    type: String,
+    enum: ['AND', 'OR'],
+    default: 'AND'
+  },
   actions: [{
     type: {
       type: String,
@@ -71,12 +80,6 @@ const ruleSchema = new mongoose.Schema({
     min: 1,
     max: 1000  // Max 1000 triggers per day
   },
-  duration: {
-    type: Number,
-    default: 0,  // 0 = trigger ngay lập tức
-    min: 0,
-    max: 3600000  // Max 1 hour (ms)
-  },
   triggerCount: {
     type: Number,
     default: 0
@@ -89,14 +92,10 @@ const ruleSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-  durationStartTime: {
+  deletedAt: {
     type: Date,
     default: null
   },
-  durationMet: {
-    type: Boolean,
-    default: false
-  }
 });
 
 const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'];
@@ -114,15 +113,20 @@ const sortByPriority = (a, b) =>
 
 // Statics
 ruleSchema.statics.findActiveRulesForDevice = async function (deviceId, ownerId = null) {
-  const query = { deviceId, isActive: true, ...(ownerId && { ownerId }) };
+  const query = { deviceId, isActive: true, deletedAt: null, ...(ownerId && { ownerId }) };
   const rules = await this.find(query).sort({ createdAt: 1 });
   return rules.sort(sortByPriority);
 };
 
 // find by owner
 ruleSchema.statics.findByOwner = async function (ownerId, options = {}) {
-  const { deviceId, category, isActive, limit = 50, page = 1 } = options;
-  const query = { ownerId, ...(deviceId && { deviceId }), ...(category && { category }), ...(isActive !== undefined && { isActive }) };
+  const { deviceId, isActive, limit = 50, page = 1, includeDeleted = false } = options;
+  const query = { 
+    ownerId, 
+    ...(deviceId && { deviceId }), 
+    ...(isActive !== undefined && { isActive }),
+    ...(includeDeleted ? {} : { deletedAt: null })
+  };
 
   const rules = await this.find(query)
     .sort({ createdAt: -1 })
@@ -174,6 +178,9 @@ ruleSchema.methods.canTrigger = async function() {
   // Check if rule is active
   if (!this.isActive) return false;
   
+  // Check if rule is soft deleted
+  if (this.deletedAt) return false;
+  
   // Check if rule is paused
   if (this.pausedUntil && new Date() < this.pausedUntil) return false;
   
@@ -186,41 +193,12 @@ ruleSchema.methods.canTrigger = async function() {
   return true;
 };
 
-// Start duration tracking
-ruleSchema.methods.startDurationTracking = function() {
-  if (this.duration > 0 && !this.durationStartTime) {
-    this.durationStartTime = new Date();
-    this.durationMet = false;
-    console.log(`⏱️ Started duration tracking for ${this.name}: ${this.duration}ms`);
-  }
+// Soft delete method
+ruleSchema.methods.softDelete = function() {
+  this.deletedAt = new Date();
+  return this.save();
 };
 
-// Check if duration has been met
-ruleSchema.methods.checkDurationMet = function() {
-  if (this.duration === 0) return true; // No duration required
-  
-  if (!this.durationStartTime) {
-    this.startDurationTracking();
-    return false;
-  }
-
-  const elapsed = Date.now() - this.durationStartTime.getTime();
-  const met = elapsed >= this.duration;
-  
-  if (met && !this.durationMet) {
-    this.durationMet = true;
-    console.log(`✅ Duration met for ${this.name}: ${elapsed}ms >= ${this.duration}ms`);
-  }
-  
-  return met;
-};
-
-// Reset duration tracking
-ruleSchema.methods.resetDurationTracking = function() {
-  this.durationStartTime = null;
-  this.durationMet = false;
-  console.log(`🔄 Reset duration tracking for ${this.name}`);
-};
 
 const Rule = mongoose.models.Rule || mongoose.model('Rule', ruleSchema);
 

@@ -1,5 +1,8 @@
 import { Kafka } from 'kafkajs';
 import RuleEvaluationService from '../services/RuleEvaluationService.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('RuleConsumer');
 
 class RuleConsumer {
   constructor() {
@@ -21,10 +24,10 @@ class RuleConsumer {
 
   async start() {
     try {
-      console.log('🚀 Starting Rules Service Consumer...');
+      logger.info('Starting Rules Service Consumer...');
       await this.consumer.connect();
       await this.consumer.subscribe({ topic: 'iot.telemetry.logs', fromBeginning: false });
-      console.log('✅ Connected & subscribed to topic: iot.telemetry.logs');
+      logger.info('Connected & subscribed to topic: iot.telemetry.logs');
 
       await this.consumer.run({
         autoCommit: true,
@@ -32,7 +35,7 @@ class RuleConsumer {
         eachMessage: async ({ topic, partition, message }) => {
           try {
             const logData = JSON.parse(message.value.toString());
-            console.log(`📩 [${topic}:${partition}] ${logData.deviceId || 'Unknown Device'}`);
+            logger.debug(`[${topic}:${partition}] ${logData.deviceId || 'Unknown Device'}`);
 
             if (logData?.type === 'telemetry' && logData.deviceId && logData.payload) {
               await this.ruleEvaluationService.evaluateRules(
@@ -41,19 +44,19 @@ class RuleConsumer {
                 logData.ownerId
               );
             } else {
-              console.warn('⚠️ Skipped: invalid or non-telemetry message');
+              logger.warn('Skipped: invalid or non-telemetry message');
             }
           } catch (err) {
-            console.error(`❌ Message processing error: ${err.message}`, {
+            logger.error(`Message processing error: ${err.message}`, {
               topic, partition, value: message.value.toString(),
             });
           }
         },
       });
 
-      console.log('✅ Rules Service Consumer running');
+      logger.info('Rules Service Consumer running');
     } catch (err) {
-      console.error('❌ Failed to start consumer:', err);
+      logger.error('Failed to start consumer:', err);
       throw err;
     }
   }
@@ -61,9 +64,9 @@ class RuleConsumer {
   async stop() {
     try {
       await this.consumer.disconnect();
-      console.log('🛑 Consumer disconnected');
+      logger.info('Consumer disconnected');
     } catch (err) {
-      console.error('❌ Error stopping consumer:', err);
+      logger.error('Error stopping consumer:', err);
     }
   }
 }

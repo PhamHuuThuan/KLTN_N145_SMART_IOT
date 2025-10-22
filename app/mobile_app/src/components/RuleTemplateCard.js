@@ -1,21 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
 
 const TemplateCard = ({ template, onPress, isCreating }) => {
+  const { t } = useTranslation();
+  
   const getPriorityInfo = (priority) => {
     const priorityMap = {
-      'low': { label: 'Low', color: '#4CAF50', icon: 'keyboard-arrow-down' },
-      'medium': { label: 'Medium', color: '#FF9800', icon: 'remove' },
-      'high': { label: 'High', color: '#FF5722', icon: 'keyboard-arrow-up' },
-      'urgent': { label: 'Urgent', color: '#F44336', icon: 'priority-high' }
+      'low': { label: t('rules.low'), color: '#4CAF50', icon: 'keyboard-arrow-down' },
+      'medium': { label: t('rules.medium'), color: '#FF9800', icon: 'remove' },
+      'high': { label: t('rules.high'), color: '#FF5722', icon: 'keyboard-arrow-up' },
+      'urgent': { label: t('rules.urgent'), color: '#F44336', icon: 'priority-high' }
     };
     return priorityMap[priority] || priorityMap['medium'];
   };
 
   const formatCooldown = (cooldownMs) => {
-    if (!cooldownMs) return 'None';
+    if (!cooldownMs) return t('rules.none');
     const minutes = Math.floor(cooldownMs / 60000);
     const hours = Math.floor(minutes / 60);
     if (hours > 0) return `${hours}h`;
@@ -27,38 +30,30 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
   return (
     <View style={styles.templateCard}>
       <View style={styles.templateHeader}>
-        <Text style={styles.templateName}>{template.name}</Text>
+        <Text style={styles.templateName}>{t(template.name)}</Text>
         <View style={[styles.priorityBadge, { backgroundColor: priorityInfo.color }]}>
           <MaterialIcons name={priorityInfo.icon} size={12} color="white" />
           <Text style={styles.priorityText}>{priorityInfo.label}</Text>
         </View>
       </View>
-      <Text style={styles.templateDescription}>{template.description}</Text>
+      <Text style={styles.templateDescription}>{t(template.description)}</Text>
       
       {/* Template Stats */}
       <View style={styles.templateMeta}>
         <View style={styles.templateStats}>
           {template.priority !== 'urgent' && (
             <View style={styles.statItem}>
-              <MaterialIcons name="timer" size={12} color={CONFIG.COLORS.gray} />
+              <MaterialIcons name="timer" size={12} color={CONFIG.THEME.gray} />
               <Text style={styles.statText}>
-                Cooldown: {formatCooldown(template.cooldownPeriod)}
+                {t('rules.cooldown')} {formatCooldown(template.cooldownPeriod)}
               </Text>
             </View>
           )}
           {template.priority !== 'urgent' && (
             <View style={styles.statItem}>
-              <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
+              <MaterialIcons name="repeat" size={12} color={CONFIG.THEME.gray} />
               <Text style={styles.statText}>
-                Max/day: {template.maxTriggersPerDay || '∞'}
-              </Text>
-            </View>
-          )}
-          {template.priority !== 'urgent' && (
-            <View style={styles.statItem}>
-              <MaterialIcons name="schedule" size={12} color={CONFIG.COLORS.gray} />
-              <Text style={styles.statText}>
-                Duration: {formatCooldown(template.duration)}
+                {t('rules.maxPerDay')} {template.maxTriggersPerDay || '∞'}
               </Text>
             </View>
           )}
@@ -66,7 +61,7 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
             <View style={styles.statItem}>
               <MaterialIcons name="priority-high" size={12} color="#F44336" />
               <Text style={[styles.statText, { color: '#F44336', fontWeight: 'bold' }]}>
-                Emergency Mode
+                {t('rules.emergencyModeLabel')}
               </Text>
             </View>
           )}
@@ -84,10 +79,10 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
         <MaterialIcons 
           name={isCreating ? "hourglass-empty" : "tune"} 
           size={20} 
-          color={CONFIG.COLORS.white} 
+          color={CONFIG.THEME.surface} 
         />
         <Text style={styles.createButtonText}>
-          {isCreating ? 'Creating...' : 'Customize & Create'}
+          {isCreating ? t('rules.creatingLabel') : t('rules.customizeAndCreate')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -129,16 +124,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   priorityText: {
-    color: CONFIG.COLORS.white,
+    color: CONFIG.THEME.surface,
     fontSize: 11,
     fontWeight: 'bold',
     marginLeft: 4,
   },
   templateDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: CONFIG.THEME.gray,
     marginBottom: 8,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   templateMeta: {
     marginTop: 8,
@@ -157,7 +152,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statText: {
-    fontSize: 10,
+    fontSize: 9,
     color: CONFIG.THEME.gray,
     marginLeft: 4,
     fontWeight: '500',

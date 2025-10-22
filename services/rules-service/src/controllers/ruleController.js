@@ -1,22 +1,11 @@
 import Rule from '../models/Rule.js';
-import { Kafka } from 'kafkajs';
+import RuleEvaluationService from '../services/RuleEvaluationService.js';
+import { createLogger } from '../utils/logger.js';
 
-// Kafka producer for sending user responses
-const kafka = new Kafka({
-  clientId: 'rules-service-controller',
-  brokers: [process.env.KAFKA_BROKERS || 'localhost:9092']
-});
-const producer = kafka.producer();
+const logger = createLogger('ruleController');
 
-// Initialize producer
-let producerConnected = false;
-const initProducer = async () => {
-  if (!producerConnected) {
-    await producer.connect();
-    producerConnected = true;
-    console.log('✅ Rules Controller Kafka producer connected');
-  }
-};
+// Delegate messaging to RuleEvaluationService to reuse its Kafka producer
+const ruleEvaluationService = new RuleEvaluationService();
 
 // Get all rules for a user
 export const getAllRules = async (req, res) => {
@@ -24,7 +13,7 @@ export const getAllRules = async (req, res) => {
     const { deviceId, isActive, limit = 50, page = 1 } = req.query;
     const ownerId = req.user.userId;
 
-    const query = { ownerId };
+    const query = { ownerId, deletedAt: null }; // Loại trừ rule đã bị soft delete
     if (deviceId) query.deviceId = deviceId;
     if (isActive !== undefined) query.isActive = isActive === 'true';
 
@@ -70,7 +59,19 @@ export const createRule = async (req, res) => {
   try {
     console.log('Create rule request body:', JSON.stringify(req.body, null, 2));
     
-    const { name, description, deviceId, priority, conditions, actions } = req.body;
+    const { 
+      name, 
+      description, 
+      deviceId, 
+      priority, 
+      conditions, 
+      actions,
+      cooldownPeriod,
+      maxTriggersPerDay,
+      isActive,
+      conditionLogic
+    } = req.body;
+    
     const ownerId = (req.user && (req.user.userId || req.user.sub || req.user.id)) || null;
 
     if (!name || !deviceId || !conditions?.length || !actions?.length) {
@@ -91,7 +92,11 @@ export const createRule = async (req, res) => {
       deviceId,
       priority: normalizedPriority,
       conditions,
-      actions
+      actions,
+      cooldownPeriod: cooldownPeriod || 300000,
+      maxTriggersPerDay: maxTriggersPerDay || 10,
+      isActive: isActive !== undefined ? isActive : true,
+      conditionLogic: conditionLogic || 'AND'
     });
 
     await rule.save();
@@ -117,8 +122,8 @@ export const updateRule = async (req, res) => {
     const { ruleId } = req.params;
     const { _id, createdAt, updatedAt, ownerId, ...updateData } = req.body;
 
-    // Kiểm tra rule thuộc quyền user
-    const rule = await Rule.findOne({ _id: ruleId, ownerId: req.user.userId });
+    // Kiểm tra rule thuộc quyền user và chưa bị soft delete
+    const rule = await Rule.findOne({ _id: ruleId, ownerId: req.user.userId, deletedAt: null });
     if (!rule) {
       return res.status(404).json({
         success: false,
@@ -147,23 +152,27 @@ export const updateRule = async (req, res) => {
   }
 };
 
-// Delete rule
+// Delete rule (soft delete)
 export const deleteRule = async (req, res) => {
   try {
     const { ruleId } = req.params;
 
-    // Xóa rule nếu thuộc quyền sở hữu user
-    const deletedRule = await Rule.findOneAndDelete({
+    // Tìm rule thuộc quyền sở hữu user
+    const rule = await Rule.findOne({
       _id: ruleId,
-      ownerId: req.user.userId
+      ownerId: req.user.userId,
+      deletedAt: null // Chỉ tìm rule chưa bị xóa mềm
     });
 
-    if (!deletedRule) {
+    if (!rule) {
       return res.status(404).json({
         success: false,
         message: 'Rule not found or access denied',
       });
     }
+
+    // Soft delete rule
+    await rule.softDelete();
 
     res.json({
       success: true,
@@ -184,9 +193,9 @@ export const toggleRuleStatus = async (req, res) => {
     const { ruleId } = req.params;
     const { isActive } = req.body;
 
-    // Cập nhật rule chỉ khi thuộc về user
+    // Cập nhật rule chỉ khi thuộc về user và chưa bị soft delete
     const updatedRule = await Rule.findOneAndUpdate(
-      { _id: ruleId, ownerId: req.user.userId },
+      { _id: ruleId, ownerId: req.user.userId, deletedAt: null },
       { isActive: !!isActive, updatedAt: new Date() },
       { new: true }
     );
@@ -212,120 +221,6 @@ export const toggleRuleStatus = async (req, res) => {
   }
 };
 
-// Get rule templates (predefined rule configurations)
-export const getRuleTemplates = async (req, res) => {
-  try {
-    const templates = [
-      {
-        id: 'gas_leak_detection',
-        name: 'Gas Leak Detection',
-        description: 'Emergency response for gas leak',
-        priority: 'urgent',
-        isActive: true,
-        cooldownPeriod: null,  // No cooldown for gas emergency
-        maxTriggersPerDay: null,  // Unlimited for gas emergency
-        duration: 0,  // Immediate trigger
-        conditions: [
-          {
-            type: 'sensor',
-            sensor: 'gas_ppm',
-            operator: '>',
-            value: 1000
-          }
-        ],
-        actions: [
-          {
-            type: 'send_alert',
-            message: 'Gas leak detected! Emergency mode activated.'
-          }
-        ]
-      },
-      {
-        id: 'smoke_detection',
-        name: 'Smoke Detection',
-        description: 'Emergency response for smoke detection',
-        priority: 'high',
-        isActive: true,
-        cooldownPeriod: 300000,  // 5 minutes cooldown
-        maxTriggersPerDay: 20,  // 20 times per day
-        duration: 30000,  // 30 seconds duration
-        conditions: [
-          {
-            type: 'sensor',
-            sensor: 'smoke',
-            operator: '==',
-            value: 1
-          }
-        ],
-        actions: [
-          {
-            type: 'send_notification',
-            message: 'Smoke detected! Please check if it\'s from cooking or if there\'s a real fire.'
-          }
-        ]
-      },
-      {
-        id: 'temperature_high',
-        name: 'High Temperature Alert',
-        description: 'Alert when temperature exceeds threshold',
-        priority: 'high',
-        isActive: true,
-        cooldownPeriod: 300000,  // 5 minutes
-        maxTriggersPerDay: 20,  // 20 times per day
-        duration: 300000,  // 5 minutes duration
-        conditions: [
-          {
-            type: 'sensor',
-            sensor: 'temperature',
-            operator: '>',
-            value: 40
-          }
-        ],
-        actions: [
-          {
-            type: 'send_notification',
-            message: 'High temperature detected!'
-          }
-        ]
-      },
-      {
-        id: 'humidity_high',
-        name: 'High Humidity Alert',
-        description: 'Alert when humidity exceeds comfortable level',
-        priority: 'medium',
-        isActive: true,
-        cooldownPeriod: 600000,  // 10 minutes
-        maxTriggersPerDay: 10,  // 10 times per day
-        duration: 600000,  // 10 minutes duration
-        conditions: [
-          {
-            type: 'sensor',
-            sensor: 'humidity',
-            operator: '>',
-            value: 80
-          }
-        ],
-        actions: [
-          {
-            type: 'send_notification',
-            message: 'High humidity detected! Consider ventilation.'
-          }
-        ]
-      }
-    ];
-    
-    res.json({
-      success: true,
-      data: templates
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching rule templates',
-      error: error.message
-    });
-  }
-};
 
 // User responds to an alert (acknowledge, dismiss, false alarm)
 export const respondToAlert = async (req, res) => {
@@ -334,103 +229,24 @@ export const respondToAlert = async (req, res) => {
     const { response, metadata = {}, timeoutMs } = req.body || {};
     const userId = req.user?.userId || req.user?.sub;
 
-    if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Unauthorized - user ID required' 
-      });
-    }
-
-    if (!ruleId || !response) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'ruleId and response are required' 
-      });
-    }
-
-    // Validate response type
-    const validResponses = ['acknowledged', 'dismissed', 'false_alarm'];
-    if (!validResponses.includes(response)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Invalid response. Must be one of: ${validResponses.join(', ')}` 
-      });
-    }
-
-    // Find the rule
-    const rule = await Rule.findById(ruleId);
-    if (!rule) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Rule not found' 
-      });
-    }
-
-    // Check if user owns the rule
-    if (rule.ownerId.toString() !== userId) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied - you can only respond to your own rules' 
-      });
-    }
-
-    console.log(`👤 User ${userId} responded to rule ${rule.name}: ${response}`);
-
-    // Send response to alerts-service via Kafka
-    const responseMessage = {
-      type: response,
-      userId: userId,
-      ruleId: ruleId,
-      ruleName: rule.name,
-      deviceId: rule.deviceId,
-      priority: rule.priority,
-      timestamp: new Date(),
-      metadata: {
-        ...metadata,
-        responseTime: Date.now(),
-        userAction: response
-      }
-    };
-
-    // Send response to alerts-service via Kafka
-    try {
-      await initProducer();
-      await producer.send({
-        topic: 'notification-requests',
-        messages: [{
-          key: userId,
-          value: JSON.stringify(responseMessage)
-        }]
-      });
-      console.log(`📤 User response sent to alerts-service: ${response}`);
-    } catch (kafkaError) {
-      console.error('❌ Failed to send user response to alerts-service:', kafkaError);
-      // Don't fail the request, just log the error
-    }
-
-    // Log the response
-    console.log(`📤 User response sent:`, {
-      ruleId,
-      ruleName: rule.name,
-      response,
+    const result = await ruleEvaluationService.handleUserResponse({
       userId,
-      timestamp: new Date()
+      ruleId,
+      response,
+      metadata,
+      timeoutMs
     });
 
     res.json({
       success: true,
       message: `Response '${response}' recorded successfully`,
-      data: {
-        ruleId,
-        ruleName: rule.name,
-        response,
-        timestamp: new Date()
-      }
+      data: result
     });
 
   } catch (error) {
-    console.error('Error handling user response:', error);
-    res.status(500).json({
+    logger.error('Error handling user response:', error);
+    const status = error.statusCode || (error.message?.includes('Unauthorized') ? 401 : 500);
+    res.status(status).json({
       success: false,
       message: 'Failed to process user response',
       error: error.message

@@ -1,25 +1,67 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
 
 const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
+  const { t } = useTranslation();
+  
   const getPriorityInfo = (priority) => {
     const priorityMap = {
-      'low': { label: 'Low', color: '#4CAF50', icon: 'keyboard-arrow-down' },
-      'medium': { label: 'Medium', color: '#FF9800', icon: 'remove' },
-      'high': { label: 'High', color: '#FF5722', icon: 'keyboard-arrow-up' },
-      'urgent': { label: 'Urgent', color: '#F44336', icon: 'priority-high' }
+      'low': { label: t('rules.low'), color: '#4CAF50', icon: 'keyboard-arrow-down' },
+      'medium': { label: t('rules.medium'), color: '#FF9800', icon: 'remove' },
+      'high': { label: t('rules.high'), color: '#FF5722', icon: 'keyboard-arrow-up' },
+      'urgent': { label: t('rules.urgent'), color: '#F44336', icon: 'priority-high' }
     };
     return priorityMap[priority] || priorityMap['medium'];
   };
 
   const formatCooldown = (cooldownMs) => {
-    if (!cooldownMs) return 'None';
+    if (!cooldownMs) return t('rules.none');
     const minutes = Math.floor(cooldownMs / 60000);
     const hours = Math.floor(minutes / 60);
     if (hours > 0) return `${hours}h`;
     return `${minutes}m`;
+  };
+
+  // Function to get translated rule name and description
+  const getTranslatedRuleName = (ruleName) => {
+    // Check if rule name is a template key
+    const templateKeys = ['gasLeakDetection', 'smokeDetection', 'highTemperature', 'lowHumidity', 'flameDetection'];
+    
+    if (templateKeys.includes(ruleName)) {
+      return t(`rules.templates.${ruleName}.name`);
+    }
+    
+    // Check if rule name matches any translated template name
+    for (const key of templateKeys) {
+      const translatedName = t(`rules.templates.${key}.name`);
+      if (ruleName === translatedName) {
+        return translatedName; // Return current language version
+      }
+    }
+    
+    return ruleName;
+  };
+
+  const getTranslatedRuleDescription = (ruleDescription) => {
+    // Check if rule description is a template key
+    const templateKeys = ['gasLeakDetection', 'smokeDetection', 'highTemperature', 'lowHumidity', 'flameDetection'];
+    
+    if (templateKeys.includes(ruleDescription)) {
+      return t(`rules.templates.${ruleDescription}.description`);
+    }
+    
+    // Check if rule description matches any translated template description
+    for (const key of templateKeys) {
+      const translatedDescription = t(`rules.templates.${key}.description`);
+      if (ruleDescription === translatedDescription) {
+        return translatedDescription; // Return current language version
+      }
+    }
+    
+    return ruleDescription;
   };
 
   const getSensorIcon = (sensor) => {
@@ -34,10 +76,10 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
 
   const getSensorLabel = (sensor) => {
     const labelMap = {
-      'temperature': 'Temperature',
-      'humidity': 'Humidity', 
-      'gas_ppm': 'Gas',
-      'smoke': 'Smoke'
+      'temperature': t('rules.temperature'),
+      'humidity': t('rules.humidity'), 
+      'gas_ppm': t('rules.gas'),
+      'smoke': t('rules.smoke')
     };
     return labelMap[sensor] || sensor;
   };
@@ -63,14 +105,14 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
       <View style={styles.ruleHeader}>
         <View style={styles.ruleInfo}>
           <View style={styles.ruleTitleRow}>
-            <Text style={styles.ruleName} numberOfLines={1} ellipsizeMode="tail">{rule.name}</Text>
+            <Text style={styles.ruleName} numberOfLines={1} ellipsizeMode="tail">{getTranslatedRuleName(rule.name)}</Text>
           </View>
-          <Text style={styles.ruleDescription}>{rule.description}</Text>
+          <Text style={styles.ruleDescription}>{getTranslatedRuleDescription(rule.description)}</Text>
           
           {/* Conditions Display */}
           {rule.conditions && rule.conditions.length > 0 && (
             <View style={styles.conditionsContainer}>
-              <Text style={styles.conditionsLabel}>Conditions:</Text>
+              <Text style={styles.conditionsLabel}>{t('rules.conditions')}</Text>
               {rule.conditions.map((condition, index) => (
                 <View key={index} style={styles.conditionItem}>
                   <MaterialIcons 
@@ -95,7 +137,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                   <View style={styles.statItem}>
                     <MaterialIcons name="timer" size={12} color={CONFIG.COLORS.gray} />
                     <Text style={styles.statText}>
-                      Cooldown: {formatCooldown(rule.cooldownPeriod)}
+                      {t('rules.cooldown')} {formatCooldown(rule.cooldownPeriod)}
                     </Text>
                   </View>
                 )}
@@ -103,7 +145,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                   <View style={styles.statItem}>
                     <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
                     <Text style={styles.statText}>
-                      Max/day: {rule.maxTriggersPerDay || '∞'}
+                      {t('rules.maxPerDay')} {rule.maxTriggersPerDay || '∞'}
                     </Text>
                   </View>
                 )}
@@ -111,7 +153,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                   <View style={styles.statItem}>
                     <MaterialIcons name="priority-high" size={12} color="#F44336" />
                     <Text style={[styles.statText, { color: '#F44336', fontWeight: 'bold' }]}>
-                      Emergency Mode
+                      {t('rules.emergencyModeLabel')}
                     </Text>
                   </View>
                 )}
@@ -120,13 +162,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                 <View style={styles.statItem}>
                   <MaterialIcons name="flash-on" size={12} color={CONFIG.COLORS.gray} />
                   <Text style={styles.statText}>
-                    Triggered: {rule.triggerCount || 0}
-                  </Text>
-                </View>
-                <View style={styles.statItem}>
-                  <MaterialIcons name="schedule" size={12} color={CONFIG.COLORS.gray} />
-                  <Text style={styles.statText}>
-                    Duration: {formatCooldown(rule.duration)}
+                    {t('rules.triggered')} {rule.triggerCount || 0}
                   </Text>
                 </View>
               </View>
@@ -151,7 +187,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
           activeOpacity={0.85}
         >
           <MaterialIcons name="edit" size={16} color={CONFIG.COLORS.white} />
-          <Text style={styles.editButtonText}>Edit</Text>
+          <Text style={styles.editButtonText}>{t('rules.edit')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
@@ -159,7 +195,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
           activeOpacity={0.85}
         >
           <MaterialIcons name="delete" size={16} color={CONFIG.COLORS.white} />
-          <Text style={styles.deleteButtonText}>Delete</Text>
+          <Text style={styles.deleteButtonText}>{t('rules.delete')}</Text>
         </TouchableOpacity>
         </View>
       </View>
