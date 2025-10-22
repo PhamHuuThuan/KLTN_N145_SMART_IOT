@@ -65,30 +65,6 @@ class RulesService {
     }
   }
 
-  // Get rule templates
-  async getRuleTemplates() {
-    try {
-      const response = await fetch(`${this.baseURL}/api/rules/templates`, {
-        method: 'GET',
-        headers: await this.getAuthHeaders(),
-      });
-
-      console.log('Templates API response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Templates API error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Templates API response data:', data);
-      return data;
-    } catch (error) {
-      console.error('Error fetching rule templates:', error);
-      throw error;
-    }
-  }
 
   // Create new rule
   async createRule(ruleData) {
@@ -135,29 +111,19 @@ class RulesService {
   }
 
   // Create rule from template
-  async createRuleFromTemplate(templateId, ownerId, deviceId, customizations = {}) {
+  async createRuleFromTemplate(template, ownerId, deviceId, customizations = {}) {
     try {
-      console.log('createRuleFromTemplate called with:', { templateId, ownerId, deviceId, customizations });
+      console.log('createRuleFromTemplate called with:', { template, ownerId, deviceId, customizations });
       
       // Validate required parameters
-      if (!templateId) {
-        throw new Error('Template ID is required');
+      if (!template) {
+        throw new Error('Template is required');
       }
       if (!ownerId) {
         throw new Error('Owner ID is required');
       }
       if (!deviceId) {
         throw new Error('Device ID is required');
-      }
-
-      const templatesResponse = await this.getRuleTemplates();
-      if (!templatesResponse.success) {
-        throw new Error('Failed to fetch templates');
-      }
-      
-      const template = templatesResponse.data.find(t => t.id === templateId);  
-      if (!template) {
-        throw new Error(`Template with ID ${templateId} not found`);
       }
 
       // Create rule data from template
@@ -167,11 +133,11 @@ class RulesService {
         ownerId,
         deviceId,
         priority: template.priority || 'medium',
-        maxTriggersPerDay: template.maxTriggersPerDay || 10,
-        cooldownPeriod: template.cooldownPeriod || 300000,
-        duration: template.duration || 0,
-        isActive: template.isActive !== undefined ? template.isActive : true,
+        maxTriggersPerDay: template.maxTriggersPerDay || (template.priority === 'urgent' ? null : 10),
+        cooldownPeriod: template.cooldownPeriod || (template.priority === 'urgent' ? null : 300000),
+        isActive: true, // Always active by default when created from template
         conditions: template.conditions,
+        conditionLogic: template.conditionLogic || 'AND',
         actions: template.actions,
         ...customizations
       };
