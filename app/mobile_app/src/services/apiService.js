@@ -112,10 +112,14 @@ class ApiService {
     }
   }
 
-  // Get all devices
-  async getDevices() {
+  // Get all devices with pagination
+  async getDevices(page = 1, limit = 20) {
     try {
-      const response = await apiClient.get(CONFIG.ENDPOINTS.DEVICES);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+      const response = await apiClient.get(`${CONFIG.ENDPOINTS.DEVICES}?${params}`);
       return response.data;
     } catch (error) {
       throw new Error(`Failed to fetch devices: ${error.message}`);
