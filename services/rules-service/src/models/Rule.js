@@ -92,6 +92,10 @@ const ruleSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
 });
 
 const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'];
@@ -109,15 +113,20 @@ const sortByPriority = (a, b) =>
 
 // Statics
 ruleSchema.statics.findActiveRulesForDevice = async function (deviceId, ownerId = null) {
-  const query = { deviceId, isActive: true, ...(ownerId && { ownerId }) };
+  const query = { deviceId, isActive: true, deletedAt: null, ...(ownerId && { ownerId }) };
   const rules = await this.find(query).sort({ createdAt: 1 });
   return rules.sort(sortByPriority);
 };
 
 // find by owner
 ruleSchema.statics.findByOwner = async function (ownerId, options = {}) {
-  const { deviceId, isActive, limit = 50, page = 1 } = options;
-  const query = { ownerId, ...(deviceId && { deviceId }), ...(isActive !== undefined && { isActive }) };
+  const { deviceId, isActive, limit = 50, page = 1, includeDeleted = false } = options;
+  const query = { 
+    ownerId, 
+    ...(deviceId && { deviceId }), 
+    ...(isActive !== undefined && { isActive }),
+    ...(includeDeleted ? {} : { deletedAt: null })
+  };
 
   const rules = await this.find(query)
     .sort({ createdAt: -1 })
@@ -169,6 +178,9 @@ ruleSchema.methods.canTrigger = async function() {
   // Check if rule is active
   if (!this.isActive) return false;
   
+  // Check if rule is soft deleted
+  if (this.deletedAt) return false;
+  
   // Check if rule is paused
   if (this.pausedUntil && new Date() < this.pausedUntil) return false;
   
@@ -179,6 +191,12 @@ ruleSchema.methods.canTrigger = async function() {
   if (await this.hasReachedDailyLimit()) return false;
   
   return true;
+};
+
+// Soft delete method
+ruleSchema.methods.softDelete = function() {
+  this.deletedAt = new Date();
+  return this.save();
 };
 
 
