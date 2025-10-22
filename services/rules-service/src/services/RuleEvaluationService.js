@@ -580,7 +580,7 @@ class RuleEvaluationService {
         throw new Error(`Invalid response. Must be one of: ${validResponses.join(', ')}`);
       }
 
-      const rule = await Rule.findById(ruleId);
+      const rule = await Rule.findOne({ _id: ruleId, deletedAt: null });
       if (!rule) {
         const err = new Error('Rule not found');
         err.statusCode = 404;
