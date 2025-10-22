@@ -2,8 +2,8 @@
 export const RULE_TEMPLATES = {
   vi: {
     gas_leak_detection: {
-      name: 'Phát hiện rò rỉ khí gas',
-      description: 'Phản ứng khẩn cấp khi phát hiện rò rỉ khí gas',
+      name: 'rules.templates.gasLeakDetection.name',
+      description: 'rules.templates.gasLeakDetection.description',
       priority: 'urgent',
       conditions: [
         {
@@ -17,13 +17,13 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '🚨 Cảnh báo: Phát hiện nồng độ khí gas cao! Vui lòng tắt nguồn gas ngay lập tức và thông gió khu vực!'
+          message: 'rules.templates.gasLeakDetection.message'
         }
       ]
     },
     smoke_detection: {
-      name: 'Phát hiện khói',
-      description: 'Phản ứng khẩn cấp khi phát hiện khói',
+      name: 'rules.templates.smokeDetection.name',
+      description: 'rules.templates.smokeDetection.description',
       priority: 'high',
       cooldownPeriod: 300000,
       maxTriggersPerDay: 20,
@@ -39,13 +39,13 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '🔥 Cảnh báo: Phát hiện khói! Kiểm tra ngay lập tức và liên hệ cứu hỏa nếu cần!'
+          message: 'rules.templates.smokeDetection.message'
         }
       ]
     },
     high_temperature: {
-      name: 'Nhiệt độ cao',
-      description: 'Cảnh báo khi nhiệt độ vượt ngưỡng an toàn',
+      name: 'rules.templates.highTemperature.name',
+      description: 'rules.templates.highTemperature.description',
       priority: 'medium',
       cooldownPeriod: 600000,
       maxTriggersPerDay: 10,
@@ -62,13 +62,13 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '🌡️ Cảnh báo: Nhiệt độ cao! Kiểm tra nguồn nhiệt và bật quạt/điều hòa.'
+          message: 'rules.templates.highTemperature.message'
         }
       ]
     },
     low_humidity: {
-      name: 'Độ ẩm thấp',
-      description: 'Cảnh báo khi độ ẩm quá thấp',
+      name: 'rules.templates.lowHumidity.name',
+      description: 'rules.templates.lowHumidity.description',
       priority: 'low',
       cooldownPeriod: 1800000,
       maxTriggersPerDay: 5,
@@ -84,13 +84,13 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '💧 Cảnh báo: Độ ẩm thấp! Cân nhắc sử dụng máy tạo ẩm.'
+          message: 'rules.templates.lowHumidity.message'
         }
       ]
     },
     flame_detection: {
-      name: 'Phát hiện lửa',
-      description: 'Cảnh báo khẩn cấp khi phát hiện lửa',
+      name: 'rules.templates.flameDetection.name',
+      description: 'rules.templates.flameDetection.description',
       priority: 'urgent',
       conditions: [
         {
@@ -104,15 +104,15 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '🔥 CẢNH BÁO KHẨN CẤP: Phát hiện lửa! Liên hệ cứu hỏa ngay lập tức!'
+          message: 'rules.templates.flameDetection.message'
         }
       ]
     },
   },
   en: {
     gas_leak_detection: {
-      name: 'Gas Leak Detection',
-      description: 'Emergency response for gas leak',
+      name: 'rules.templates.gasLeakDetection.name',
+      description: 'rules.templates.gasLeakDetection.description',
       priority: 'urgent',
       conditions: [
         {
@@ -126,13 +126,13 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '🚨 Warning: High gas concentration detected! Please turn off the gas supply immediately and ventilate the area!'
+          message: 'rules.templates.gasLeakDetection.message'
         }
       ]
     },
     smoke_detection: {
-      name: 'Smoke Detection',
-      description: 'Emergency response for smoke detection',
+      name: 'rules.templates.smokeDetection.name',
+      description: 'rules.templates.smokeDetection.description',
       priority: 'high',
       cooldownPeriod: 300000,
       maxTriggersPerDay: 20,
@@ -148,13 +148,13 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '🔥 Warning: Smoke detected! Check immediately and contact fire department if needed!'
+          message: 'rules.templates.smokeDetection.message'
         }
       ]
     },
     high_temperature: {
-      name: 'High Temperature',
-      description: 'Alert when temperature exceeds safe threshold',
+      name: 'rules.templates.highTemperature.name',
+      description: 'rules.templates.highTemperature.description',
       priority: 'medium',
       cooldownPeriod: 600000,
       maxTriggersPerDay: 10,
@@ -170,13 +170,13 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '🌡️ Warning: High temperature! Check heat sources and turn on fans/AC.'
+          message: 'rules.templates.highTemperature.message'
         }
       ]
     },
     low_humidity: {
-      name: 'Low Humidity',
-      description: 'Alert when humidity is too low',
+      name: 'rules.templates.lowHumidity.name',
+      description: 'rules.templates.lowHumidity.description',
       priority: 'low',
       cooldownPeriod: 1800000,
       maxTriggersPerDay: 5,
@@ -192,13 +192,13 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '💧 Warning: Low humidity! Consider using a humidifier.'
+          message: 'rules.templates.lowHumidity.message'
         }
       ]
     },
     flame_detection: {
-      name: 'Flame Detection',
-      description: 'Emergency alert when flame is detected',
+      name: 'rules.templates.flameDetection.name',
+      description: 'rules.templates.flameDetection.description',
       priority: 'urgent',
       conditions: [
         {
@@ -212,7 +212,7 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: '🔥 EMERGENCY ALERT: Flame detected! Contact fire department immediately!'
+          message: 'rules.templates.flameDetection.message'
         }
       ]
     },
