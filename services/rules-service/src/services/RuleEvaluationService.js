@@ -232,6 +232,11 @@ class RuleEvaluationService {
       return true;
     }
 
+    // Nếu chỉ có 1 điều kiện hoặc conditionLogic là null, chỉ cần đánh giá điều kiện đó
+    if (conditions.length === 1 || conditionLogic === null) {
+      return await this.evaluateCondition(conditions[0], sensorData);
+    }
+
     const results = [];
     for (const condition of conditions) {
       const conditionMet = await this.evaluateCondition(condition, sensorData);
