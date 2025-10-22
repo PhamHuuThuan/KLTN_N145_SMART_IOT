@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,6 +15,7 @@ import CONFIG from '../constants/config';
 const RulesScreen = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const templatesListRef = useRef(null);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [customizeVisible, setCustomizeVisible] = useState(false);
@@ -25,6 +26,7 @@ const RulesScreen = () => {
     priority: 'medium',
     maxTriggersPerDay: 10,
     cooldownPeriod: 300000,
+    conditionLogic: 'AND',
     sensorValue: '',
   });
   const [detailVisible, setDetailVisible] = useState(false);
@@ -37,10 +39,17 @@ const RulesScreen = () => {
     isActive: true,
     maxTriggersPerDay: 10,
     cooldownPeriod: 300000,
+    conditionLogic: 'AND',
     sensorValue: '',
   });
   const { rules, templates, devices, loading, refreshing, loadRules, onRefresh } = useRulesData();
   const { creatingRule, creatingTemplateId, toggleRuleStatus, deleteRule, createRuleFromTemplate, updateRule } = useRuleActions(loadRules);
+
+  // Sort templates by priority
+  const sortedTemplates = templates.sort((a, b) => {
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+    return priorityOrder[a.priority] - priorityOrder[b.priority];
+  });
 
   useEffect(() => {
     if (devices.length > 0 && !selectedDevice) {
@@ -62,7 +71,7 @@ const RulesScreen = () => {
       priority: template.priority || 'medium',
       maxTriggersPerDay: template.maxTriggersPerDay || 10,
       cooldownPeriod: template.cooldownPeriod || 300000,
-      duration: template.duration || 0,
+      conditionLogic: template.conditionLogic || 'AND',
       conditions: template.conditions || [],
       sensorValue: template?.conditions?.[0]?.type === 'sensor' ? `${template.conditions[0].value}` : '',
     });
@@ -98,7 +107,7 @@ const RulesScreen = () => {
       isActive: !!rule.isActive,
       maxTriggersPerDay: rule.maxTriggersPerDay || 10,
       cooldownPeriod: rule.cooldownPeriod || 300000,
-      duration: rule.duration || 0,
+      conditionLogic: rule.conditionLogic || 'AND',
       conditions: rule.conditions || [],
       sensorValue: rule?.conditions?.[0]?.type === 'sensor' ? String(rule.conditions[0].value) : '',
     });
@@ -116,7 +125,7 @@ const RulesScreen = () => {
       isActive: fields.isActive,
       maxTriggersPerDay: fields.maxTriggersPerDay,
       cooldownPeriod: fields.cooldownPeriod,
-      duration: fields.duration,
+      conditionLogic: fields.conditionLogic || 'AND',
     };
     
     // Use the updated conditions from editFields
@@ -164,12 +173,6 @@ const RulesScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>{t('rules.rulesManagement')}</Text>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => setShowTemplatesModal(true)}
-        >
-          <MaterialIcons name="library-books" size={20} color={CONFIG.THEME.primary} />
-        </TouchableOpacity>
       </View>
 
       {/* Device selector for scoping rules to a device */}
@@ -181,6 +184,25 @@ const RulesScreen = () => {
             setSelectedDevice(id);
           }}
         />
+      </View>
+
+      {/* Add Rule Button */}
+      <View style={styles.addRuleContainer}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => {
+            setShowTemplatesModal(true);
+            // Reset scroll position when opening templates modal
+            setTimeout(() => {
+              if (templatesListRef.current) {
+                templatesListRef.current.scrollToOffset({ offset: 0, animated: false });
+              }
+            }, 200);
+          }}
+        >
+          <MaterialIcons name="add" size={18} color={CONFIG.THEME.surface} />
+          <Text style={styles.actionButtonText}>{t('rules.addRule')}</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Rules section */}
@@ -199,7 +221,7 @@ const RulesScreen = () => {
           }
           style={styles.rulesListView}
           contentContainerStyle={styles.rulesList}
-          nestedScrollEnabled={true}
+          showsVerticalScrollIndicator={true}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <MaterialIcons name="rule" size={48} color={CONFIG.THEME.gray} />
@@ -215,8 +237,8 @@ const RulesScreen = () => {
       {/* Templates Modal */}
       <Modal
         visible={showTemplatesModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
+        animationType="fade"
+        onRequestClose={() => setShowTemplatesModal(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -230,7 +252,7 @@ const RulesScreen = () => {
           </View>
           
           {templates.length === 0 ? (
-            <View style={styles.emptyContainer}>
+            <View style={[styles.emptyContainer, { paddingTop: 48, paddingBottom: 40 }]}>
               <MaterialIcons name="library-books" size={64} color={CONFIG.THEME.gray} />
               <Text style={styles.emptyText}>{t('rules.noTemplatesAvailable')}</Text>
               <Text style={styles.emptySubtext}>
@@ -239,10 +261,25 @@ const RulesScreen = () => {
             </View>
           ) : (
             <FlatList
-              data={templates}
-              renderItem={renderTemplateItem}
-              keyExtractor={(item) => item.id}
+              ref={templatesListRef}
+              data={sortedTemplates}
+              renderItem={({ item: template, index }) => (
+                <TemplateCard
+                  key={template.id || template._id || index}
+                  template={template}
+                  onPress={() => openCustomize(template)}
+                  isCreating={creatingTemplateId === template.id}
+                />
+              )}
+              keyExtractor={(item, index) => item.id || item._id || index.toString()}
+              style={styles.templatesFlatList}
               contentContainerStyle={styles.templatesList}
+              showsVerticalScrollIndicator={true}
+              scrollEnabled={true}
+              bounces={true}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
+              removeClippedSubviews={false}
             />
           )}
           {creatingRule && (
@@ -287,13 +324,13 @@ const RulesScreen = () => {
           onCreate={(updatedCustomFields) => {
             if (!customizeTemplate) return;
             const fields = updatedCustomFields || customFields;
-            const overrides = { 
+            const overrides = {
               name: fields.name, 
               description: fields.description,
               priority: fields.priority,
               maxTriggersPerDay: fields.maxTriggersPerDay,
               cooldownPeriod: fields.cooldownPeriod,
-              duration: fields.duration,
+              conditionLogic: fields.conditionLogic || 'AND',
             };
             
             // Use the updated conditions from customFields
@@ -341,16 +378,31 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: CONFIG.THEME.primary,
   },
+  addRuleContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
   actionButton: {
-    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: CONFIG.THEME.background,
+    backgroundColor: CONFIG.THEME.primary,
+    borderWidth: 1,
+    borderColor: CONFIG.THEME.primary,
+    minWidth: 120,
+  },
+  actionButtonText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '600',
+    color: CONFIG.THEME.surface,
   },
   rulesList: {
-    paddingTop: 8,
-    paddingBottom: 16,
-    paddingHorizontal: 12,
-    alignItems: 'stretch'
+    padding: 12,
+    paddingBottom: 40,
   },
   emptyContainer: {
     justifyContent: 'flex-start',
@@ -374,6 +426,8 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     backgroundColor: CONFIG.THEME.background,
+    marginTop: 20,
+    marginBottom: 10,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -392,8 +446,13 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
+  templatesFlatList: {
+    flex: 1,
+  },
   templatesList: {
     padding: 16,
+    paddingBottom: 16,
+    flexGrow: 1,
   },
   sectionTitle: {
     fontSize: 18,
@@ -420,7 +479,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   rulesListView: {
-    flexGrow: 1,
+    flex: 1,
   },
 });
 
