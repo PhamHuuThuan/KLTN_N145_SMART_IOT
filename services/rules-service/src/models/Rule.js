@@ -46,7 +46,16 @@ const ruleSchema = new mongoose.Schema({
       enum: ['>', '<', '>=', '<=', '==', '!=', 'between']
     },
     value: mongoose.Schema.Types.Mixed,
+    unit: {
+      type: String,
+      default: ''
+    }
   }],
+  conditionLogic: {
+    type: String,
+    enum: ['AND', 'OR'],
+    default: 'AND'
+  },
   actions: [{
     type: {
       type: String,
@@ -71,12 +80,6 @@ const ruleSchema = new mongoose.Schema({
     min: 1,
     max: 1000  // Max 1000 triggers per day
   },
-  duration: {
-    type: Number,
-    default: 0,  // 0 = trigger ngay lập tức
-    min: 0,
-    max: 3600000  // Max 1 hour (ms)
-  },
   triggerCount: {
     type: Number,
     default: 0
@@ -89,14 +92,6 @@ const ruleSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-  durationStartTime: {
-    type: Date,
-    default: null
-  },
-  durationMet: {
-    type: Boolean,
-    default: false
-  }
 });
 
 const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'];
@@ -186,41 +181,6 @@ ruleSchema.methods.canTrigger = async function() {
   return true;
 };
 
-// Start duration tracking
-ruleSchema.methods.startDurationTracking = function() {
-  if (this.duration > 0 && !this.durationStartTime) {
-    this.durationStartTime = new Date();
-    this.durationMet = false;
-    console.log(`⏱️ Started duration tracking for ${this.name}: ${this.duration}ms`);
-  }
-};
-
-// Check if duration has been met
-ruleSchema.methods.checkDurationMet = function() {
-  if (this.duration === 0) return true; // No duration required
-  
-  if (!this.durationStartTime) {
-    this.startDurationTracking();
-    return false;
-  }
-
-  const elapsed = Date.now() - this.durationStartTime.getTime();
-  const met = elapsed >= this.duration;
-  
-  if (met && !this.durationMet) {
-    this.durationMet = true;
-    console.log(`✅ Duration met for ${this.name}: ${elapsed}ms >= ${this.duration}ms`);
-  }
-  
-  return met;
-};
-
-// Reset duration tracking
-ruleSchema.methods.resetDurationTracking = function() {
-  this.durationStartTime = null;
-  this.durationMet = false;
-  console.log(`🔄 Reset duration tracking for ${this.name}`);
-};
 
 const Rule = mongoose.models.Rule || mongoose.model('Rule', ruleSchema);
 
