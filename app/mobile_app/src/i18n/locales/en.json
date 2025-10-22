@@ -180,7 +180,13 @@
     "conditionsEditable": "Conditions (Editable):",
     "operator": "Operator",
     "value": "Value",
-    "priority": "Priority",
+    "priorityLabel": "Priority",
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High", 
+      "urgent": "Urgent"
+    },
     "cooldownPeriod": "Cooldown Period (minutes)",
     "maxTriggersPerDay": "Max Triggers/Day",
     "emergencyMode": "Emergency Mode",
@@ -214,7 +220,42 @@
     "creatingLabel": "Creating...",
     "deleteRule": "Delete Rule",
     "deleteRuleConfirm": "Are you sure you want to delete \"{{ruleName}}\"?",
-    "loadFailed": "Failed to load rules data"
+    "loadFailed": "Failed to load rules data",
+    "add": "Add",
+    "remove": "Remove",
+    "sensorType": "Sensor Type",
+    "conditionLogic": "Condition Logic",
+    "multipleConditions": "multiple conditions",
+    "singleCondition": "1 condition",
+    "andAll": "AND (all)",
+    "orOne": "OR (one of)",
+    "templates": {
+      "gasLeakDetection": {
+        "name": "Gas Leak Detection",
+        "description": "Emergency response for gas leak",
+        "message": "🚨 Warning: High gas concentration detected! Please turn off the gas supply immediately and ventilate the area!"
+      },
+      "smokeDetection": {
+        "name": "Smoke Detection",
+        "description": "Emergency response for smoke detection",
+        "message": "🔥 Warning: Smoke detected! Check immediately and contact fire department if needed!"
+      },
+      "highTemperature": {
+        "name": "High Temperature",
+        "description": "Alert when temperature exceeds safe threshold",
+        "message": "🌡️ Warning: High temperature! Check heat sources and turn on fans/AC."
+      },
+      "lowHumidity": {
+        "name": "Low Humidity",
+        "description": "Alert when humidity is too low",
+        "message": "💧 Warning: Low humidity! Consider using a humidifier."
+      },
+      "flameDetection": {
+        "name": "Flame Detection",
+        "description": "Emergency alert when flame is detected",
+        "message": "🔥 EMERGENCY ALERT: Flame detected! Contact fire department immediately!"
+      }
+    }
   },
   "notifications": {
     "title": "Notifications",
