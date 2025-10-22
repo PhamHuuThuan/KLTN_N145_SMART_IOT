@@ -237,8 +237,8 @@ class NotificationController {
         logger.info(`Creating default preferences for user ${userId}`);
         preferences = new UserNotificationPreferences({
           userId,
-          email: { enabled: true, address: '', verified: false },
-          sms: { enabled: false, phoneNumber: '', verified: false },
+          email: { enabled: true, addresses: [] },
+          sms: { enabled: false, phoneNumbers: [] },
           fcm: { enabled: true, tokens: [] },
           inApp: { enabled: true },
           quietHours: {
@@ -324,8 +324,8 @@ class NotificationController {
         logger.info(`Creating default preferences for user ${userId}`);
         preferences = new UserNotificationPreferences({
           userId,
-          email: { enabled: true, address: '', verified: false },
-          sms: { enabled: false, phoneNumber: '', verified: false },
+          email: { enabled: true, addresses: [] },
+          sms: { enabled: false, phoneNumbers: [] },
           fcm: { enabled: true, tokens: [] },
           inApp: { enabled: true },
           quietHours: {
@@ -426,8 +426,8 @@ class NotificationController {
         logger.info(`🔧 Creating default preferences for user ${userId}`);
         preferences = new UserNotificationPreferences({
           userId,
-          email: { enabled: true, address: '', verified: false },
-          sms: { enabled: false, phoneNumber: '', verified: false },
+          email: { enabled: true, addresses: [] },
+          sms: { enabled: false, phoneNumbers: [] },
           fcm: { enabled: true, tokens: [] },
           inApp: { enabled: true },
           quietHours: {
@@ -518,8 +518,8 @@ class NotificationController {
         logger.info(`🔧 Creating default preferences for user ${userId}`);
         preferences = new UserNotificationPreferences({
           userId,
-          email: { enabled: true, address: '', verified: false },
-          sms: { enabled: false, phoneNumber: '', verified: false },
+          email: { enabled: true, addresses: [] },
+          sms: { enabled: false, phoneNumbers: [] },
           fcm: { enabled: true, tokens: [] },
           inApp: { enabled: true },
           quietHours: {
@@ -538,10 +538,19 @@ class NotificationController {
 
       // Update preferences without overwriting FCM tokens
       if (preferencesData.email) {
-        preferences.email = { ...preferences.email, ...preferencesData.email };
+        // Only allow enabled + addresses array
+        const { enabled, addresses } = preferencesData.email;
+        preferences.email.enabled = enabled !== undefined ? enabled : preferences.email.enabled;
+        if (Array.isArray(addresses)) {
+          preferences.email.addresses = addresses;
+        }
       }
       if (preferencesData.sms) {
-        preferences.sms = { ...preferences.sms, ...preferencesData.sms };
+        const { enabled, phoneNumbers } = preferencesData.sms;
+        preferences.sms.enabled = enabled !== undefined ? enabled : preferences.sms.enabled;
+        if (Array.isArray(phoneNumbers)) {
+          preferences.sms.phoneNumbers = phoneNumbers;
+        }
       }
       if (preferencesData.fcm) {
         // Only update fcm.enabled, preserve existing tokens

@@ -3,14 +3,16 @@ import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const SensorGrid = ({ deviceData }) => {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   
   if (!deviceData) {
     return (
       <View style={[styles.container, { backgroundColor: colors.surface }]}>
-        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>Device data not found</Text>
+        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>{t('sensors.noDeviceData')}</Text>
       </View>
     );
   }
@@ -19,7 +21,7 @@ const SensorGrid = ({ deviceData }) => {
   if (!latestTelemetry) {
     return (
       <View style={[styles.container, { backgroundColor: colors.surface }]}>
-        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>No telemetry data</Text>
+        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>{t('sensors.noTelemetryData')}</Text>
       </View>
     );
   }
@@ -27,7 +29,7 @@ const SensorGrid = ({ deviceData }) => {
   const sensorData = [
     {
       id: 'temperature',
-      label: 'Temperature',
+      label: t('sensors.labels.temperature'),
       value: latestTelemetry.temp !== null && latestTelemetry.temp !== undefined ? `${latestTelemetry.temp}°C` : '--',
       icon: 'thermometer',
       color: CONFIG.COLORS.danger,
@@ -35,7 +37,7 @@ const SensorGrid = ({ deviceData }) => {
     },
     {
       id: 'humidity',
-      label: 'Humidity',
+      label: t('sensors.labels.humidity'),
       value: latestTelemetry.humid !== null && latestTelemetry.humid !== undefined ? `${latestTelemetry.humid}%` : '--',
       icon: 'water-percent',
       color: CONFIG.COLORS.info,
@@ -43,7 +45,7 @@ const SensorGrid = ({ deviceData }) => {
     },
     {
       id: 'gas',
-      label: 'Gas Level',
+      label: t('sensors.labels.gasLevel'),
       value: latestTelemetry.gas_ppm !== null && latestTelemetry.gas_ppm !== undefined ? `${latestTelemetry.gas_ppm} ppm` : '--',
       icon: 'molecule-co2',
       color: CONFIG.COLORS.warning,
@@ -51,8 +53,8 @@ const SensorGrid = ({ deviceData }) => {
     },
     {
       id: 'smoke',
-      label: 'Smoke',
-      value: latestTelemetry.smoke !== null && latestTelemetry.smoke !== undefined ? (latestTelemetry.smoke > 0 ? 'Detected' : 'Clear') : '--',
+      label: t('sensors.labels.smoke'),
+      value: latestTelemetry.smoke !== null && latestTelemetry.smoke !== undefined ? (latestTelemetry.smoke > 0 ? t('sensors.values.detected') : t('sensors.values.clear')) : '--',
       icon: 'smoke-detector',
       color: latestTelemetry.smoke > 0 ? CONFIG.COLORS.danger : CONFIG.COLORS.success,
       unit: ''
@@ -61,7 +63,7 @@ const SensorGrid = ({ deviceData }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      <Text style={[styles.title, { color: colors.primary }]}>📊 Sensor Data</Text>
+      <Text style={[styles.title, { color: colors.primary }]}>📊 {t('sensors.title')}</Text>
       <View style={styles.grid}>
         {sensorData.map((sensor) => (
           <View key={sensor.id} style={[styles.sensorCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>

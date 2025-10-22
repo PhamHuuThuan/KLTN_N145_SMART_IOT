@@ -275,7 +275,36 @@
     "notificationTypes": "Notification Types",
     "notificationTypesDescription": "You'll receive notifications for device alerts, security events, system updates, and maintenance reminders based on your preferences above.",
     "saving": "Saving...",
-    "inAppDescription": "Receive notifications in the app"
+    "inAppDescription": "Receive notifications in the app",
+    "recipientsEmailLabel": "Notification emails",
+    "recipientsSMSLabel": "SMS recipients",
+    "defaultLabel": "Default",
+    "familyMembersLabel": "Other members",
+    "addEmail": "Add email",
+    "addPhone": "Add phone number",
+    "nameLabel": "Name",
+    "emailLabel": "Email",
+    "phoneLabel": "Phone number",
+    "enterName": "Enter name",
+    "enterEmail": "Enter email",
+    "enterPhone": "Enter phone number",
+    "addEmailTitle": "Add email",
+    "addPhoneTitle": "Add phone number"
+  },
+  "sensors": {
+    "title": "Sensor Data",
+    "noDeviceData": "Device data not found",
+    "noTelemetryData": "No telemetry data",
+    "labels": {
+      "temperature": "Temperature",
+      "humidity": "Humidity",
+      "gasLevel": "Gas Level",
+      "smoke": "Smoke"
+    },
+    "values": {
+      "detected": "Detected",
+      "clear": "Clear"
+    }
   },
   "emergency": {
     "title": "Emergency Mode",

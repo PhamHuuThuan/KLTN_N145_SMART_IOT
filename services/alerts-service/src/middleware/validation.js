@@ -30,17 +30,29 @@ const notificationSchema = Joi.object({
   }).default({})
 });
 
-// User preferences validation schema
+// User preferences validation schema (updated to support multiple emails/phones)
 const preferencesSchema = Joi.object({
   email: Joi.object({
     enabled: Joi.boolean(),
-    address: Joi.string().email().allow(''),
-    verified: Joi.boolean()
+    addresses: Joi.array().items(
+      Joi.object({
+        name: Joi.string().required(),
+        address: Joi.string().email().required(),
+        isDefault: Joi.boolean().default(false),
+        addedAt: Joi.date()
+      })
+    ).default([])
   }),
   sms: Joi.object({
     enabled: Joi.boolean(),
-    phoneNumber: Joi.string().pattern(/^(\+?[1-9]\d{1,14}|0\d{9,10})$/).allow(''),
-    verified: Joi.boolean()
+    phoneNumbers: Joi.array().items(
+      Joi.object({
+        name: Joi.string().required(),
+        phoneNumber: Joi.string().pattern(/^(\+?[1-9]\d{1,14}|0\d{9,10})$/).required(),
+        isDefault: Joi.boolean().default(false),
+        addedAt: Joi.date()
+      })
+    ).default([])
   }),
   fcm: Joi.object({
     enabled: Joi.boolean(),

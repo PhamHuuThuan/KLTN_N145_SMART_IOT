@@ -275,7 +275,36 @@
     "notificationTypes": "Loại thông báo",
     "notificationTypesDescription": "Bạn sẽ nhận thông báo cho cảnh báo thiết bị, sự kiện bảo mật, cập nhật hệ thống và nhắc nhở bảo trì dựa trên cài đặt của bạn ở trên.",
     "saving": "Đang lưu...",
-    "inAppDescription": "Nhận thông báo trong ứng dụng"
+    "inAppDescription": "Nhận thông báo trong ứng dụng",
+    "recipientsEmailLabel": "Email nhận thông báo",
+    "recipientsSMSLabel": "Số điện thoại nhận SMS",
+    "defaultLabel": "Mặc định",
+    "familyMembersLabel": "Thành viên khác",
+    "addEmail": "Thêm email",
+    "addPhone": "Thêm số điện thoại",
+    "nameLabel": "Tên",
+    "emailLabel": "Email",
+    "phoneLabel": "Số điện thoại",
+    "enterName": "Nhập tên",
+    "enterEmail": "Nhập email",
+    "enterPhone": "Nhập số điện thoại",
+    "addEmailTitle": "Thêm email",
+    "addPhoneTitle": "Thêm số điện thoại"
+  },
+  "sensors": {
+    "title": "Dữ liệu cảm biến",
+    "noDeviceData": "Không tìm thấy dữ liệu thiết bị",
+    "noTelemetryData": "Không có dữ liệu đo",
+    "labels": {
+      "temperature": "Nhiệt độ",
+      "humidity": "Độ ẩm",
+      "gasLevel": "Mức khí gas",
+      "smoke": "Khói"
+    },
+    "values": {
+      "detected": "Phát hiện",
+      "clear": "Bình thường"
+    }
   },
   "emergency": {
     "title": "Chế độ khẩn cấp",

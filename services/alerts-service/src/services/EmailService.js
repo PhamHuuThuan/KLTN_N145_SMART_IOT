@@ -108,7 +108,7 @@ class EmailService {
     const createdAt = metadata.timestamp ? new Date(metadata.timestamp) : new Date();
     const priority = (metadata.priority || metadata.rulePriority || '').toString().toLowerCase();
     const priorityLabel = priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : 'Info';
-    
+        
     return `
       <!DOCTYPE html>
       <html lang="vi">

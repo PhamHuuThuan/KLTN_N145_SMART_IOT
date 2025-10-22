@@ -138,22 +138,36 @@ class NotificationService {
         logger.info(`inAppService.send result:`, result);
         break;
       case 'email':
-        result = await this.emailService.send(
-          preferences.email.address,
-          title,
-          message,
-          metadata
-        );
-        logger.info(`emailService.send result:`, result);
+        // Send to all enabled email addresses
+        if (preferences.email.addresses && preferences.email.addresses.length > 0) {
+          const emailData = preferences.email.addresses.map(emailAddr => ({
+            to: emailAddr.address,
+            subject: title,
+            message: message,
+            metadata: { ...metadata, recipientName: emailAddr.name }
+          }));
+          
+          result = await this.emailService.sendBulk(emailData);
+          logger.info(`Email service results:`, result);
+        } else {
+          logger.warn('No email addresses configured for user');
+          result = null;
+        }
         break;
       case 'sms':
-        if (preferences.sms.phoneNumber) {
-          result = await this.smsService.send(
-            preferences.sms.phoneNumber,
-            message,
-            metadata
-          );
-          logger.info(`smsService.send result:`, result);
+        // Send to all enabled phone numbers
+        if (preferences.sms.phoneNumbers && preferences.sms.phoneNumbers.length > 0) {
+          const smsData = preferences.sms.phoneNumbers.map(phoneNum => ({
+            to: phoneNum.phoneNumber,
+            message: message,
+            metadata: { ...metadata, recipientName: phoneNum.name }
+          }));
+          
+          result = await this.smsService.sendBulk(smsData);
+          logger.info(`SMS service results:`, result);
+        } else {
+          logger.warn('No phone numbers configured for user');
+          result = null;
         }
         break;
       case 'fcm':
