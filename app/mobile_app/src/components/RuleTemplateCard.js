@@ -43,7 +43,7 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
         <View style={styles.templateStats}>
           {template.priority !== 'urgent' && (
             <View style={styles.statItem}>
-              <MaterialIcons name="timer" size={12} color={CONFIG.COLORS.gray} />
+              <MaterialIcons name="timer" size={12} color={CONFIG.THEME.gray} />
               <Text style={styles.statText}>
                 {t('rules.cooldown')} {formatCooldown(template.cooldownPeriod)}
               </Text>
@@ -51,17 +51,9 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
           )}
           {template.priority !== 'urgent' && (
             <View style={styles.statItem}>
-              <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
+              <MaterialIcons name="repeat" size={12} color={CONFIG.THEME.gray} />
               <Text style={styles.statText}>
                 {t('rules.maxPerDay')} {template.maxTriggersPerDay || '∞'}
-              </Text>
-            </View>
-          )}
-          {template.priority !== 'urgent' && (
-            <View style={styles.statItem}>
-              <MaterialIcons name="schedule" size={12} color={CONFIG.COLORS.gray} />
-              <Text style={styles.statText}>
-                {t('rules.durationLabel')} {formatCooldown(template.duration)}
               </Text>
             </View>
           )}
@@ -87,7 +79,7 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
         <MaterialIcons 
           name={isCreating ? "hourglass-empty" : "tune"} 
           size={20} 
-          color={CONFIG.COLORS.white} 
+          color={CONFIG.THEME.surface} 
         />
         <Text style={styles.createButtonText}>
           {isCreating ? t('rules.creatingLabel') : t('rules.customizeAndCreate')}
@@ -132,16 +124,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   priorityText: {
-    color: CONFIG.COLORS.white,
+    color: CONFIG.THEME.surface,
     fontSize: 11,
     fontWeight: 'bold',
     marginLeft: 4,
   },
   templateDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: CONFIG.THEME.gray,
     marginBottom: 8,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   templateMeta: {
     marginTop: 8,
@@ -160,7 +152,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statText: {
-    fontSize: 10,
+    fontSize: 9,
     color: CONFIG.THEME.gray,
     marginLeft: 4,
     fontWeight: '500',

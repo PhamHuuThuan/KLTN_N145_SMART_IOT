@@ -55,6 +55,70 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
     return labelMap[sensor] || sensor;
   };
 
+  // Validate conditions for logical consistency
+  const validateConditions = (conditions) => {
+    if (!conditions || conditions.length < 2) return { valid: true, message: '' };
+
+    // Group conditions by sensor
+    const sensorGroups = {};
+    conditions.forEach(condition => {
+      if (condition.sensor) {
+        if (!sensorGroups[condition.sensor]) {
+          sensorGroups[condition.sensor] = [];
+        }
+        sensorGroups[condition.sensor].push(condition);
+      }
+    });
+
+    // Check each sensor group for conflicts
+    for (const [sensor, sensorConditions] of Object.entries(sensorGroups)) {
+      if (sensorConditions.length < 2) continue;
+
+      const values = sensorConditions.map(c => parseFloat(c.value)).filter(v => !isNaN(v));
+      if (values.length < 2) continue;
+
+      // Check for redundant conditions (same operator, overlapping ranges)
+      const operators = sensorConditions.map(c => c.operator);
+      const hasGreater = operators.some(op => ['>', '>='].includes(op));
+      const hasLess = operators.some(op => ['<', '<='].includes(op));
+
+      if (hasGreater && hasLess) {
+        const maxGreater = Math.max(...values.filter((v, i) => ['>', '>='].includes(operators[i])));
+        const minLess = Math.min(...values.filter((v, i) => ['<', '<='].includes(operators[i])));
+        
+        if (maxGreater >= minLess) {
+          return {
+            valid: false,
+            message: `Mâu thuẫn: ${sensor} > ${maxGreater} và ${sensor} < ${minLess} không thể xảy ra cùng lúc`
+          };
+        }
+      }
+
+      // Check for redundant conditions (same direction)
+      if (hasGreater && !hasLess) {
+        const sortedValues = values.sort((a, b) => a - b);
+        if (sortedValues.length > 1) {
+          return {
+            valid: false,
+            message: `Dư thừa: ${sensor} > ${sortedValues[0]} đã bao gồm ${sensor} > ${sortedValues[sortedValues.length - 1]}`
+          };
+        }
+      }
+
+      if (hasLess && !hasGreater) {
+        const sortedValues = values.sort((a, b) => b - a);
+        if (sortedValues.length > 1) {
+          return {
+            valid: false,
+            message: `Dư thừa: ${sensor} < ${sortedValues[0]} đã bao gồm ${sensor} < ${sortedValues[sortedValues.length - 1]}`
+          };
+        }
+      }
+    }
+
+    return { valid: true, message: '' };
+  };
+
   const getSensorUnit = (sensor) => {
     const unitMap = {
       'temperature': '°C',
@@ -226,6 +290,31 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           </View>
         </View>
 
+        {/* Condition Logic (only show if multiple conditions) */}
+        {editFields.conditions && editFields.conditions.length > 1 && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.inputLabel}>Logic điều kiện</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {['AND', 'OR'].map((logic) => (
+                <TouchableOpacity
+                  key={logic}
+                  activeOpacity={0.85}
+                  style={[
+                    styles.priorityChip,
+                    editFields.conditionLogic === logic && [styles.priorityChipSelected, { borderColor: '#2196F3', backgroundColor: '#2196F322' }],
+                    { borderColor: '#2196F3' }
+                  ]}
+                  onPress={() => setEditFields(prev => ({ ...prev, conditionLogic: logic }))}
+                >
+                  <Text style={[styles.priorityLabel, editFields.conditionLogic === logic && { color: '#2196F3', fontWeight: '700' }]}>
+                    {logic === 'AND' ? 'VÀ (tất cả)' : 'HOẶC (một trong)'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Cooldown Period - Hidden for urgent priority */}
         {editFields.priority !== 'urgent' && (
           <View style={{ marginTop: 16 }}>
@@ -260,22 +349,6 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           </View>
         )}
 
-        {/* Duration - Hidden for urgent priority */}
-        {editFields.priority !== 'urgent' && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.duration')}</Text>
-            <TextInput
-              style={styles.input}
-              value={editFields.duration ? String(Math.floor(editFields.duration / 60000)) : ''}
-              onChangeText={(text) => {
-                const minutes = parseInt(text) || 0;
-                setEditFields(prev => ({ ...prev, duration: minutes * 60000 }));
-              }}
-              placeholder="0"
-              keyboardType="numeric"
-            />
-          </View>
-        )}
 
         {/* Emergency Mode Notice for Urgent Priority */}
         {editFields.priority === 'urgent' && (
@@ -289,9 +362,35 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             </Text>
           </View>
         )}
+
+        {/* Validation Error */}
+        {(() => {
+          const validation = validateConditions(editFields.conditions);
+          return !validation.valid && (
+            <View style={{ marginTop: 16, padding: 12, backgroundColor: '#F4433622', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F44336' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <MaterialIcons name="error" size={16} color="#F44336" />
+                <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>Không thể lưu rule</Text>
+              </View>
+              <Text style={{ color: '#F44336', fontSize: 12, marginBottom: 4 }}>
+                {validation.message}
+              </Text>
+              <Text style={{ color: '#F44336', fontSize: 11, fontStyle: 'italic' }}>
+                💡 Hãy sửa lại điều kiện hoặc chọn logic OR để kích hoạt khi một trong các điều kiện đúng
+              </Text>
+            </View>
+          );
+        })()}
         
         <TouchableOpacity
-          style={[styles.createButton, { marginTop: 16 }]}
+          style={[
+            styles.createButton, 
+            { 
+              marginTop: 16,
+              opacity: validateConditions(editFields.conditions).valid ? 1 : 0.5
+            }
+          ]}
+          disabled={!validateConditions(editFields.conditions).valid}
           onPress={() => {
             // Ensure conditions are properly formatted before saving
             const updatedEditFields = {
@@ -304,8 +403,17 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
             onSave(updatedEditFields);
           }}
         >
-          <MaterialIcons name="save" size={20} color={CONFIG.COLORS.white} />
-          <Text style={styles.createButtonText}>{t('rules.saveChanges')}</Text>
+          <MaterialIcons 
+            name={validateConditions(editFields.conditions).valid ? "save" : "error"} 
+            size={20} 
+            color={CONFIG.COLORS.white} 
+          />
+          <Text style={styles.createButtonText}>
+            {validateConditions(editFields.conditions).valid 
+              ? t('rules.saveChanges') 
+              : 'Sửa lỗi trước khi lưu'
+            }
+          </Text>
         </TouchableOpacity>
 
         {/* Quick actions: acknowledge, pause rule without toggling off */}

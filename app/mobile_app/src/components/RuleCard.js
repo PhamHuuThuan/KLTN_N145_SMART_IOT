@@ -126,12 +126,6 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                     {t('rules.triggered')} {rule.triggerCount || 0}
                   </Text>
                 </View>
-                <View style={styles.statItem}>
-                  <MaterialIcons name="schedule" size={12} color={CONFIG.COLORS.gray} />
-                  <Text style={styles.statText}>
-                    {t('rules.durationLabel')} {formatCooldown(rule.duration)}
-                  </Text>
-                </View>
               </View>
             </View>
           </View>
