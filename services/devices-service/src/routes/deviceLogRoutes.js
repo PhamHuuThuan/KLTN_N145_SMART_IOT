@@ -4,19 +4,19 @@ import {
   getDeviceLogs,
   getLatestTelemetry,
   getTelemetryHistory,
-  
   deleteOldLogs
 } from '../controllers/deviceLogController.js';
+import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Telemetry and log routes
 router.post('/', createDeviceLog);
-router.get('/', getDeviceLogs);
-router.get('/:deviceId/latest', getLatestTelemetry);
-router.get('/:deviceId/history', getTelemetryHistory);
+router.get('/', optionalAuth, getDeviceLogs);
+router.get('/:deviceId/latest', optionalAuth, getLatestTelemetry);
+router.get('/:deviceId/history', optionalAuth, getTelemetryHistory);
 
 // Background processing routes
-router.delete('/cleanup', deleteOldLogs);
+router.delete('/cleanup', authenticateToken, deleteOldLogs);
 
 export default router;

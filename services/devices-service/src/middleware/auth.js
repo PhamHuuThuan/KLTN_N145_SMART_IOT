@@ -44,13 +44,13 @@ export const authenticateToken = (req, res, next) => {
 /**
  * Check if user can access resource (device ownership)
  */
-export const checkDeviceOwnership = (req, res, next) => {
+export const checkDeviceOwnership = async (req, res, next) => {
   const userId = req.user.sub;
   const deviceId = req.params.deviceId;
 
   logger.info(`Checking device ownership:`, { userId, deviceId });
 
-  // If no deviceId, skip ownership check (e.g., for getAllDevices route)
+  // If no deviceId, skip ownership checks
   if (!deviceId) {
     logger.info(`No deviceId provided, skipping ownership check`);
     return next();
@@ -62,8 +62,6 @@ export const checkDeviceOwnership = (req, res, next) => {
     return next();
   }
 
-  // For device operations, we need to check ownership
-  // This will be done in the controller since we need to query the database
   next();
 };
 
@@ -103,9 +101,6 @@ export const checkResourceAccess = (resourceParam = 'ownerId') => {
   };
 };
 
-/**
- * Optional authentication (for public endpoints)
- */
 export const optionalAuth = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -120,7 +115,6 @@ export const optionalAuth = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    // If token is invalid, continue without user
     req.user = null;
     next();
   }

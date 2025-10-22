@@ -1,5 +1,20 @@
 import DeviceLog from '../models/DeviceLog.js';
 import Device from '../models/Device.js';
+import logger from '../utils/logger.js';
+
+// Check device ownership for logs
+const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
+  const device = await Device.findOne({ deviceId });
+  if (!device) {
+    return { success: false, message: 'Device not found', device: null };
+  }
+  
+  if (!isAdmin && device.ownerId !== userId) {
+    return { success: false, message: 'Access denied: You can only access your own devices', device: null };
+  }
+  
+  return { success: true, device };
+};
 
 // Create new device log (telemetry data)
 export const createDeviceLog = async (req, res) => {
@@ -46,12 +61,15 @@ export const createDeviceLog = async (req, res) => {
     
     await deviceLog.save();
     
+    logger.info(`Device log created for device ${deviceId}`, { type, severity });
+    
     res.status(201).json({
       success: true,
       data: deviceLog,
       message: 'Device log created successfully'
     });
   } catch (error) {
+    logger.error('Error creating device log:', error);
     res.status(500).json({
       success: false,
       message: 'Error creating device log',
@@ -63,10 +81,30 @@ export const createDeviceLog = async (req, res) => {
 // Get device logs
 export const getDeviceLogs = async (req, res) => {
   try {
+    const userId = req.user?.sub;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'service';
     const { deviceId, type, severity, limit = 100, page = 1, startDate, endDate } = req.query;
     
     let query = {};
-    if (deviceId) query.deviceId = deviceId;
+    if (deviceId) {
+      // Check device ownership if deviceId is provided
+      if (userId) {
+        const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+        if (!ownershipCheck.success) {
+          return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
+            success: false,
+            message: ownershipCheck.message
+          });
+        }
+      }
+      query.deviceId = deviceId;
+    } else if (userId && !isAdmin) {
+      // If no deviceId specified, only show logs for user's devices
+      const userDevices = await Device.find({ ownerId: userId }).select('deviceId');
+      const deviceIds = userDevices.map(d => d.deviceId);
+      query.deviceId = { $in: deviceIds };
+    }
+    
     if (type) query.type = type;
     if (severity) query.severity = severity;
     
@@ -94,6 +132,7 @@ export const getDeviceLogs = async (req, res) => {
       }
     });
   } catch (error) {
+    logger.error('Error fetching device logs:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching device logs',
@@ -106,6 +145,19 @@ export const getDeviceLogs = async (req, res) => {
 export const getLatestTelemetry = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user?.sub;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'service';
+    
+    // Check device ownership
+    if (userId) {
+      const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+      if (!ownershipCheck.success) {
+        return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
+          success: false,
+          message: ownershipCheck.message
+        });
+      }
+    }
     
     const latestLog = await DeviceLog.findOne({ 
       deviceId, 
@@ -128,6 +180,7 @@ export const getLatestTelemetry = async (req, res) => {
       }
     });
   } catch (error) {
+    logger.error('Error fetching latest telemetry:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching latest telemetry',
@@ -140,7 +193,20 @@ export const getLatestTelemetry = async (req, res) => {
 export const getTelemetryHistory = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user?.sub;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'service';
     const { hours = 24, limit = 1000 } = req.query;
+    
+    // Check device ownership
+    if (userId) {
+      const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+      if (!ownershipCheck.success) {
+        return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
+          success: false,
+          message: ownershipCheck.message
+        });
+      }
+    }
     
     const startDate = new Date(Date.now() - parseInt(hours) * 60 * 60 * 1000);
     
@@ -160,6 +226,7 @@ export const getTelemetryHistory = async (req, res) => {
       count: logs.length
     });
   } catch (error) {
+    logger.error('Error fetching telemetry history:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching telemetry history',
