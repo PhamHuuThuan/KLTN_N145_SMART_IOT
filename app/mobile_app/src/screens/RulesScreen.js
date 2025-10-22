@@ -64,10 +64,21 @@ const RulesScreen = () => {
   }, [selectedDevice]);
 
   const openCustomize = (template) => {
-    setCustomizeTemplate(template);
+    // Create translated template
+    const translatedTemplate = {
+      ...template,
+      name: t(template.name),
+      description: t(template.description),
+      actions: template.actions?.map(action => ({
+        ...action,
+        message: t(action.message)
+      }))
+    };
+    
+    setCustomizeTemplate(translatedTemplate);
     setCustomFields({
-      name: template.name || '',
-      description: template.description || '',
+      name: translatedTemplate.name || '',
+      description: translatedTemplate.description || '',
       priority: template.priority || 'medium',
       maxTriggersPerDay: template.maxTriggersPerDay || 10,
       cooldownPeriod: template.cooldownPeriod || 300000,
