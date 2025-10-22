@@ -59,7 +59,19 @@ export const createRule = async (req, res) => {
   try {
     console.log('Create rule request body:', JSON.stringify(req.body, null, 2));
     
-    const { name, description, deviceId, priority, conditions, actions } = req.body;
+    const { 
+      name, 
+      description, 
+      deviceId, 
+      priority, 
+      conditions, 
+      actions,
+      cooldownPeriod,
+      maxTriggersPerDay,
+      isActive,
+      conditionLogic
+    } = req.body;
+    
     const ownerId = (req.user && (req.user.userId || req.user.sub || req.user.id)) || null;
 
     if (!name || !deviceId || !conditions?.length || !actions?.length) {
@@ -80,7 +92,11 @@ export const createRule = async (req, res) => {
       deviceId,
       priority: normalizedPriority,
       conditions,
-      actions
+      actions,
+      cooldownPeriod: cooldownPeriod || 300000,
+      maxTriggersPerDay: maxTriggersPerDay || 10,
+      isActive: isActive !== undefined ? isActive : true,
+      conditionLogic: conditionLogic || 'AND'
     });
 
     await rule.save();
@@ -201,120 +217,6 @@ export const toggleRuleStatus = async (req, res) => {
   }
 };
 
-// Get rule templates (predefined rule configurations)
-export const getRuleTemplates = async (req, res) => {
-  try {
-    const templates = [
-      {
-        id: 'gas_leak_detection',
-        name: 'Gas Leak Detection',
-        description: 'Emergency response for gas leak',
-        priority: 'urgent',
-        isActive: true,
-        cooldownPeriod: null,  // No cooldown for gas emergency
-        maxTriggersPerDay: null,  // Unlimited for gas emergency
-        duration: 0,  // Immediate trigger
-        conditions: [
-          {
-            type: 'sensor',
-            sensor: 'gas_ppm',
-            operator: '>',
-            value: 1000
-          }
-        ],
-        actions: [
-          {
-            type: 'send_alert',
-            message: '🚨 Gas leak detected! Current level: {sensorValue} ppm (Threshold: {threshold} ppm). Emergency mode activated - evacuate immediately!'
-          }
-        ]
-      },
-      {
-        id: 'smoke_detection',
-        name: 'Smoke Detection',
-        description: 'Emergency response for smoke detection',
-        priority: 'high',
-        isActive: true,
-        cooldownPeriod: 300000,  // 5 minutes cooldown
-        maxTriggersPerDay: 20,  // 20 times per day
-        duration: 30000,  // 30 seconds duration
-        conditions: [
-          {
-            type: 'sensor',
-            sensor: 'smoke',
-            operator: '==',
-            value: 1
-          }
-        ],
-        actions: [
-          {
-            type: 'send_notification',
-            message: '⚠️ Smoke detected! Level: {sensorValue} (Threshold: {threshold}). Please check if it\'s from cooking or if there\'s a real fire. Location: {deviceId}'
-          }
-        ]
-      },
-      {
-        id: 'temperature_high',
-        name: 'High Temperature Alert',
-        description: 'Alert when temperature exceeds threshold',
-        priority: 'high',
-        isActive: true,
-        cooldownPeriod: 300000,  // 5 minutes
-        maxTriggersPerDay: 20,  // 20 times per day
-        duration: 300000,  // 5 minutes duration
-        conditions: [
-          {
-            type: 'sensor',
-            sensor: 'temperature',
-            operator: '>',
-            value: 40
-          }
-        ],
-        actions: [
-          {
-            type: 'send_notification',
-            message: '🌡️ High temperature detected! Current: {sensorValue}°C (Threshold: {threshold}°C). Check ventilation and cooling systems. Device: {deviceId}'
-          }
-        ]
-      },
-      {
-        id: 'humidity_high',
-        name: 'High Humidity Alert',
-        description: 'Alert when humidity exceeds comfortable level',
-        priority: 'medium',
-        isActive: true,
-        cooldownPeriod: 600000,  // 10 minutes
-        maxTriggersPerDay: 10,  // 10 times per day
-        duration: 600000,  // 10 minutes duration
-        conditions: [
-          {
-            type: 'sensor',
-            sensor: 'humidity',
-            operator: '>',
-            value: 80
-          }
-        ],
-        actions: [
-          {
-            type: 'send_notification',
-            message: '💧 High humidity detected! Current: {sensorValue}% (Threshold: {threshold}%). Consider ventilation or dehumidifier. Device: {deviceId}'
-          }
-        ]
-      }
-    ];
-    
-    res.json({
-      success: true,
-      data: templates
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching rule templates',
-      error: error.message
-    });
-  }
-};
 
 // User responds to an alert (acknowledge, dismiss, false alarm)
 export const respondToAlert = async (req, res) => {
