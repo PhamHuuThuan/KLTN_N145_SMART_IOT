@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
 import apiService from '../services/apiService';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('useOutletControl');
 
 export const useOutletControl = () => {
   const [loading, setLoading] = useState(false);

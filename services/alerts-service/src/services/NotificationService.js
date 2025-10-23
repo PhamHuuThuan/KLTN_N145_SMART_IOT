@@ -46,8 +46,9 @@ class NotificationService {
         throw new Error('userId is required for notification');
       }
 
-      if (!mongoose.Types.ObjectId.isValid(userId)) {
-        throw new Error('userId must be a valid MongoDB ObjectId');
+      // Validate userId format (can be ObjectId or custom string)
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('userId must be a valid string');
       }
 
       const notification = new Notification({
@@ -81,13 +82,13 @@ class NotificationService {
       }
 
       if (scheduledFor && scheduledFor > new Date()) {
-        logger.info(`Notification scheduled for ${scheduledFor}`, { notificationId: notification._id });
+        logger.info(`Notification scheduled for ${scheduledFor}`, { notificationId: notification.notificationId });
         return notification;
       }
 
-      logger.info(`Sending notification through channels for userId: ${userId}`);
+      logger.info(`Sending notification through channels for userId: ${userId}`, { notificationId: notification.notificationId });
       await this._sendThroughChannels(notification, preferences);
-      logger.info(`Notification sent through all channels for userId: ${userId}`);
+      logger.info(`Notification sent through all channels for userId: ${userId}`, { notificationId: notification.notificationId });
 
       return notification;
     } catch (error) {
@@ -137,22 +138,36 @@ class NotificationService {
         logger.info(`inAppService.send result:`, result);
         break;
       case 'email':
-        result = await this.emailService.send(
-          preferences.email.address,
-          title,
-          message,
-          metadata
-        );
-        logger.info(`emailService.send result:`, result);
+        // Send to all enabled email addresses
+        if (preferences.email.addresses && preferences.email.addresses.length > 0) {
+          const emailData = preferences.email.addresses.map(emailAddr => ({
+            to: emailAddr.address,
+            subject: title,
+            message: message,
+            metadata: { ...metadata, recipientName: emailAddr.name }
+          }));
+          
+          result = await this.emailService.sendBulk(emailData);
+          logger.info(`Email service results:`, result);
+        } else {
+          logger.warn('No email addresses configured for user');
+          result = null;
+        }
         break;
       case 'sms':
-        if (preferences.sms.phoneNumber) {
-          result = await this.smsService.send(
-            preferences.sms.phoneNumber,
-            message,
-            metadata
-          );
-          logger.info(`smsService.send result:`, result);
+        // Send to all enabled phone numbers
+        if (preferences.sms.phoneNumbers && preferences.sms.phoneNumbers.length > 0) {
+          const smsData = preferences.sms.phoneNumbers.map(phoneNum => ({
+            to: phoneNum.phoneNumber,
+            message: message,
+            metadata: { ...metadata, recipientName: phoneNum.name }
+          }));
+          
+          result = await this.smsService.sendBulk(smsData);
+          logger.info(`SMS service results:`, result);
+        } else {
+          logger.warn('No phone numbers configured for user');
+          result = null;
         }
         break;
       case 'fcm':
@@ -235,7 +250,7 @@ class NotificationService {
   async markAsRead(notificationId, userId) {
     try {
       const notification = await Notification.findOne({
-        _id: notificationId,
+        notificationId: notificationId,
         userId
       });
 
@@ -273,7 +288,7 @@ class NotificationService {
   async deleteNotification(notificationId, userId) {
     try {
       const notification = await Notification.findOneAndDelete({
-        _id: notificationId,
+        notificationId: notificationId,
         userId
       });
 
@@ -281,6 +296,7 @@ class NotificationService {
         throw new Error('Notification not found');
       }
 
+      logger.info(`Notification deleted: ${notificationId} for user: ${userId}`);
       return notification;
     } catch (error) {
       logger.error('Error deleting notification:', error);
@@ -291,7 +307,7 @@ class NotificationService {
   async getNotificationStats(userId) {
     try {
       const stats = await Notification.aggregate([
-        { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+        { $match: { userId: userId } },
         {
           $group: {
             _id: null,

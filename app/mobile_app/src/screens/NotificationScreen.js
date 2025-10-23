@@ -28,18 +28,16 @@ const NotificationScreen = ({ navigation }) => {
     loading,
     error,
     refreshing,
+    loadingMore,
+    hasMore,
     loadNotifications,
     refreshNotifications,
+    loadMoreNotifications,
     markAllAsRead,
-    deleteNotification,
-    testApiConnection,
   } = useNotificationContext();
   
   const { user } = useAuth();
 
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
   const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
   
@@ -49,11 +47,9 @@ const NotificationScreen = ({ navigation }) => {
   }, []);
 
   const handleRefresh = async () => {
-    setPage(1);
     setShowLoader(true);
     try {
       await refreshNotifications();
-      setHasMore(false);
       setFeedback({ visible: true, type: 'success', message: t('common.refresh') });
     } catch (e) {
       setFeedback({ visible: true, type: 'error', message: t('errors.refreshFailed') });
@@ -66,30 +62,11 @@ const NotificationScreen = ({ navigation }) => {
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) return;
-
-    setLoadingMore(true);
+    
     try {
-      const nextPage = page + 1;
-      if (!user?.id) {
-        console.error('User not authenticated for load more');
-        return;
-      }
-      
-      const response = await notificationService.getNotifications(user.id, nextPage, 20);
-      
-      if (response.success && response.data.notifications.length > 0) {
-        // Add new notifications to existing list
-        const newNotifications = [...notifications, ...response.data.notifications];
-        // Update context with new notifications
-        // Note: This would need to be implemented in the context
-        setPage(nextPage);
-      } else {
-        setHasMore(false);
-      }
+      await loadMoreNotifications();
     } catch (error) {
       console.error('Error loading more notifications:', error);
-    } finally {
-      setLoadingMore(false);
     }
   };
 
@@ -224,7 +201,7 @@ const NotificationScreen = ({ navigation }) => {
 
       <FlatList
         data={notifications}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.notificationId || item.id}
         renderItem={renderNotificationItem}
         ListEmptyComponent={renderEmptyState}
         ListFooterComponent={renderFooter}

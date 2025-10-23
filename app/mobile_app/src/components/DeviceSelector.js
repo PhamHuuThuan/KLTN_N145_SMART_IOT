@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Alert, ActivityIndicator, FlatList } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
@@ -9,7 +9,17 @@ import { useTheme } from '../contexts/ThemeContext';
 import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
 
-const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetails, onDeviceAdded, onDeviceRemoved }) => {
+const DeviceSelector = ({ 
+  devices, 
+  selectedDevice, 
+  onSelectDevice, 
+  onPressDetails, 
+  onDeviceAdded, 
+  onDeviceRemoved,
+  hasMore,
+  loadingMore,
+  onLoadMore
+}) => {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
@@ -81,9 +91,11 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                 <MaterialCommunityIcons name="close" size={20} color={colors.gray} />
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ maxHeight: 260 }}>
-              {devices.map((deviceId) => (
-                <View key={deviceId} style={styles.deviceItemContainer}>
+            <FlatList
+              data={devices}
+              keyExtractor={(item) => item}
+              renderItem={({ item: deviceId }) => (
+                <View style={styles.deviceItemContainer}>
                   <TouchableOpacity
                     style={[
                       styles.modalItem,
@@ -162,8 +174,28 @@ const DeviceSelector = ({ devices, selectedDevice, onSelectDevice, onPressDetail
                   </TouchableOpacity>
                   </TouchableOpacity>
                 </View>
-              ))}
-            </ScrollView>
+              )}
+              onEndReached={() => {
+                if (hasMore && !loadingMore && onLoadMore) {
+                  onLoadMore();
+                }
+              }}
+              onEndReachedThreshold={0.1}
+              ListFooterComponent={() => {
+                if (loadingMore) {
+                  return (
+                    <View style={styles.loadMoreContainer}>
+                      <ActivityIndicator color={colors.primary} />
+                      <Text style={[styles.loadMoreText, { color: colors.textSecondary }]}>
+                        {t('common.loadingMore')}
+                      </Text>
+                    </View>
+                  );
+                }
+                return null;
+              }}
+              style={{ maxHeight: 260 }}
+            />
           </View>
         </View>
       </Modal>
@@ -499,6 +531,16 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
     marginLeft: 8,
+  },
+  loadMoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  loadMoreText: {
+    fontSize: 12,
   },
 });
 

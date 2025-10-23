@@ -1,6 +1,6 @@
 const { Kafka } = require('kafkajs');
 const mqttClient = require('../mqtt/client');
-const { default: logger } = require('../../../../app/mobile_app/src/utils/logger');
+const { logger } = require('../utils/logger');
 
 const kafka = new Kafka({
   clientId: 'mqtt-outlet-consumer',

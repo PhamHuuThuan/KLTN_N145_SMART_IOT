@@ -87,7 +87,7 @@ const NotificationItem = ({ notification, onPress }) => {
 
   const handleMarkAsRead = async () => {
     if (!notification.isRead) {
-      await markAsRead(notification.id);
+      await markAsRead(notification.notificationId);
     }
   };
 
@@ -100,7 +100,7 @@ const NotificationItem = ({ notification, onPress }) => {
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => deleteNotification(notification.id),
+          onPress: () => deleteNotification(notification.notificationId),
         },
       ]
     );

@@ -34,7 +34,10 @@ const HomeScreen = ({ navigation }) => {
     selectedDevice,
     loading,
     error,
+    hasMore,
+    loadingMore,
     fetchDevices,
+    loadMoreDevices,
     selectDevice,
     fetchDeviceStatus,
     fetchDeviceDetail,
@@ -46,7 +49,7 @@ const HomeScreen = ({ navigation }) => {
   const { controlOutlet, loading: controlLoading } = useOutletControl();
 
   const onRefresh = async () => {
-    await fetchDevices();
+    await fetchDevices(1, 20);
   };
 
   return (
@@ -71,11 +74,11 @@ const HomeScreen = ({ navigation }) => {
           onPressDetails={() => setShowDeviceInfo(true)}
           onDeviceAdded={async () => {
             // Refresh devices list when a new device is added
-            await fetchDevices();
+            await fetchDevices(1, 20);
           }}
           onDeviceRemoved={async (deviceId, newSelectedDevice = null) => {
             // Refresh devices list when a device is removed
-            await fetchDevices();
+            await fetchDevices(1, 20);
             
             // If the removed device was selected, auto-select another device
             if (selectedDevice === deviceId) {
@@ -90,6 +93,9 @@ const HomeScreen = ({ navigation }) => {
               }
             }
           }}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={loadMoreDevices}
         />
 
         <SensorGrid deviceData={deviceData} />

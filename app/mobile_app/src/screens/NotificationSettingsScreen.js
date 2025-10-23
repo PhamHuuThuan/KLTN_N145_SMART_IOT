@@ -22,9 +22,18 @@ const NotificationSettingsScreen = ({ navigation }) => {
   const [saving, setSaving] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
   const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addModalType, setAddModalType] = useState('email'); // 'email' or 'sms'
+  const [newContact, setNewContact] = useState({ name: '', address: '', phoneNumber: '' });
   const [prefs, setPrefs] = useState({
-    email: { enabled: true, address: user?.email || '' },
-    sms: { enabled: false, phoneNumber: user?.phone || '' },
+    email: { 
+      enabled: true, 
+      addresses: user?.email ? [{ name: 'Tôi', address: user.email, isDefault: true }] : []
+    },
+    sms: { 
+      enabled: false, 
+      phoneNumbers: user?.phone ? [{ name: 'Tôi', phoneNumber: user.phone, isDefault: true }] : []
+    },
     fcm: { enabled: true },
     inApp: { enabled: true },
     quietHours: {
@@ -72,23 +81,27 @@ const NotificationSettingsScreen = ({ navigation }) => {
 
   const load = async () => {
     if (!user?.id) return;
-    // setLoading(true);
-    // setShowLoader(true);
     try {
       const res = await notificationService.getPreferences(user.id);
       if (res.success && res.data?.data) {
-        setPrefs({
+        const data = res.data.data;
+        
+        // Use addresses directly from API response
+        const emailAddresses = data.email?.addresses || [];
+        const smsNumbers = data.sms?.phoneNumbers || [];
+        
+        const newPrefs = {
           email: {
-            enabled: !!res.data.data.email?.enabled,
-            address: res.data.data.email?.address || user?.email || ''
+            enabled: !!data.email?.enabled,
+            addresses: emailAddresses
           },
           sms: {
-            enabled: !!res.data.data.sms?.enabled,
-            phoneNumber: res.data.data.sms?.phoneNumber || user?.phone || ''
+            enabled: !!data.sms?.enabled,
+            phoneNumbers: smsNumbers
           },
-          fcm: { enabled: !!res.data.data.fcm?.enabled },
-          inApp: { enabled: !!res.data.data.inApp?.enabled },
-          quietHours: res.data.data.quietHours || {
+          fcm: { enabled: !!data.fcm?.enabled },
+          inApp: { enabled: !!data.inApp?.enabled },
+          quietHours: data.quietHours || {
             enabled: false,
             startTime: '22:00',
             endTime: '08:00',
@@ -99,7 +112,9 @@ const NotificationSettingsScreen = ({ navigation }) => {
               { type: 'system', enabled: true }
             ]
           }
-        });
+        };
+        
+        setPrefs(newPrefs);
       }
     } catch (e) {
       setFeedback({ visible: true, type: 'error', message: t('settings.loadPreferencesError') });
@@ -109,14 +124,50 @@ const NotificationSettingsScreen = ({ navigation }) => {
     }
   };
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const phoneRegex = /^(\+?[1-9]\d{1,14}|0\d{9,10})$/;
+
+  const emailExists = (email) => prefs.email.addresses.some(e => e.address.trim().toLowerCase() === email.trim().toLowerCase());
+  const phoneExists = (phone) => prefs.sms.phoneNumbers.some(p => p.phoneNumber.trim() === phone.trim());
+
   const validateForm = () => {
-    if (prefs.email.enabled && !prefs.email.address) {
-      setFeedback({ visible: true, type: 'error', message: t('settings.emailRequired') });
-      return false;
+    if (prefs.email.enabled) {
+      if (prefs.email.addresses.length === 0) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.emailRequired') });
+        return false;
+      }
+      const seenEmails = new Set();
+      for (const addr of prefs.email.addresses) {
+        if (!addr?.address || !emailRegex.test(addr.address)) {
+          setFeedback({ visible: true, type: 'error', message: t('settings.invalidEmail') });
+          return false;
+        }
+        const key = addr.address.trim().toLowerCase();
+        if (seenEmails.has(key)) {
+          setFeedback({ visible: true, type: 'error', message: t('settings.duplicateEmail') });
+          return false;
+        }
+        seenEmails.add(key);
+      }
     }
-    if (prefs.sms.enabled && !prefs.sms.phoneNumber) {
-      setFeedback({ visible: true, type: 'error', message: t('settings.phoneRequired') });
-      return false;
+    if (prefs.sms.enabled) {
+      if (prefs.sms.phoneNumbers.length === 0) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.phoneRequired') });
+        return false;
+      }
+      const seenPhones = new Set();
+      for (const pn of prefs.sms.phoneNumbers) {
+        if (!pn?.phoneNumber || !phoneRegex.test(pn.phoneNumber)) {
+          setFeedback({ visible: true, type: 'error', message: t('settings.invalidPhone') });
+          return false;
+        }
+        const key = pn.phoneNumber.trim();
+        if (seenPhones.has(key)) {
+          setFeedback({ visible: true, type: 'error', message: t('settings.duplicatePhone') });
+          return false;
+        }
+        seenPhones.add(key);
+      }
     }
     return true;
   };
@@ -134,16 +185,17 @@ const NotificationSettingsScreen = ({ navigation }) => {
       const payload = {
         email: { 
           enabled: prefs.email.enabled, 
-          address: prefs.email.enabled ? (prefs.email.address || user?.email) : '' 
+          addresses: prefs.email.addresses
         },
         sms: { 
           enabled: prefs.sms.enabled, 
-          phoneNumber: prefs.sms.enabled ? (prefs.sms.phoneNumber || user?.phone) : '' 
+          phoneNumbers: prefs.sms.phoneNumbers
         },
         fcm: { enabled: prefs.fcm.enabled },
         inApp: { enabled: prefs.inApp.enabled },
         quietHours: prefs.quietHours
       };
+      
       const res = await notificationService.updatePreferences(user.id, payload);
       if (res.success) {
         setFeedback({ visible: true, type: 'success', message: t('settings.preferencesSaved') });
@@ -151,7 +203,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
         setFeedback({ visible: true, type: 'error', message: res.message || t('settings.savePreferencesError') });
       }
     } catch (e) {
-      console.error('Save preferences error:', e);
       let errorMessage = t('settings.savePreferencesError');
       
       if (e.response?.data?.message) {
@@ -216,20 +267,154 @@ const NotificationSettingsScreen = ({ navigation }) => {
     }
   };
 
-  useEffect(() => { 
-    load(); 
+  // Add email address
+  const addEmailAddress = () => {
+    if (prefs.email.addresses.length >= 3) {
+      setFeedback({ visible: true, type: 'error', message: 'Tối đa 3 email (bao gồm email mặc định)' });
+      return;
+    }
+    
+    setAddModalType('email');
+    setNewContact({ name: '', address: '', phoneNumber: '' });
+    setShowAddModal(true);
+  };
+
+  // Add SMS number
+  const addSMSNumber = () => {
+    if (prefs.sms.phoneNumbers.length >= 3) {
+      setFeedback({ visible: true, type: 'error', message: 'Tối đa 3 số điện thoại (bao gồm số mặc định)' });
+      return;
+    }
+    
+    setAddModalType('sms');
+    setNewContact({ name: '', address: '', phoneNumber: '' });
+    setShowAddModal(true);
+  };
+
+  // Save new contact from modal
+  const saveNewContact = () => {
+    if (!newContact.name.trim() || (!newContact.address.trim() && !newContact.phoneNumber.trim())) {
+      setFeedback({ visible: true, type: 'error', message: t('common.error') });
+      return;
+    }
+
+    if (addModalType === 'email') {
+      if (!newContact.address.trim() || !emailRegex.test(newContact.address.trim())) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.invalidEmail') });
+        return;
+      }
+      if (emailExists(newContact.address)) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.duplicateEmail') });
+        return;
+      }
+      
+      const newEmail = { 
+        name: newContact.name.trim(), 
+        address: newContact.address.trim(), 
+        isDefault: false 
+      };
+      
+      setPrefs({
+        ...prefs,
+        email: {
+          ...prefs.email,
+          addresses: [...prefs.email.addresses, newEmail]
+        }
+      });
+    } else {
+      if (!newContact.phoneNumber.trim() || !phoneRegex.test(newContact.phoneNumber.trim())) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.invalidPhone') });
+        return;
+      }
+      if (phoneExists(newContact.phoneNumber)) {
+        setFeedback({ visible: true, type: 'error', message: t('settings.duplicatePhone') });
+        return;
+      }
+      
+      const newSMS = { 
+        name: newContact.name.trim(), 
+        phoneNumber: newContact.phoneNumber.trim(), 
+        isDefault: false 
+      };
+      
+      setPrefs({
+        ...prefs,
+        sms: {
+          ...prefs.sms,
+          phoneNumbers: [...prefs.sms.phoneNumbers, newSMS]
+        }
+      });
+    }
+
+    setShowAddModal(false);
+    setNewContact({ name: '', address: '', phoneNumber: '' });
+  };
+
+  // Remove email address
+  const removeEmailAddress = (index) => {
+    const email = prefs.email.addresses[index];
+    if (email.isDefault) return;
+    
+    setPrefs({
+      ...prefs,
+      email: {
+        ...prefs.email,
+        addresses: prefs.email.addresses.filter((_, i) => i !== index)
+      }
+    });
+  };
+
+  // Update email address
+  const updateEmailAddress = (index, field, value) => {
+    const newAddresses = [...prefs.email.addresses];
+    newAddresses[index] = { ...newAddresses[index], [field]: value };
+    setPrefs({
+      ...prefs,
+      email: { ...prefs.email, addresses: newAddresses }
+    });
+  };
+
+  // Remove SMS number
+  const removeSMSNumber = (index) => {
+    const sms = prefs.sms.phoneNumbers[index];
+    if (sms.isDefault) return; // Cannot remove default phone
+    
+    setPrefs({
+      ...prefs,
+      sms: {
+        ...prefs.sms,
+        phoneNumbers: prefs.sms.phoneNumbers.filter((_, i) => i !== index)
+      }
+    });
+  };
+
+  // Update SMS number
+  const updateSMSNumber = (index, field, value) => {
+    const newNumbers = [...prefs.sms.phoneNumbers];
+    newNumbers[index] = { ...newNumbers[index], [field]: value };
+    setPrefs({
+      ...prefs,
+      sms: { ...prefs.sms, phoneNumbers: newNumbers }
+    });
+  };
+
+  // Load preferences when component mounts or user changes
+  useEffect(() => {
+    if (user?.id) {
+      load();
+    }
   }, [user?.id]);
 
-  // Update email and phone when user data changes
-  useEffect(() => {
-    if (user?.email || user?.phone) {
-      setPrefs(prev => ({
-        ...prev,
-        email: { ...prev.email, address: prev.email.address || user?.email || '' },
-        sms: { ...prev.sms, phoneNumber: prev.sms.phoneNumber || user?.phone || '' }
-      }));
-    }
-  }, [user?.email, user?.phone]);
+  // Update email and phone when user data changes - DISABLED to prevent overriding arrays
+  // useEffect(() => {
+  //   if (user?.email || user?.phone) {
+  //     setPrefs(prev => ({
+  //       ...prev,
+  //       email: { ...prev.email, address: prev.email.address || user?.email || '' },
+  //       sms: { ...prev.sms, phoneNumber: prev.sms.phoneNumber || user?.phone || '' }
+  //     }));
+  //   }
+  // }, [user?.email, user?.phone]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -282,18 +467,82 @@ const NotificationSettingsScreen = ({ navigation }) => {
             <Switch value={prefs.email.enabled} onValueChange={(v) => setPrefs({ ...prefs, email: { ...prefs.email, enabled: v } })} />
           </View>
           {prefs.email.enabled && (
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('settings.emailAddress')}</Text>
-              <TextInput
-                style={[styles.input, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }, !prefs.email.address && styles.inputError]}
-                placeholder={t('settings.enterEmailAddress')}
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={prefs.email.address}
-                onChangeText={(t) => setPrefs({ ...prefs, email: { ...prefs.email, address: t } })}
-              />
-              {!prefs.email.address && <Text style={[styles.errorText, { color: colors.danger }]}>{t('settings.emailRequired')}</Text>}
+            <View style={styles.addressesContainer}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('settings.recipientsEmailLabel')}</Text>
+              
+              {prefs.email.addresses.filter(email => email.isDefault).map((email, index) => (
+                <View key={`default-${index}`} style={styles.defaultSection}>
+                  <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('settings.defaultLabel')}</Text>
+                  <View style={styles.emailItem}>
+                    <View style={styles.emailInputContainer}>
+                      <TextInput
+                        style={[
+                          styles.input, 
+                          styles.emailInput, 
+                          { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textSecondary }
+                        ]}
+                        value={`${email.name} (${email.address})`}
+                        editable={false}
+                      />
+                    </View>
+                  </View>
+                </View>
+              ))}
+
+              {prefs.email.addresses.filter(email => !email.isDefault).length > 0 && (
+                <View style={styles.additionalSection}>
+                  <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('settings.familyMembersLabel')}</Text>
+                  {prefs.email.addresses.filter(email => !email.isDefault).map((email, index) => {
+                    const realIndex = prefs.email.addresses.findIndex(e => e === email);
+                    return (
+                      <View key={`additional-${index}`} style={styles.emailItem}>
+                        <View style={styles.emailInputContainer}>
+                          <TextInput
+                            style={[
+                              styles.input, 
+                              styles.emailInput, 
+                              { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }
+                            ]}
+                            placeholder={t('settings.enterName')}
+                            placeholderTextColor={colors.textSecondary}
+                            value={email.name}
+                            onChangeText={(text) => updateEmailAddress(realIndex, 'name', text)}
+                          />
+                          <TextInput
+                            style={[
+                              styles.input, 
+                              styles.emailInput, 
+                              { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }
+                            ]}
+                            placeholder={t('settings.enterEmail')}
+                            placeholderTextColor={colors.textSecondary}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            value={email.address}
+                            onChangeText={(text) => updateEmailAddress(realIndex, 'address', text)}
+                          />
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.removeButton, { backgroundColor: colors.danger }]}
+                          onPress={() => removeEmailAddress(realIndex)}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={colors.white} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {prefs.email.addresses.length < 3 && (
+                <TouchableOpacity
+                  style={[styles.addButton, { backgroundColor: colors.primary }]}
+                  onPress={addEmailAddress}
+                >
+                  <Ionicons name="add" size={18} color={colors.white} />
+                  <Text style={[styles.addButtonText, { color: colors.white }]}>{t('settings.addEmail')}</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -308,17 +557,81 @@ const NotificationSettingsScreen = ({ navigation }) => {
             <Switch value={prefs.sms.enabled} onValueChange={(v) => setPrefs({ ...prefs, sms: { ...prefs.sms, enabled: v } })} />
           </View>
           {prefs.sms.enabled && (
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('settings.phoneNumber')}</Text>
-              <TextInput
-                style={[styles.input, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }, !prefs.sms.phoneNumber && styles.inputError]}
-                placeholder={t('settings.enterPhoneNumber')}
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="phone-pad"
-                value={prefs.sms.phoneNumber}
-                onChangeText={(t) => setPrefs({ ...prefs, sms: { ...prefs.sms, phoneNumber: t } })}
-              />
-              {!prefs.sms.phoneNumber && <Text style={[styles.errorText, { color: colors.danger }]}>{t('settings.phoneRequired')}</Text>}
+            <View style={styles.addressesContainer}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('settings.recipientsSMSLabel')}</Text>
+              
+              {prefs.sms.phoneNumbers.filter(sms => sms.isDefault).map((sms, index) => (
+                <View key={`default-${index}`} style={styles.defaultSection}>
+                  <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('settings.defaultLabel')}</Text>
+                  <View style={styles.emailItem}>
+                    <View style={styles.emailInputContainer}>
+                      <TextInput
+                        style={[
+                          styles.input, 
+                          styles.emailInput, 
+                          { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textSecondary }
+                        ]}
+                        value={`${sms.name} (${sms.phoneNumber})`}
+                        editable={false}
+                      />
+                    </View>
+                  </View>
+                </View>
+              ))}
+
+              {prefs.sms.phoneNumbers.filter(sms => !sms.isDefault).length > 0 && (
+                <View style={styles.additionalSection}>
+                  <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('settings.familyMembersLabel')}</Text>
+                  {prefs.sms.phoneNumbers.filter(sms => !sms.isDefault).map((sms, index) => {
+                    const realIndex = prefs.sms.phoneNumbers.findIndex(s => s === sms);
+                    return (
+                      <View key={`additional-${index}`} style={styles.emailItem}>
+                        <View style={styles.emailInputContainer}>
+                          <TextInput
+                            style={[
+                              styles.input, 
+                              styles.emailInput, 
+                              { borderColor: colors.border, backgroundColor: colors.background, color: colors.text}
+                            ]}
+                            placeholder={t('settings.enterName')}
+                            placeholderTextColor={colors.textSecondary}
+                            value={sms.name}
+                            onChangeText={(text) => updateSMSNumber(realIndex, 'name', text)}
+                          />
+                          <TextInput
+                            style={[
+                              styles.input, 
+                              styles.emailInput, 
+                              { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }
+                            ]}
+                            placeholder={t('settings.enterPhone')}
+                            placeholderTextColor={colors.textSecondary}
+                            keyboardType="phone-pad"
+                            value={sms.phoneNumber}
+                            onChangeText={(text) => updateSMSNumber(realIndex, 'phoneNumber', text)}
+                          />
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.removeButton, { backgroundColor: colors.danger }]}
+                          onPress={() => removeSMSNumber(realIndex)}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={colors.white} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {prefs.sms.phoneNumbers.length < 3 && (
+                <TouchableOpacity
+                  style={[styles.addButton, { backgroundColor: colors.primary }]}
+                  onPress={addSMSNumber}
+                >
+                  <Ionicons name="add" size={18} color={colors.white} />
+                  <Text style={[styles.addButtonText, { color: colors.white }]}>{t('settings.addPhone')}</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -440,6 +753,71 @@ const NotificationSettingsScreen = ({ navigation }) => {
           }
         }}
       />
+
+      {/* Add Contact Modal */}
+      {showAddModal && (
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                {addModalType === 'email' ? t('settings.addEmailTitle') : t('settings.addPhoneTitle')}
+              </Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowAddModal(false)}
+              >
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalBody}>
+              <View style={styles.modalInputContainer}>
+                <Text style={[styles.modalInputLabel, { color: colors.text }]}>{t('settings.nameLabel')}</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
+                  placeholder={t('settings.enterName')}
+                  placeholderTextColor={colors.textSecondary}
+                  value={newContact.name}
+                  onChangeText={(text) => setNewContact({ ...newContact, name: text })}
+                />
+              </View>
+              
+              <View style={styles.modalInputContainer}>
+                <Text style={[styles.modalInputLabel, { color: colors.text }]}>
+                  {addModalType === 'email' ? t('settings.emailLabel') : t('settings.phoneLabel')}
+                </Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
+                  placeholder={addModalType === 'email' ? t('settings.enterEmail') : t('settings.enterPhone')}
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType={addModalType === 'email' ? 'email-address' : 'phone-pad'}
+                  autoCapitalize="none"
+                  value={addModalType === 'email' ? newContact.address : newContact.phoneNumber}
+                  onChangeText={(text) => setNewContact({ 
+                    ...newContact, 
+                    [addModalType === 'email' ? 'address' : 'phoneNumber']: text 
+                  })}
+                />
+              </View>
+            </View>
+            
+            <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton, { borderColor: colors.border }]}
+                onPress={() => setShowAddModal(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.text }]}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton, { backgroundColor: colors.primary }]}
+                onPress={saveNewContact}
+              >
+                <Text style={[styles.modalSaveText, { color: colors.white }]}>{t('common.add')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -464,9 +842,10 @@ const styles = StyleSheet.create({
   inputLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8 },
   input: { 
     borderWidth: 1, 
-    borderRadius: 8, 
-    padding: 12,
-    fontSize: 16
+    borderRadius: 10, 
+    padding: 14,
+    fontSize: 16,
+    minHeight: 48
   },
   inputError: {
     borderColor: '#FF3B30'
@@ -536,6 +915,138 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8
+  },
+  addressesContainer: {
+    marginTop: 16
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
+  },
+  defaultSection: {
+    marginBottom: 8
+  },
+  additionalSection: {
+    marginBottom: 8
+  },
+  emailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12
+  },
+  emailInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8
+  },
+  emailInput: {
+    flex: 1
+  },
+  removeButton: {
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 44,
+    minHeight: 44
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    gap: 8,
+    marginTop: 16
+  },
+  addButtonText: {
+    fontSize: 15,
+    fontWeight: '600'
+  },
+  // Modal styles
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 12,
+    overflow: 'hidden'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600'
+  },
+  modalCloseButton: {
+    padding: 4
+  },
+  modalBody: {
+    padding: 20
+  },
+  modalInputContainer: {
+    marginBottom: 16
+  },
+  modalInputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    minHeight: 48
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    gap: 12
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  modalCancelButton: {
+    borderWidth: 1
+  },
+  modalSaveButton: {
+    // backgroundColor handled by theme
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '500'
+  },
+  modalSaveText: {
+    fontSize: 16,
+    fontWeight: '600'
   }
 });
 

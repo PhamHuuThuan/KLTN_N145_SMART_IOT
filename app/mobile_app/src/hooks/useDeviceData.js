@@ -14,6 +14,12 @@ export const useDeviceData = () => {
   const [error, setError] = useState(null);
   const [deviceDetail, setDeviceDetail] = useState(null);
   const socketRef = useRef(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Fetch device status
   const fetchDeviceStatus = useCallback(async (deviceId) => {
@@ -38,22 +44,31 @@ export const useDeviceData = () => {
   }, []);
 
   // Fetch devices
-  const fetchDevices = useCallback(async () => {
+  const fetchDevices = useCallback(async (page = 1, limit = 20) => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await apiService.getDevices();
+      const response = await apiService.getDevices(page, limit);
+      
       const devices = response.data || [];
+      const pagination = response.pagination || {};
       
-      log.info('devices loaded', devices.length);
+      log.info('devices loaded', devices.length, 'page:', page);
       
-      // Map devices to get deviceId, guard against bad entries
       const deviceIds = devices.map(device => device?.deviceId).filter(Boolean);
-      setDevicesList(deviceIds);
       
-      // Only auto-select first device if nothing selected yet
-      if (!selectedDevice && deviceIds.length > 0) {
+      if (page === 1) {
+        setDevicesList(deviceIds);
+      } else {
+        setDevicesList(prev => [...prev, ...deviceIds]);
+      }
+      
+      setCurrentPage(pagination.page || page);
+      setTotalPages(pagination.pages || 1);
+      setHasMore((pagination.page || page) < (pagination.pages || 1));
+      
+      if (page === 1 && !selectedDevice && deviceIds.length > 0) {
         const firstDevice = deviceIds[0];
         log.info('auto-selected device', firstDevice);
         setSelectedDevice(firstDevice);
@@ -77,6 +92,26 @@ export const useDeviceData = () => {
       log.error('fetchDeviceDetail error', err?.message || err);
     }
   }, []);
+
+  // Load more devices
+  const loadMoreDevices = useCallback(async () => {
+    if (loadingMore || !hasMore) {
+      log.debug('Skipping load more:', { loadingMore, hasMore });
+      return;
+    }
+
+    const nextPage = currentPage + 1;
+    log.info(`Loading more devices - page ${nextPage}`);
+
+    try {
+      setLoadingMore(true);
+      await fetchDevices(nextPage, 20);
+    } catch (error) {
+      log.error('Load more devices error:', error.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, currentPage, fetchDevices]);
 
   // Select device
   const selectDevice = useCallback(async (deviceId) => {
@@ -195,11 +230,18 @@ export const useDeviceData = () => {
     selectedDevice,
     loading,
     error,
+    // Pagination state
+    currentPage,
+    hasMore,
+    loadingMore,
+    totalPages,
+    // Functions
     fetchDevices,
+    loadMoreDevices,
     selectDevice,
     fetchDeviceStatus,
     fetchDeviceDetail,
-    refreshDevices: fetchDevices,
+    refreshDevices: () => fetchDevices(1, 20),
     removeDevice,
   };
 };

@@ -68,23 +68,15 @@ export const getDeviceById = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
     
     logger.info(`Getting device ${deviceId} for user ${userId}`);
     
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
         success: false,
-        message: 'Device not found'
-      });
-    }
-    
-    // Check ownership (unless admin)
-    if (req.user.role !== 'admin' && req.user.role !== 'service' && device.ownerId !== userId) {
-      logger.warn(`Access denied: User ${userId} trying to access device ${deviceId} owned by ${device.ownerId}`);
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied: You can only access your own devices'
+        message: ownershipCheck.message
       });
     }
     
@@ -92,7 +84,7 @@ export const getDeviceById = async (req, res) => {
     
     res.json({
       success: true,
-      data: device
+      data: ownershipCheck.device
     });
   } catch (error) {
     logger.error('Error fetching device:', error);
@@ -203,20 +195,25 @@ export const createDevice = async (req, res) => {
 export const updateDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
     const updateData = req.body;
+    
+    logger.info(`Updating device ${deviceId} for user ${userId}`);
+    
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
+        success: false,
+        message: ownershipCheck.message
+      });
+    }
     
     const device = await Device.findOneAndUpdate(
       { deviceId },
       { ...updateData, updatedAt: new Date() },
       { new: true, runValidators: true }
     );
-    
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        message: 'Device not found'
-      });
-    }
     
     producer.send({
       topic: 'device.updated',
@@ -238,6 +235,7 @@ export const updateDevice = async (req, res) => {
       message: 'Device updated successfully'
     });
   } catch (error) {
+    logger.error('Error updating device:', error);
     res.status(500).json({
       success: false,
       message: 'Error updating device',
@@ -302,19 +300,25 @@ export const deleteDevice = async (req, res) => {
 export const toggleOutlet = async (req, res) => {
   try {
     const { deviceId, outletId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
     let { status } = req.body;
     
     if (typeof status === 'string') {
       status = status.toLowerCase() === 'true' || status.toLowerCase() === 'on' || status === '1';
     }
     
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({
+    logger.info(`Toggling outlet ${outletId} on device ${deviceId} for user ${userId}`);
+    
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
         success: false,
-        message: 'Device not found'
+        message: ownershipCheck.message
       });
     }
+    
+    const device = ownershipCheck.device;
     
     if (!device.isOnline()) {
       return res.status(400).json({
@@ -408,15 +412,20 @@ export const toggleOutlet = async (req, res) => {
 export const enterEmergencyMode = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
     
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({
+    logger.info(`Entering emergency mode for device ${deviceId} by user ${userId}`);
+    
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
         success: false,
-        message: 'Device not found'
+        message: ownershipCheck.message
       });
     }
     
+    const device = ownershipCheck.device;
     device.enterEmergencyMode();
     await device.save();
     
@@ -480,6 +489,7 @@ export const enterEmergencyMode = async (req, res) => {
       message: 'Emergency mode activated successfully'
     });
   } catch (error) {
+    logger.error('Error activating emergency mode:', error);
     res.status(500).json({
       success: false,
       message: 'Error activating emergency mode',
@@ -492,15 +502,20 @@ export const enterEmergencyMode = async (req, res) => {
 export const exitEmergencyMode = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
     
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({
+    logger.info(`Exiting emergency mode for device ${deviceId} by user ${userId}`);
+    
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
         success: false,
-        message: 'Device not found'
+        message: ownershipCheck.message
       });
     }
     
+    const device = ownershipCheck.device;
     device.exitEmergencyMode();
     await device.save();
     
@@ -527,6 +542,7 @@ export const exitEmergencyMode = async (req, res) => {
       message: 'Emergency mode deactivated successfully'
     });
   } catch (error) {
+    logger.error('Error deactivating emergency mode:', error);
     res.status(500).json({
       success: false,
       message: 'Error deactivating emergency mode',
@@ -539,15 +555,20 @@ export const exitEmergencyMode = async (req, res) => {
 export const getDeviceStatus = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
     
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({
+    logger.info(`Getting device status for ${deviceId} by user ${userId}`);
+    
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
         success: false,
-        message: 'Device not found'
+        message: ownershipCheck.message
       });
     }
     
+    const device = ownershipCheck.device;
     const latestLog = await DeviceLog.findOne({ deviceId })
       .sort({ createdAt: -1 });
     const status = {
@@ -567,6 +588,7 @@ export const getDeviceStatus = async (req, res) => {
       data: status
     });
   } catch (error) {
+    logger.error('Error fetching device status:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching device status',
@@ -636,17 +658,22 @@ export const removeDeviceOwnership = async (req, res) => {
 export const updateOutletSettings = async (req, res) => {
   try {
     const { deviceId, outletId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
     const { name } = req.body;
     const { type } = req.body;
     
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({
+    logger.info(`Updating outlet settings for ${outletId} on device ${deviceId} by user ${userId}`);
+    
+    const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.message.includes('not found') ? 404 : 403).json({
         success: false,
-        message: 'Device not found'
+        message: ownershipCheck.message
       });
     }
     
+    const device = ownershipCheck.device;
     const outlet = device.outlets.find(o => o.id === outletId);
     if (!outlet) {
       return res.status(404).json({
@@ -689,6 +716,7 @@ export const updateOutletSettings = async (req, res) => {
       message: 'Outlet settings updated successfully'
     });
   } catch (error) {
+    logger.error('Error updating outlet settings:', error);
     res.status(500).json({
       success: false,
       message: 'Error updating outlet settings',

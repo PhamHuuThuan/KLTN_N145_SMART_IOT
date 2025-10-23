@@ -1,6 +1,14 @@
 import mongoose from 'mongoose';
+import { generateNotificationId } from '../utils/idGenerator.js';
 
 const notificationSchema = new mongoose.Schema({
+  notificationId: {
+    type: String,
+    default: generateNotificationId,
+    required: true,
+    unique: true,
+    index: true
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

@@ -10,17 +10,21 @@ const userNotificationPreferencesSchema = new mongoose.Schema({
   },
   email: {
     enabled: { type: Boolean, default: true },
-    address: { type: String, required: true },
-    verified: { type: Boolean, default: false },
-    verificationToken: { type: String },
-    verificationExpires: { type: Date }
+    addresses: [{
+      name: { type: String, required: true },
+      address: { type: String, required: true },
+      isDefault: { type: Boolean, default: false },
+      addedAt: { type: Date, default: Date.now }
+    }]
   },
   sms: {
     enabled: { type: Boolean, default: false },
-    phoneNumber: { type: String },
-    verified: { type: Boolean, default: false },
-    verificationCode: { type: String },
-    verificationExpires: { type: Date }
+    phoneNumbers: [{
+      name: { type: String, required: true },
+      phoneNumber: { type: String, required: true },
+      isDefault: { type: Boolean, default: false },
+      addedAt: { type: Date, default: Date.now }
+    }]
   },
   fcm: {
     enabled: { type: Boolean, default: true },
@@ -137,13 +141,21 @@ userNotificationPreferencesSchema.statics.createDefaultPreferences = function(us
     userId,
     email: {
       enabled: true,
-      address: email,
-      verified: false
+      addresses: email ? [{
+        name: 'Tôi',
+        address: email,
+        isDefault: true,
+        addedAt: new Date()
+      }] : []
     },
     sms: {
       enabled: false,
-      phoneNumber: phoneNumber,
-      verified: false
+      phoneNumbers: phoneNumber ? [{
+        name: 'Tôi',
+        phoneNumber: phoneNumber,
+        isDefault: true,
+        addedAt: new Date()
+      }] : []
     },
     fcm: {
       enabled: true,

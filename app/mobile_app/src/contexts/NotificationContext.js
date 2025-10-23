@@ -19,6 +19,11 @@ const initialState = {
   error: null,
   refreshing: false,
   emergency: null,
+  // Pagination state
+  currentPage: 1,
+  hasMore: true,
+  loadingMore: false,
+  totalPages: 0,
 };
 
 // Action types
@@ -33,6 +38,9 @@ const NOTIFICATION_ACTIONS = {
   SET_REFRESHING: 'SET_REFRESHING',
   UPDATE_UNREAD_COUNT: 'UPDATE_UNREAD_COUNT',
   SET_EMERGENCY: 'SET_EMERGENCY',
+  LOAD_MORE_NOTIFICATIONS: 'LOAD_MORE_NOTIFICATIONS',
+  SET_LOADING_MORE: 'SET_LOADING_MORE',
+  SET_PAGINATION: 'SET_PAGINATION',
 };
 
 // Reducer
@@ -50,12 +58,17 @@ const notificationReducer = (state, action) => {
         ? action.payload 
         : action.payload.data?.notifications || [];
       
+      const paginationData = action.payload.data || {};
+      
       return {
         ...state,
         notifications: notifications,
         unreadCount: notifications.filter(n => !n.isRead).length,
         loading: false,
         error: null,
+        currentPage: paginationData.page || 1,
+        totalPages: paginationData.pages || 1,
+        hasMore: (paginationData.page || 1) < (paginationData.pages || 1),
       };
     
     case NOTIFICATION_ACTIONS.ADD_NOTIFICATION:
@@ -68,7 +81,7 @@ const notificationReducer = (state, action) => {
     
     case NOTIFICATION_ACTIONS.MARK_AS_READ:
       const updatedNotifications = state.notifications.map(notification =>
-        notification.id === action.payload
+        notification.notificationId === action.payload
           ? { ...notification, isRead: true, readAt: new Date().toISOString() }
           : notification
       );
@@ -92,7 +105,7 @@ const notificationReducer = (state, action) => {
     
     case NOTIFICATION_ACTIONS.DELETE_NOTIFICATION:
       const filteredNotifications = state.notifications.filter(
-        notification => notification.id !== action.payload
+        notification => notification.notificationId !== action.payload
       );
       return {
         ...state,
@@ -108,6 +121,34 @@ const notificationReducer = (state, action) => {
     
     case NOTIFICATION_ACTIONS.SET_EMERGENCY:
       return { ...state, emergency: action.payload };
+    
+    case NOTIFICATION_ACTIONS.LOAD_MORE_NOTIFICATIONS:
+      const moreNotifications = Array.isArray(action.payload) 
+        ? action.payload 
+        : action.payload.data?.notifications || [];
+      
+      const morePaginationData = action.payload.data || {};
+      
+      return {
+        ...state,
+        notifications: [...state.notifications, ...moreNotifications],
+        unreadCount: [...state.notifications, ...moreNotifications].filter(n => !n.isRead).length,
+        loadingMore: false,
+        currentPage: morePaginationData.page || state.currentPage,
+        totalPages: morePaginationData.pages || state.totalPages,
+        hasMore: (morePaginationData.page || state.currentPage) < (morePaginationData.pages || state.totalPages),
+      };
+    
+    case NOTIFICATION_ACTIONS.SET_LOADING_MORE:
+      return { ...state, loadingMore: action.payload };
+    
+    case NOTIFICATION_ACTIONS.SET_PAGINATION:
+      return {
+        ...state,
+        currentPage: action.payload.currentPage || state.currentPage,
+        totalPages: action.payload.totalPages || state.totalPages,
+        hasMore: action.payload.hasMore !== undefined ? action.payload.hasMore : state.hasMore,
+      };
     
     default:
       return state;
@@ -217,7 +258,7 @@ export const NotificationProvider = ({ children }) => {
           
           // Map WebSocket notification to match API structure
           const notificationData = {
-            id: notification.id || `ws_${Date.now()}`,
+            notificationId: notification.notificationId || `ws_${Date.now()}`,
             title: notification.title || 'Notification',
             body: notification.message || notification.body || '',
             message: notification.message || notification.body || '', // Add message field for compatibility
@@ -270,7 +311,7 @@ export const NotificationProvider = ({ children }) => {
           
           // Map emergency notification
           const notificationData = {
-            id: notification.id || `emergency_${Date.now()}`,
+            notificationId: notification.notificationId || notification.id || `emergency_${Date.now()}`,
             title: notification.title || 'Emergency Alert',
             body: notification.message || notification.body || '',
             message: notification.message || notification.body || '',
@@ -522,6 +563,52 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
+  // Load more notifications
+  const loadMoreNotifications = async () => {
+    if (!isAuthenticated || !user?.id || state.loadingMore || !state.hasMore) {
+      log.debug('Skipping load more:', { 
+        isAuthenticated, 
+        userId: user?.id, 
+        loadingMore: state.loadingMore, 
+        hasMore: state.hasMore 
+      });
+      return;
+    }
+
+    const nextPage = state.currentPage + 1;
+    log.info(`Loading more notifications - page ${nextPage}`);
+
+    try {
+      dispatch({ type: NOTIFICATION_ACTIONS.SET_LOADING_MORE, payload: true });
+      
+      // Ensure auth token is present
+      if (!notificationService.getAuthToken()) {
+        log.warn('Auth token not ready yet, delaying load more');
+        await new Promise(r => setTimeout(r, 200));
+        if (!notificationService.getAuthToken()) {
+          dispatch({ type: NOTIFICATION_ACTIONS.SET_LOADING_MORE, payload: false });
+          return;
+        }
+      }
+
+      const response = await notificationService.getNotifications(user.id, nextPage, 20);
+      
+      if (response.success && response.data) {
+        dispatch({
+          type: NOTIFICATION_ACTIONS.LOAD_MORE_NOTIFICATIONS,
+          payload: response.data,
+        });
+        log.info(`Loaded ${response.data.notifications?.length || 0} more notifications`);
+      } else {
+        log.warn('Load more failed:', response.message);
+        dispatch({ type: NOTIFICATION_ACTIONS.SET_LOADING_MORE, payload: false });
+      }
+    } catch (error) {
+      log.error('Load more error:', error.message);
+      dispatch({ type: NOTIFICATION_ACTIONS.SET_LOADING_MORE, payload: false });
+    }
+  };
+
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     if (!isAuthenticated || !user?.id) {
@@ -674,6 +761,7 @@ export const NotificationProvider = ({ children }) => {
     ...state,
     loadNotifications,
     refreshNotifications,
+    loadMoreNotifications,
     markAsRead,
     markAllAsRead,
     deleteNotification,
