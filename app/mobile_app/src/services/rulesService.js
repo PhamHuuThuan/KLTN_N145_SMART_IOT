@@ -6,19 +6,6 @@ class RulesService {
     this.baseURL = environment.getApiUrl('GATEWAY');
   }
 
-  async getAuthHeaders(extra = {}) {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      return {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        ...extra
-      };
-    } catch (_) {
-      return { 'Content-Type': 'application/json', ...extra };
-    }
-  }
-
   // Get authentication token from storage
   async getAuthToken() {
     try {
@@ -31,7 +18,7 @@ class RulesService {
   }
 
   // Get all rules for a user
-  async getAllRules(ownerId, params = {}) {
+  async getAllRules(params = {}) {
     try {
       const queryParams = new URLSearchParams({
         ...params
@@ -41,7 +28,6 @@ class RulesService {
 
       const response = await fetch(`${this.baseURL}/api/rules?${queryParams}`, {
         method: 'GET',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -71,16 +57,15 @@ class RulesService {
     try {
       const token = await this.getAuthToken();     
       
-      // Ensure ownerId is included in ruleData
-      if (!ruleData.ownerId) {
-        console.warn('⚠️ No ownerId in ruleData, this may cause issues');
+      // Ensure deviceId is included in ruleData
+      if (!ruleData.deviceId) {
+        console.warn('⚠️ No deviceId in ruleData, this may cause issues');
       }
       
       console.log('📤 Creating rule with data:', JSON.stringify(ruleData, null, 2));
 
       const response = await fetch(`${this.baseURL}/api/rules`, {
         method: 'POST',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -111,16 +96,13 @@ class RulesService {
   }
 
   // Create rule from template
-  async createRuleFromTemplate(template, ownerId, deviceId, customizations = {}) {
+  async createRuleFromTemplate(template, deviceId, customizations = {}) {
     try {
-      console.log('createRuleFromTemplate called with:', { template, ownerId, deviceId, customizations });
+      console.log('createRuleFromTemplate called with:', { template, deviceId, customizations });
       
       // Validate required parameters
       if (!template) {
         throw new Error('Template is required');
-      }
-      if (!ownerId) {
-        throw new Error('Owner ID is required');
       }
       if (!deviceId) {
         throw new Error('Device ID is required');
@@ -130,7 +112,6 @@ class RulesService {
       const ruleData = {
         name: customizations.name || template.name,
         description: customizations.description || template.description,
-        ownerId,
         deviceId,
         priority: template.priority || 'medium',
         maxTriggersPerDay: template.maxTriggersPerDay || (template.priority === 'urgent' ? null : 10),
@@ -159,7 +140,6 @@ class RulesService {
       
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
         method: 'PATCH',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -188,7 +168,6 @@ class RulesService {
       
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
         method: 'DELETE',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -216,7 +195,6 @@ class RulesService {
       
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/status`, {
         method: 'PATCH',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
