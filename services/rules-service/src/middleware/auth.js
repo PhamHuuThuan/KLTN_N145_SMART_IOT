@@ -27,23 +27,3 @@ export const authenticateToken = (req, res, next) => {
   }
 };
 
-export const authorizeOwner = (req, res, next) => {
-  const { ownerId } = req.params;
-  const userId = req.user?.userId;
-
-  if (!userId) {
-    return res.status(401).json({ 
-      success: false, 
-      message: 'User not authenticated' 
-    });
-  }
-
-  if (ownerId && ownerId !== userId) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Access denied: Not the owner of this resource' 
-    });
-  }
-
-  next();
-};

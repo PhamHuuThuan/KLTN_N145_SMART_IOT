@@ -6,9 +6,7 @@ import connectDB from './config/database.js';
 import ruleRoutes from './routes/ruleRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import RuleConsumer from './consumers/RuleConsumer.js';
-import { createLogger } from './utils/logger.js';
-
-const logger = createLogger('rules-service');
+import logger from './utils/logger.js';
 
 dotenv.config();
 

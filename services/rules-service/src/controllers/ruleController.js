@@ -1,8 +1,6 @@
 import Rule from '../models/Rule.js';
 import RuleEvaluationService from '../services/RuleEvaluationService.js';
-import { createLogger } from '../utils/logger.js';
-
-const logger = createLogger('ruleController');
+import logger from '../utils/logger.js';
 
 // Delegate messaging to RuleEvaluationService to reuse its Kafka producer
 const ruleEvaluationService = new RuleEvaluationService();
@@ -11,38 +9,25 @@ const ruleEvaluationService = new RuleEvaluationService();
 export const getAllRules = async (req, res) => {
   try {
     const { deviceId, isActive, limit = 50, page = 1 } = req.query;
-    const ownerId = req.user.userId;
+    const userId = req.user.userId;
 
-    const query = { ownerId, deletedAt: null }; // Loại trừ rule đã bị soft delete
-    if (deviceId) query.deviceId = deviceId;
-    if (isActive !== undefined) query.isActive = isActive === 'true';
-
-    const numericLimit = parseInt(limit);
-    const numericPage = parseInt(page);
-
-    // Lấy danh sách rule
-    const rules = await Rule.find(query)
-      .sort({ createdAt: -1 })
-      .skip((numericPage - 1) * numericLimit)
-      .limit(numericLimit);
-
-    // Sắp xếp lại theo priority: urgent → high → medium → low
-    const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'];
-    rules.sort(
-      (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
-    );
+    const options = { deviceId, isActive, limit: parseInt(limit), page: parseInt(page) };
+    const rules = await Rule.findByCreator(userId, options);
 
     // Đếm tổng số rule
+    const query = { createdBy: userId, deletedAt: null };
+    if (deviceId) query.deviceId = deviceId;
+    if (isActive !== undefined) query.isActive = isActive === 'true';
     const total = await Rule.countDocuments(query);
 
     res.json({
       success: true,
       data: rules,
       pagination: {
-        page: numericPage,
-        limit: numericLimit,
+        page: parseInt(page),
+        limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / numericLimit),
+        pages: Math.ceil(total / parseInt(limit)),
       },
     });
   } catch (error) {
@@ -57,7 +42,7 @@ export const getAllRules = async (req, res) => {
 // Create new rule
 export const createRule = async (req, res) => {
   try {
-    console.log('Create rule request body:', JSON.stringify(req.body, null, 2));
+    logger.debug('Create rule request body:', JSON.stringify(req.body, null, 2));
     
     const { 
       name, 
@@ -72,7 +57,7 @@ export const createRule = async (req, res) => {
       conditionLogic
     } = req.body;
     
-    const ownerId = (req.user && (req.user.userId || req.user.sub || req.user.id)) || null;
+    const createdBy = (req.user && (req.user.userId || req.user.sub || req.user.id)) || null;
 
     if (!name || !deviceId || !conditions?.length || !actions?.length) {
       return res.status(400).json({
@@ -88,7 +73,7 @@ export const createRule = async (req, res) => {
     const rule = new Rule({
       name,
       description,
-      ownerId,
+      createdBy,
       deviceId,
       priority: normalizedPriority,
       conditions,
@@ -107,7 +92,7 @@ export const createRule = async (req, res) => {
       message: 'Rule created successfully'
     });
   } catch (error) {
-    console.error('Error creating rule:', error);
+    logger.error('Error creating rule:', error);
     res.status(500).json({
       success: false,
       message: 'Error creating rule',
@@ -120,10 +105,10 @@ export const createRule = async (req, res) => {
 export const updateRule = async (req, res) => {
   try {
     const { ruleId } = req.params;
-    const { _id, createdAt, updatedAt, ownerId, ...updateData } = req.body;
+    const { _id, createdAt, updatedAt, createdBy, ...updateData } = req.body;
 
     // Kiểm tra rule thuộc quyền user và chưa bị soft delete
-    const rule = await Rule.findOne({ _id: ruleId, ownerId: req.user.userId, deletedAt: null });
+    const rule = await Rule.findOne({ _id: ruleId, createdBy: req.user.userId, deletedAt: null });
     if (!rule) {
       return res.status(404).json({
         success: false,
@@ -160,7 +145,7 @@ export const deleteRule = async (req, res) => {
     // Tìm rule thuộc quyền sở hữu user
     const rule = await Rule.findOne({
       _id: ruleId,
-      ownerId: req.user.userId,
+      createdBy: req.user.userId,
       deletedAt: null // Chỉ tìm rule chưa bị xóa mềm
     });
 
@@ -195,7 +180,7 @@ export const toggleRuleStatus = async (req, res) => {
 
     // Cập nhật rule chỉ khi thuộc về user và chưa bị soft delete
     const updatedRule = await Rule.findOneAndUpdate(
-      { _id: ruleId, ownerId: req.user.userId, deletedAt: null },
+      { _id: ruleId, createdBy: req.user.userId, deletedAt: null },
       { isActive: !!isActive, updatedAt: new Date() },
       { new: true }
     );

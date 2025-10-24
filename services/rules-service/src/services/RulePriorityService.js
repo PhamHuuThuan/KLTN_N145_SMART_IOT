@@ -4,30 +4,6 @@ class RulePriorityService {
   }
 
   /**
-   * Xử lý nhiều rules cùng trigger
-   */
-  async handleMultipleTriggers(triggeredRules, sensorData) {
-    console.log(`🔄 Handling ${triggeredRules.length} triggered rules`);
-    
-    // 1. Sắp xếp theo priority
-    const sortedRules = this.sortByPriority(triggeredRules);
-    
-    // 2. Tạo incident report
-    const incident = this.createIncidentReport(sortedRules, sensorData);
-    
-    // 3. Thực thi theo priority
-    const executionResult = await this.executeWithPriority(sortedRules, sensorData);
-    
-    return {
-      incident,
-      executionResult,
-      totalRules: triggeredRules.length,
-      executedRules: executionResult.executed.length,
-      skippedRules: executionResult.skipped.length
-    };
-  }
-
-  /**
    * Sắp xếp rules theo priority
    */
   sortByPriority(rules) {
@@ -101,76 +77,27 @@ class RulePriorityService {
   }
 
   /**
-   * Thực thi rules theo priority
-   */
-  async executeWithPriority(rules, sensorData) {
-    const result = {
-      executed: [],
-      skipped: [],
-      errors: []
-    };
-
-    let hasUrgent = false;
-
-    for (const rule of rules) {
-      try {
-        // Nếu có urgent rule, bỏ qua medium/low priority
-        if (hasUrgent && ['medium', 'low'].includes(rule.priority)) {
-          result.skipped.push(rule);
-          continue;
-        }
-
-        if (rule.priority === 'urgent') {
-          hasUrgent = true;
-        }
-
-        await this.executeRule(rule, sensorData);
-        result.executed.push(rule);
-        
-      } catch (error) {
-        result.errors.push({ rule, error });
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Thực thi một rule cụ thể
-   */
-  async executeRule(rule, sensorData) {
-    console.log(`🎯 Rule already executed: ${rule.name} (${rule.priority})`);
-    
-    return {
-      ruleId: rule._id,
-      ruleName: rule.name,
-      executed: true,
-      timestamp: new Date()
-    };
-  }
-
-    /**
    * Nhóm rules theo priority level
    */
-    groupRulesByPriority(rules) {
-      const groups = {
-        urgent: [],
-        high: [],
-        medium: [],
-        low: []
-      };
-      
-      rules.forEach(rule => {
-        if (groups[rule.priority]) {
-          groups[rule.priority].push(rule);
-        }
-      });
-      
-      // Chỉ trả về các nhóm có rules
-      return Object.fromEntries(
-        Object.entries(groups).filter(([priority, rules]) => rules.length > 0)
-      );
-    }
+  groupRulesByPriority(rules) {
+    const groups = {
+      urgent: [],
+      high: [],
+      medium: [],
+      low: []
+    };
+    
+    rules.forEach(rule => {
+      if (groups[rule.priority]) {
+        groups[rule.priority].push(rule);
+      }
+    });
+    
+    // Chỉ trả về các nhóm có rules
+    return Object.fromEntries(
+      Object.entries(groups).filter(([priority, rules]) => rules.length > 0)
+    );
+  }
 
   /**
    * Tạo thông báo hợp nhất chi tiết với thông tin từng rule

@@ -1,8 +1,6 @@
 import { Kafka } from 'kafkajs';
 import RuleEvaluationService from '../services/RuleEvaluationService.js';
-import { createLogger } from '../utils/logger.js';
-
-const logger = createLogger('RuleConsumer');
+import logger from '../utils/logger.js';
 
 class RuleConsumer {
   constructor() {
@@ -40,8 +38,7 @@ class RuleConsumer {
             if (logData?.type === 'telemetry' && logData.deviceId && logData.payload) {
               await this.ruleEvaluationService.evaluateRules(
                 logData.deviceId,
-                logData.payload,
-                logData.ownerId
+                logData.payload
               );
             } else {
               logger.warn('Skipped: invalid or non-telemetry message');
