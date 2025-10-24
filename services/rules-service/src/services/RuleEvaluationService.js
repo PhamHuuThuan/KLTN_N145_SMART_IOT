@@ -1,10 +1,7 @@
 import Rule from '../models/Rule.js';
-import mongoose from 'mongoose';
 import { Kafka } from 'kafkajs';
 import RulePriorityService from './RulePriorityService.js';
-import { createLogger } from '../utils/logger.js';
-
-const logger = createLogger('RuleEvaluationService');
+import logger from '../utils/logger.js';
 
 class RuleEvaluationService {
   constructor() {
@@ -85,7 +82,7 @@ class RuleEvaluationService {
   }
 
   // Đánh giá tất cả rules cho một device khi nhận dữ liệu sensor
-  async evaluateRules(deviceId, sensorData, ownerId = null) {
+  async evaluateRules(deviceId, sensorData) {
     try {
       const now = Date.now();
       const lastTime = this.lastEvaluationTime.get(deviceId);
@@ -96,21 +93,9 @@ class RuleEvaluationService {
       this.lastEvaluationTime.set(deviceId, now);
 
       // 🔎 1. Lấy danh sách rule đang hoạt động
-      let finalOwnerId = ownerId;
-      
-      if (!finalOwnerId) {
-        const existingRule = await Rule.findOne({ deviceId, isActive: true });
-        if (existingRule) {
-          finalOwnerId = existingRule.ownerId;
-        } else {
-          return;
-        }
-      }
-      
       const query = { 
         deviceId, 
-        isActive: true,
-        ownerId: mongoose.Types.ObjectId.isValid(finalOwnerId) ? new mongoose.Types.ObjectId(finalOwnerId) : finalOwnerId
+        isActive: true
       };
       
       const rules = await Rule.find(query);
@@ -145,7 +130,7 @@ class RuleEvaluationService {
           if (rules.length > 1) {
             // Gộp nhiều rules cùng priority
             const incident = this.priorityService.createIncidentReport(rules, { ...sensorData, deviceId });
-            const consolidatedMessage = this.priorityService.buildDetailedConsolidatedNotification(incident, finalOwnerId, sensorData);
+            const consolidatedMessage = this.priorityService.buildDetailedConsolidatedNotification(incident, null, sensorData);
             
             await this.sendToAlertsService(consolidatedMessage);
             logger.info(`Consolidated alert sent for ${priorityLevel} priority - ${rules.length} rules`);
@@ -172,16 +157,16 @@ class RuleEvaluationService {
   // Đánh giá một rule cụ thể
   async evaluateRule(rule, sensorData) {
     try {
-      const { name } = rule;
+      const { priority } = rule;
 
       // Special handling for urgent rules - always trigger regardless of cooldown/limits
-      const isUrgent = rule.priority === 'urgent';
+      const isUrgent = priority === 'urgent';
       
       if (!isUrgent) {
-        // Check if rule can trigger (active, not paused, not in cooldown, not reached daily limit)
-        const canTrigger = await rule.canTrigger();
+        // Check if rule can trigger with escalation logic
+        const canTrigger = await this.checkRuleCanTrigger(rule, sensorData);
         if (!canTrigger) {
-          logger.debug(`${name}: cooldown/daily limit`);
+          logger.debug(`${rule.name}: cooldown/daily limit`);
           return false;
         }
       }
@@ -207,8 +192,7 @@ class RuleEvaluationService {
       }
       
       // Increment trigger count and update last triggered time (skip for urgent rules)
-      const isUrgentRule = rule.priority === 'urgent';
-      if (!isUrgentRule) {
+      if (!isUrgent) {
         await rule.incrementTriggerCount();
       }
       
@@ -224,6 +208,145 @@ class RuleEvaluationService {
       logger.error(`evaluateRule() error for ${rule.name}:`, err);
       return false;
     }
+  }
+
+  // Kiểm tra rule có thể trigger với escalation logic
+  async checkRuleCanTrigger(rule, sensorData) {
+    const { priority } = rule;
+    
+    // Urgent rules luôn bypass tất cả giới hạn
+    if (priority === 'urgent') {
+      return true;
+    }
+    
+    // 1. Kiểm tra daily limit trước
+    const hasReachedDailyLimit = await rule.hasReachedDailyLimit();
+    if (hasReachedDailyLimit) {
+      logger.warn(`📊 DAILY LIMIT: ${rule.name} đã đạt giới hạn ${rule.maxTriggersPerDay} triggers/ngày - chuyển sang escalation alert`);
+      
+      // Tạo escalation alert cho daily limit
+      await this.createEscalationAlert(rule, sensorData, {
+        sensor: 'daily_limit',
+        currentValue: rule.triggerCount,
+        threshold: rule.maxTriggersPerDay,
+        reason: 'daily_limit_exceeded'
+      });
+      
+      return true; // Vẫn trigger nhưng với escalation alert
+    }
+    
+    // 2. Kiểm tra cooldown cơ bản
+    const canTrigger = await rule.canTrigger();
+    if (canTrigger) {
+      return true;
+    }
+    
+    // 3. Kiểm tra escalation cho từng sensor (chỉ cho non-urgent)
+    for (const condition of rule.conditions) {
+      const { sensor, value: threshold } = condition;
+      const currentValue = sensorData[sensor];
+      
+      if (this.shouldEscalate(sensor, currentValue, threshold, priority)) {
+        logger.warn(`🚨 ESCALATION: ${rule.name} bypassing cooldown - ${sensor}: ${currentValue} (threshold: ${threshold})`);
+        
+        // Track sensor value during cooldown
+        await rule.trackSensorValue(sensor, currentValue);
+        
+        // Tạo escalation alert
+        await this.createEscalationAlert(rule, sensorData, {
+          sensor,
+          currentValue,
+          threshold,
+          reason: 'escalation'
+        });
+        
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  // Kiểm tra escalation dựa trên priority (chỉ áp dụng cho non-urgent)
+  shouldEscalate(sensorType, currentValue, threshold, priority) {
+    // Urgent rules không có cooldown nên không cần escalation
+    if (priority === 'urgent') {
+      return false;
+    }
+    
+    const escalationMultipliers = {
+      high: {
+        temperature: 1.2,  // Tăng 20%
+        smoke: 1.5,       // Tăng 50%
+        gas_ppm: 2.0,     // Tăng 100%
+        humidity: 1.3     // Tăng 30%
+      },
+      medium: {
+        temperature: 1.3,  // Tăng 30%
+        smoke: 1.8,       // Tăng 80%
+        gas_ppm: 2.5,     // Tăng 150%
+        humidity: 1.5     // Tăng 50%
+      },
+      low: {
+        temperature: 1.5,  // Tăng 50%
+        smoke: 2.0,       // Tăng 100%
+        gas_ppm: 3.0,     // Tăng 200%
+        humidity: 2.0     // Tăng 100%
+      }
+    };
+    
+    const multipliers = escalationMultipliers[priority] || escalationMultipliers.medium;
+    const multiplier = multipliers[sensorType] || 1.3;
+    const escalationThreshold = threshold * multiplier;
+    
+    return currentValue >= escalationThreshold;
+  }
+
+  // Tạo escalation alert
+  async createEscalationAlert(rule, sensorData, escalationInfo) {
+    const { sensor, currentValue, threshold, reason } = escalationInfo;
+    const { name, priority, createdBy } = rule;
+    
+    let title, message;
+    
+    if (reason === 'daily_limit_exceeded') {
+      title = `🚨 ESCALATION ALERT: ${name} - Daily Limit Exceeded`;
+      message = `⚠️ Rule đã vượt quá giới hạn ${rule.maxTriggersPerDay} triggers/ngày!\n\n` +
+               `📊 Số lần trigger hôm nay: ${rule.triggerCount}/${rule.maxTriggersPerDay}\n` +
+               `⏰ Thời gian: ${new Date().toLocaleString()}\n\n` +
+               `🔄 Hệ thống đã chuyển sang chế độ cảnh báo khẩn cấp để đảm bảo an toàn!`;
+    } else {
+      title = `🚨 ESCALATION ALERT: ${name}`;
+      message = `⚠️ ${sensor} đã tăng đáng kể trong thời gian cooldown!\n\n` +
+               `📊 Giá trị hiện tại: ${currentValue}\n` +
+               `📈 Ngưỡng ban đầu: ${threshold}\n` +
+               `⏰ Thời gian: ${new Date().toLocaleString()}\n\n` +
+               `🔄 Cooldown đã được bỏ qua để cảnh báo kịp thời.`;
+    }
+    
+    const escalationMessage = {
+      userId: createdBy,
+      title,
+      message,
+      priority: priority === 'urgent' ? 'urgent' : 'high',
+      type: 'escalation_alert',
+      metadata: {
+        ruleId: rule._id,
+        ruleName: name,
+        sensor,
+        currentValue,
+        threshold,
+        escalationReason: reason,
+        cooldownBypassed: reason === 'escalation',
+        dailyLimitExceeded: reason === 'daily_limit_exceeded',
+        triggerCount: rule.triggerCount,
+        maxTriggersPerDay: rule.maxTriggersPerDay,
+        deviceId: sensorData.deviceId
+      }
+    };
+    
+    await this.sendToAlertsService(escalationMessage);
+    logger.info(`Escalation alert sent for rule: ${name} - Reason: ${reason}`);
   }
 
   // Đánh giá tất cả conditions của rule với logic AND/OR
@@ -394,23 +517,16 @@ class RuleEvaluationService {
 
       const elevateSecurity = this.shouldElevateSecurity(sensorType, sensorValue);
 
-      // Enrich sensorData with device identifiers to avoid "Unknown Device"
-      const enrichedSensorData = {
-        ...sensorData,
-        deviceId: sensorData.deviceId || rule.deviceId,
-        deviceName: sensorData.deviceName || `Device ${rule.deviceId}`
-      };
-
       // Tạo title với placeholder replacement
       let title = action.title || this.getDefaultTitle(sensorType);
-      title = this.replacePlaceholders(title, enrichedSensorData, sensorType, sensorValue, threshold, operator);
-      if (!rule.ownerId) {
-        logger.error(`Rule ${rule.name} has no ownerId, skipping notification`);
+      title = this.replacePlaceholders(title, sensorData, sensorType, sensorValue, threshold, operator);
+      if (!rule.createdBy) {
+        logger.error(`Rule ${rule.name} has no createdBy, skipping notification`);
         return;
       }
 
       const message = {
-        userId: rule.ownerId.toString(),
+        userId: rule.createdBy,
         title: title,
         message: detailedMessage,
         type: elevateSecurity ? 'security_alert' : 'device_alert',
@@ -420,7 +536,7 @@ class RuleEvaluationService {
           ruleId: rule._id.toString(),
           ruleName: rule.name,
           deviceId: rule.deviceId,
-          deviceName: enrichedSensorData.deviceName,
+          deviceName: sensorData.deviceName || `Device ${rule.deviceId}`,
           sensorData: sensorData,
           actionType: action.type,
           sensorType: sensorType,
@@ -438,14 +554,10 @@ class RuleEvaluationService {
   // Gửi alert action
   async sendAlertAction(action, rule, sensorData) {
     const { sensorType, sensorValue, threshold } = this.getSensorInfo(rule, sensorData);
-    const isGasLeak = sensorType === 'gas_ppm';
-    const isSmoke = sensorType === 'smoke';
-    const tempHigh = sensorType === 'temperature' && Number(sensorValue) >= 80;
-    const elevateSecurity = isGasLeak || (isSmoke && Number(sensorValue) === 1) || tempHigh;
+    const elevateSecurity = this.shouldElevateSecurity(sensorType, sensorValue);
 
-    // Validate required fields
-    if (!rule.ownerId) {
-      logger.error(`Rule ${rule.name} has no ownerId, skipping alert`);
+    if (!rule.createdBy) {
+      logger.error(`Rule ${rule.name} has no createdBy, skipping alert`);
       return;
     }
 
@@ -458,23 +570,15 @@ class RuleEvaluationService {
       alertType: 'threshold_exceeded',
       category: elevateSecurity ? 'security' : 'sensor',
       priority: elevateSecurity ? 'urgent' : (rule.priority || 'medium'),
-      userId: rule.ownerId.toString(),
+      userId: rule.createdBy,
       ruleId: rule._id.toString(),
       ruleName: rule.name,
       message: action.message || `Alert: ${rule.name} triggered`
     };
 
     try {
-      if (!this.producerConnected) {
-        try {
-          await this.producer.connect();
-          this.producerConnected = true;
-          logger.info('Kafka producer connected');
-        } catch (connectError) {
-          logger.error('Failed to connect Kafka producer:', connectError);
-          return;
-        }
-      }
+      await this.ensureKafkaConnection();
+      
       await this.producer.send({
         topic: 'device-alerts',
         messages: [{
@@ -489,19 +593,24 @@ class RuleEvaluationService {
     }
   }
 
+  // Helper method để connect Kafka producer
+  async ensureKafkaConnection() {
+    if (!this.producerConnected) {
+      try {
+        await this.producer.connect();
+        this.producerConnected = true;
+        logger.info('Kafka producer connected');
+      } catch (connectError) {
+        logger.error('Failed to connect Kafka producer:', connectError);
+        throw connectError;
+      }
+    }
+  }
+
   // Gửi message đến alerts-service qua Kafka
   async sendToAlertsService(message) {
     try {
-      if (!this.producerConnected) {
-        try {
-          await this.producer.connect();
-          this.producerConnected = true;
-          logger.info('Kafka producer connected');
-        } catch (connectError) {
-          logger.error('Failed to connect Kafka producer:', connectError);
-          return;
-        }
-      }
+      await this.ensureKafkaConnection();
 
       const kafkaMessage = {
         topic: 'notification-requests',
@@ -592,8 +701,9 @@ class RuleEvaluationService {
         throw err;
       }
 
-      if (rule.ownerId.toString() !== String(userId)) {
-        const err = new Error('Access denied - you can only respond to your own rules');
+      // Kiểm tra quyền: chỉ người tạo rule mới có thể respond
+      if (rule.createdBy !== String(userId)) {
+        const err = new Error('Access denied - you can only respond to rules you created');
         err.statusCode = 403;
         throw err;
       }
