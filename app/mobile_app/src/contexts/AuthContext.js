@@ -108,34 +108,15 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (email, password, name) => {
     try {
-      setIsLoading(true);
       const result = await authService.register(email, password, name);
       
       if (result.success) {
-        const profile = await authService.getProfile();
-        setUser(profile?.success && profile.user ? profile.user : result.user);
-        setIsAuthenticated(true);
-        setToken(result.token);
-        // Set token for all services
-        notificationService.setAuthToken(result.token);
-        setAuthToken(result.token);
-        
-        // Register FCM token after successful registration
-        try {
-          await registerFCMToken(result.user.id);
-        } catch (fcmError) {
-          log.warn('FCM token registration failed during registration', fcmError?.message || fcmError);
-          // Don't fail registration if FCM registration fails
-        }
-        
         return { success: true };
       } else {
         return { success: false, error: result.error };
       }
     } catch (error) {
       return { success: false, error: 'Registration failed' };
-    } finally {
-      setIsLoading(false);
     }
   };
 
