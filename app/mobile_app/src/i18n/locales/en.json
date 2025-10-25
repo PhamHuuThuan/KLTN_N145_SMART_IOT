@@ -250,12 +250,68 @@
         "description": "Alert when humidity is too low",
         "message": "💧 Warning: Low humidity! Consider using a humidifier."
       },
-      "flameDetection": {
-        "name": "Flame Detection",
-        "description": "Emergency alert when flame is detected",
-        "message": "🔥 EMERGENCY ALERT: Flame detected! Contact fire department immediately!"
+      "tempEmergency": {
+        "name": "🔥 Emergency Temperature",
+        "description": "Emergency alert when temperature > 40°C",
+        "message": "🚨 EMERGENCY ALERT: Extreme temperature! Risk of fire or explosion!"
+      },
+      "tempHigh": {
+        "name": "🌡️ High Temperature",
+        "description": "Alert when temperature 31-40°C",
+        "message": "🌡️ Warning: High temperature! Check ventilation and heat load."
+      },
+      "tempLow": {
+        "name": "❄️ Low Temperature",
+        "description": "Alert when temperature < 15°C",
+        "message": "❄️ Warning: Low temperature! Check heating system."
+      },
+      "humidityEmergency": {
+        "name": "💧 Emergency Humidity",
+        "description": "Emergency alert when humidity > 80%",
+        "message": "🚨 EMERGENCY ALERT: Extreme humidity! Risk of electrical short circuit!"
+      },
+      "humidityHigh": {
+        "name": "💧 High Humidity",
+        "description": "Alert when humidity 61-80%",
+        "message": "💧 Warning: High humidity! May cause mold, damage components."
+      },
+      "humidityLow": {
+        "name": "💧 Low Humidity",
+        "description": "Alert when humidity < 30%",
+        "message": "💧 Warning: Low humidity! Dry air, prone to static electricity."
+      },
+      "gasEmergency": {
+        "name": "🚨 Emergency Gas",
+        "description": "Emergency alert when gas > 1000 ppm",
+        "message": "🚨 EMERGENCY ALERT: Dangerous gas! Risk of poisoning or explosion!"
+      },
+      "gasHigh": {
+        "name": "⚠️ High Gas",
+        "description": "Alert when gas 401-1000 ppm",
+        "message": "⚠️ Warning: High gas concentration! Check for leaks immediately."
+      },
+      "gasMedium": {
+        "name": "🔍 Medium Gas",
+        "description": "Alert when gas 200-400 ppm",
+        "message": "🔍 Warning: Light gas detected. Monitor and check."
+      },
+      "smokeEmergency": {
+        "name": "🔥 Emergency Smoke",
+        "description": "Emergency alert when smoke > 700 ppm",
+        "message": "🚨 EMERGENCY ALERT: Dense smoke! Risk of fire or high CO!"
+      },
+      "smokeHigh": {
+        "name": "🔥 High Smoke",
+        "description": "Alert when smoke 301-700 ppm",
+        "message": "🔥 Warning: Dense smoke! Early fire warning, check immediately."
+      },
+      "smokeMedium": {
+        "name": "💨 Medium Smoke",
+        "description": "Alert when smoke 100-300 ppm",
+        "message": "💨 Warning: Light smoke detected. May be dust or smoke."
       }
-    }
+    },
+    "valueOutOfRange": "Value is out of allowed range"
   },
   "notifications": {
     "title": "Notifications",

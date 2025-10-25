@@ -250,12 +250,68 @@
         "description": "Cảnh báo khi độ ẩm quá thấp",
         "message": "💧 Cảnh báo: Độ ẩm thấp! Cân nhắc sử dụng máy tạo ẩm."
       },
-      "flameDetection": {
-        "name": "Phát hiện lửa",
-        "description": "Cảnh báo khẩn cấp khi phát hiện lửa",
-        "message": "🔥 CẢNH BÁO KHẨN CẤP: Phát hiện lửa! Liên hệ cứu hỏa ngay lập tức!"
+      "tempEmergency": {
+        "name": "🔥 Nhiệt độ khẩn cấp",
+        "description": "Cảnh báo khẩn cấp khi nhiệt độ > 40°C",
+        "message": "🚨 CẢNH BÁO KHẨN CẤP: Nhiệt độ quá cao! Nguy cơ cháy nổ!"
+      },
+      "tempHigh": {
+        "name": "🌡️ Nhiệt độ cao",
+        "description": "Cảnh báo khi nhiệt độ 31-40°C",
+        "message": "🌡️ Cảnh báo: Nhiệt độ cao! Kiểm tra thông gió và tải nhiệt."
+      },
+      "tempLow": {
+        "name": "❄️ Nhiệt độ thấp",
+        "description": "Cảnh báo khi nhiệt độ < 15°C",
+        "message": "❄️ Cảnh báo: Nhiệt độ thấp! Kiểm tra hệ thống sưởi."
+      },
+      "humidityEmergency": {
+        "name": "💧 Độ ẩm khẩn cấp",
+        "description": "Cảnh báo khẩn cấp khi độ ẩm > 80%",
+        "message": "🚨 CẢNH BÁO KHẨN CẤP: Độ ẩm quá cao! Nguy cơ chập điện!"
+      },
+      "humidityHigh": {
+        "name": "💧 Độ ẩm cao",
+        "description": "Cảnh báo khi độ ẩm 61-80%",
+        "message": "💧 Cảnh báo: Độ ẩm cao! Có thể gây nấm mốc, hỏng linh kiện."
+      },
+      "humidityLow": {
+        "name": "💧 Độ ẩm thấp",
+        "description": "Cảnh báo khi độ ẩm < 30%",
+        "message": "💧 Cảnh báo: Độ ẩm thấp! Không khí khô, dễ tĩnh điện."
+      },
+      "gasEmergency": {
+        "name": "🚨 Khí gas khẩn cấp",
+        "description": "Cảnh báo khẩn cấp khi khí gas > 1000 ppm",
+        "message": "🚨 CẢNH BÁO KHẨN CẤP: Khí gas nguy hiểm! Nguy cơ ngộ độc hoặc cháy nổ!"
+      },
+      "gasHigh": {
+        "name": "⚠️ Khí gas cao",
+        "description": "Cảnh báo khi khí gas 401-1000 ppm",
+        "message": "⚠️ Cảnh báo: Nồng độ khí gas cao! Kiểm tra nguồn rò rỉ ngay."
+      },
+      "gasMedium": {
+        "name": "🔍 Khí gas trung bình",
+        "description": "Cảnh báo khi khí gas 200-400 ppm",
+        "message": "🔍 Cảnh báo: Phát hiện khí gas nhẹ. Theo dõi và kiểm tra."
+      },
+      "smokeEmergency": {
+        "name": "🔥 Khói khẩn cấp",
+        "description": "Cảnh báo khẩn cấp khi khói > 700 ppm",
+        "message": "🚨 CẢNH BÁO KHẨN CẤP: Khói đậm! Nguy cơ cháy hoặc CO cao!"
+      },
+      "smokeHigh": {
+        "name": "🔥 Khói cao",
+        "description": "Cảnh báo khi khói 301-700 ppm",
+        "message": "🔥 Cảnh báo: Khói đậm! Cảnh báo sớm cháy, kiểm tra ngay."
+      },
+      "smokeMedium": {
+        "name": "💨 Khói trung bình",
+        "description": "Cảnh báo khi khói 100-300 ppm",
+        "message": "💨 Cảnh báo: Phát hiện khói nhẹ. Có thể có bụi hoặc khói."
       }
-    }
+    },
+    "valueOutOfRange": "Giá trị nằm ngoài phạm vi cho phép"
   },
   "notifications": {
     "title": "Thông báo",
@@ -273,7 +329,8 @@
       "deviceAlert": "Cảnh báo thiết bị",
       "systemNotification": "Thông báo hệ thống",
       "maintenance": "Bảo trì",
-      "securityAlert": "Cảnh báo bảo mật"
+      "securityAlert": "Cảnh báo bảo mật",
+      "escalationAlert": "Cảnh báo leo thang"
     },
     "priorities": {
       "low": "Thấp",
