@@ -20,6 +20,7 @@ import CONFIG from '../constants/config';
 import Header from '../components/Header';
 import OverlayLoader from '../components/OverlayLoader';
 import ActionFeedback from '../components/ActionFeedback';
+//import GoogleLoginButton from '../components/GoogleLoginButton';
 
 const log = createLogger('Login');
 
@@ -67,6 +68,16 @@ const LoginScreen = ({ navigation }) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
+
+  // const handleGoogleSuccess = async (result) => {
+  //   setFeedback({ visible: true, type: 'success', message: t('auth.loginSuccess') });
+  //   log.info('Google login successful');
+  // };
+
+  // const handleGoogleError = (e) => {
+  //   setFeedback({ visible: true, type: 'error', message: e?.message || t('auth.loginError') });
+  //   log.error('Google login error:', e);
+  // };
 
   return (
     <View style={styles.container}>
@@ -130,6 +141,11 @@ const LoginScreen = ({ navigation }) => {
                 <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
               )}
             </TouchableOpacity>
+
+            {/* <GoogleLoginButton 
+              onSuccess={handleGoogleSuccess} 
+              onError={handleGoogleError} 
+            /> */}
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>{t('auth.dontHaveAccount')} </Text>
