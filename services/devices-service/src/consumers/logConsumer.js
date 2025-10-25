@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 import logger from '../utils/logger.js'; 
 
 dotenv.config();
-const VERBOSE = process.env.LOG_VERBOSE === 'true';
 
 const kafka = new Kafka({
   clientId: 'devices-service',
@@ -28,7 +27,7 @@ const consumer = kafka.consumer({
 async function updateDeviceStatus(data) {
   try {
     const { deviceId, payload, type } = data;
-    if (VERBOSE) logger.info(`Processing ${type} data for device: ${deviceId}`);
+    logger.info(`Processing ${type} data for device: ${deviceId}`);
     
     if (!deviceId || !payload) {
       logger.error(`Missing deviceId or payload:`, { deviceId, payload });
@@ -37,7 +36,7 @@ async function updateDeviceStatus(data) {
     
     const device = await Device.findOne({ deviceId });
     if (!device) {
-      if (VERBOSE) logger.error(`Device not found: ${deviceId}`);
+      logger.error(`Device not found: ${deviceId}`);
       return;
     }
 
@@ -58,13 +57,13 @@ async function updateDeviceStatus(data) {
           const oldStatus = outlet.status;
           outlet.status = newVal;
           outlet.lastToggleAt = new Date();
-          if (VERBOSE) logger.info(`Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
+          logger.info(`Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
         } else {
-          if (VERBOSE) logger.error(`Outlet not found: ${outletId}`);
+          logger.error(`Outlet not found: ${outletId}`);
         }
       });
     } else if (payload.outlets && typeof payload.outlets === 'object') {
-      if (VERBOSE) logger.info(`Updating outlet statuses from payload.outlets:`, payload.outlets);
+      logger.info(`Updating outlet statuses from payload.outlets:`, payload.outlets);
       Object.keys(payload.outlets).forEach(outletId => {
         const outlet = device.outlets.find(o => o.id === outletId);
         if (outlet) {
@@ -75,13 +74,13 @@ async function updateDeviceStatus(data) {
           const oldStatus = outlet.status;
           outlet.status = newVal;
           outlet.lastToggleAt = new Date();
-          if (VERBOSE) logger.info(`Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
+          logger.info(`Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
         } else {
-          if (VERBOSE) logger.error(`Outlet not found: ${outletId}`);
+          logger.error(`Outlet not found: ${outletId}`);
         }
       });
     } else {
-      if (VERBOSE) logger.error(`No outlet data found in payload for ${type} log`);
+      logger.error(`No outlet data found in payload for ${type} log`);
     }
     
     let shouldPersist = true;
@@ -97,7 +96,7 @@ async function updateDeviceStatus(data) {
         gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : prev.gas_ppm,
         o: (payload.o || payload.outlets || prev.o || {})
       };
-      if (VERBOSE) logger.info(`Updated latest telemetry:`);
+      logger.info(`Updated latest telemetry:`);
       // Emit to socket clients
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else if (type === 'event' && (payload.o || payload.outlets)) {
@@ -107,31 +106,29 @@ async function updateDeviceStatus(data) {
       }
       device.latestTelemetry.o = payload.o || payload.outlets || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();
-      if (VERBOSE) logger.info(`Updated outlet status in latestTelemetry`);
+      logger.info(`Updated outlet status in latestTelemetry`);
       // Emit to socket clients
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else if (type === 'event' && payload.ack) {
       // For ack events, only update timestamp and keep existing telemetry
-      if (VERBOSE) logger.info(`ACK event received for device ${deviceId}`);
+      logger.info(`ACK event received for device ${deviceId}`);
       if (!device.latestTelemetry) {
         device.latestTelemetry = { ts: Date.now(), o: {} };
       } else {
         // Only update timestamp, preserve existing sensor values
         device.latestTelemetry.ts = payload.ts || Date.now();
       }
-      if (VERBOSE) logger.info(`Updated timestamp for ACK event`);
+      logger.info(`Updated timestamp for ACK event`);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
-      // Do NOT persist ack-only updates to avoid DB write amplification
-      shouldPersist = false;
+      shouldPersist = true;
     } else {
-      if (VERBOSE) logger.error(`No sensor data found in ${type} log, keeping existing telemetry`);
+      logger.error(`No sensor data found in ${type} log, keeping existing telemetry`);
     }
     
     if (shouldPersist) {
-      if (VERBOSE) logger.info(`Saving device to database...`);
       await device.save();
-      if (VERBOSE) logger.info(`Device status updated successfully: ${deviceId}`);
-    } else if (VERBOSE) {
+      logger.info(`Device status updated successfully: ${deviceId}`);
+    } else {
       logger.info(`Skipped DB save for ACK-only update: ${deviceId}`);
     }
     
@@ -165,7 +162,7 @@ async function startLogConsumer() {
       autoCommitInterval: 5000,
       eachMessage: async ({ topic, partition, message }) => {
         try {
-          if (VERBOSE) logger.info(`Received message from topic: ${topic}, partition: ${partition}`);
+          logger.info(`LogConsumer received message from topic: ${topic}, partition: ${partition}`);
           
           const logData = JSON.parse(message.value.toString());
 
@@ -186,32 +183,11 @@ async function startLogConsumer() {
           if (savedLog) {
             savedLog.markAsProcessed();
             await savedLog.save();
-            if (VERBOSE) logger.info(`Device log marked as processed`);
+            logger.info(`Device log marked as processed`);
           }
 
         } catch (error) {
           logger.error(`Error processing message from ${topic}:`, error);
-          logger.error('Error details:', {  
-            message: error.message,
-            stack: error.stack,
-            topic,
-            partition,
-            messageValue: message.value.toString()
-          });
-          
-          // Don't throw error to prevent consumer from stopping
-          if (VERBOSE) logger.error(`Continuing to process next message...`);
-          
-          // Mark message as processed even if failed to prevent infinite retry
-          try {
-            await consumer.commitOffsets([{
-              topic,
-              partition,
-              offset: message.offset
-            }]);
-          } catch (commitError) {
-            logger.error('Error committing offset:', commitError);
-          }
         }
       },
     });
