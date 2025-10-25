@@ -1,42 +1,29 @@
 import environment from '../config/environment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createLogger } from '../utils/logger';
 
 class RulesService {
   constructor() {
     this.baseURL = environment.getApiUrl('GATEWAY');
+    this.log = createLogger('RulesService');
   }
 
   // Get authentication token from storage
   async getAuthToken() {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      // Kiểm tra token hợp lệ
       if (!token || token === 'null' || token === 'undefined') {
-        console.warn('⚠️ Invalid token from AsyncStorage:', token);
-        console.warn('⚠️ User may need to login again');
+        this.log.warn('Invalid token from AsyncStorage, user may need to login again');
         return null;
       }
-      console.log('🔑 Token retrieved from AsyncStorage:', token.substring(0, 20) + '...');
+      this.log.debug('Token retrieved from AsyncStorage');
       return token;
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      this.log.error('Error getting auth token:', error);
       return null;
     }
   }
 
-  // Force refresh token from AuthContext
-  async refreshToken() {
-    try {
-      // Import AuthContext dynamically to avoid circular dependency
-      const { useAuth } = await import('../contexts/AuthContext');
-      // This won't work in service, need to pass token from component
-      console.warn('⚠️ Cannot access AuthContext from service');
-      return null;
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      return null;
-    }
-  }
 
   // Get all rules for a user
   async getAllRules(params = {}, token = null) {
@@ -59,19 +46,19 @@ class RulesService {
         },
       });
 
-      console.log('Rules API response status:', response.status);
+      this.log.debug('Rules API response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Rules API error response:', errorText);
+        this.log.error('Rules API error response:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Rules API response data:', data);
+      this.log.debug('Rules loaded successfully:', data?.data?.length || 0, 'rules');
       return data;
     } catch (error) {
-      console.error('Error fetching rules:', error);
+      this.log.error('Error fetching rules:', error);
       throw error;
     }
   }
@@ -87,12 +74,11 @@ class RulesService {
         throw new Error('No authentication token available');
       }
       
-      // Ensure deviceId is included in ruleData
       if (!ruleData.deviceId) {
-        console.warn('⚠️ No deviceId in ruleData, this may cause issues');
+        this.log.warn('No deviceId in ruleData, this may cause issues');
       }
       
-      console.log('📤 Creating rule with data:', JSON.stringify(ruleData, null, 2));
+      this.log.info('Creating rule:', ruleData.name);
 
       const response = await fetch(`${this.baseURL}/api/rules`, {
         method: 'POST',
@@ -104,7 +90,7 @@ class RulesService {
       });
 
       const responseText = await response.text();
-      console.log('📥 Raw response:', response.status, responseText);
+      this.log.debug('Create rule response:', response.status);
 
       if (!response.ok) {
         let errorMessage = `HTTP error! status: ${response.status}`;
@@ -118,10 +104,10 @@ class RulesService {
       }
 
       const data = JSON.parse(responseText);
-      console.log('✅ Parsed response data:', data);
+      this.log.info('Rule created successfully:', data?.data?.name || 'Unknown');
       return data;
     } catch (error) {
-      console.error('Error creating rule:', error);
+      this.log.error('Error creating rule:', error);
       throw error;
     }
   }
@@ -129,9 +115,8 @@ class RulesService {
   // Create rule from template
   async createRuleFromTemplate(template, deviceId, customizations = {}, token = null) {
     try {
-      console.log('createRuleFromTemplate called with:', { template, deviceId, customizations });
+      this.log.info('Creating rule from template:', template.name);
       
-      // Validate required parameters
       if (!template) {
         throw new Error('Template is required');
       }
@@ -139,7 +124,6 @@ class RulesService {
         throw new Error('Device ID is required');
       }
 
-      // Create rule data from template
       const ruleData = {
         name: customizations.name || template.name,
         description: customizations.description || template.description,
@@ -147,19 +131,17 @@ class RulesService {
         priority: template.priority || 'medium',
         maxTriggersPerDay: template.maxTriggersPerDay || (template.priority === 'urgent' ? null : 10),
         cooldownPeriod: template.cooldownPeriod || (template.priority === 'urgent' ? null : 300000),
-        isActive: true, // Always active by default when created from template
+        isActive: true,
         conditions: template.conditions,
         conditionLogic: template.conditionLogic || 'AND',
         actions: template.actions,
         ...customizations
       };
 
-      // Create the rule
       const result = await this.createRule(ruleData, token);
-      console.log('Create rule result:', result);
       return result;
     } catch (error) {
-      console.error('Error creating rule from template:', error);
+      this.log.error('Error creating rule from template:', error);
       throw error;
     }
   }
@@ -184,10 +166,10 @@ class RulesService {
       }
 
       const data = await response.json();
-      console.log('Update rule result:', data);
+      this.log.info('Rule updated successfully');
       return data;
     } catch (error) {
-      console.error('Error updating rule:', error);
+      this.log.error('Error updating rule:', error);
       throw error;
     }
   }
@@ -211,10 +193,10 @@ class RulesService {
       }
 
       const data = await response.json();
-      console.log('Delete rule result:', data);
+      this.log.info('Rule deleted successfully');
       return data;
     } catch (error) {
-      console.error('Error deleting rule:', error);
+      this.log.error('Error deleting rule:', error);
       throw error;
     }
   }
@@ -239,10 +221,10 @@ class RulesService {
       }
 
       const data = await response.json();
-      console.log('Toggle rule status result:', data);
+      this.log.info('Rule status toggled successfully');
       return data;
     } catch (error) {
-      console.error('Error toggling rule status:', error);
+      this.log.error('Error toggling rule status:', error);
       throw error;
     }
   }
@@ -274,7 +256,7 @@ class RulesService {
       }
       return await res.json();
     } catch (error) {
-      console.error('respondToAlert error:', error);
+      this.log.error('respondToAlert error:', error);
       throw error;
     }
   }

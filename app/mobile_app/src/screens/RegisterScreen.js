@@ -62,16 +62,14 @@ const RegisterScreen = ({ navigation }) => {
       
       if (result.success) {
         console.log('✅ RegisterScreen: Registration successful');
-        // Ẩn loader trước khi hiển thị feedback
         setShowLoader(false);
         setIsLoading(false);
         
-        // Hiển thị feedback sau một chút delay để đảm bảo loader đã ẩn
         setTimeout(() => {
           setFeedback({ visible: true, type: 'success', message: 'Đăng ký thành công! Vui lòng đăng nhập.' });
           console.log('📱 Feedback set:', { visible: true, type: 'success', message: 'Đăng ký thành công! Vui lòng đăng nhập.' });
           
-          // Chuyển về trang login sau 3 giây để user có thời gian đọc thông báo
+          // Chuyển về trang login sau 3 giây
           setTimeout(() => {
             console.log('📱 Navigating to Login...');
             setFeedback({ visible: false, type: 'success', message: '' });
@@ -90,7 +88,6 @@ const RegisterScreen = ({ navigation }) => {
       setIsLoading(false);
       setFeedback({ visible: true, type: 'error', message: 'Có lỗi xảy ra khi đăng ký' });
     } finally {
-      // Đảm bảo loading state được reset
       setIsLoading(false);
       setShowLoader(false);
     }
