@@ -62,23 +62,6 @@ async function updateDeviceStatus(data) {
           logger.error(`Outlet not found: ${outletId}`);
         }
       });
-    } else if (payload.outlets && typeof payload.outlets === 'object') {
-      logger.info(`Updating outlet statuses from payload.outlets:`, payload.outlets);
-      Object.keys(payload.outlets).forEach(outletId => {
-        const outlet = device.outlets.find(o => o.id === outletId);
-        if (outlet) {
-          const newVal = payload.outlets[outletId];
-          if (newVal === undefined || newVal === null) {
-            return;
-          }
-          const oldStatus = outlet.status;
-          outlet.status = newVal;
-          outlet.lastToggleAt = new Date();
-          logger.info(`Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
-        } else {
-          logger.error(`Outlet not found: ${outletId}`);
-        }
-      });
     } else {
       logger.error(`No outlet data found in payload for ${type} log`);
     }
@@ -86,7 +69,7 @@ async function updateDeviceStatus(data) {
     let shouldPersist = true;
 
     // Update latest telemetry (only set provided fields; do not default to 0)
-    if (payload.temp !== undefined || payload.humid !== undefined || payload.smoke !== undefined || payload.gas_ppm !== undefined || payload.o || payload.outlets) {
+    if (payload.temp !== undefined || payload.humid !== undefined || payload.smoke !== undefined || payload.gas_ppm !== undefined || payload.o) {
       const prev = device.latestTelemetry || { ts: Date.now(), o: {} };
       device.latestTelemetry = {
         ts: payload.ts || prev.ts || Date.now(),
@@ -99,12 +82,12 @@ async function updateDeviceStatus(data) {
       logger.info(`Updated latest telemetry:`);
       // Emit to socket clients
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
-    } else if (type === 'event' && (payload.o || payload.outlets)) {
+    } else if (type === 'event' && payload.o) {
       // For event logs, only update outlet status in latestTelemetry
       if (!device.latestTelemetry) {
         device.latestTelemetry = { ts: Date.now(), o: {} };
       }
-      device.latestTelemetry.o = payload.o || payload.outlets || device.latestTelemetry.o;
+      device.latestTelemetry.o = payload.o || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();
       logger.info(`Updated outlet status in latestTelemetry`);
       // Emit to socket clients
@@ -120,7 +103,7 @@ async function updateDeviceStatus(data) {
       }
       logger.info(`Updated timestamp for ACK event`);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
-      shouldPersist = true;
+      shouldPersist = false;
     } else {
       logger.error(`No sensor data found in ${type} log, keeping existing telemetry`);
     }
