@@ -24,8 +24,9 @@ export const register = async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, passwordHash, name, phone, avatar });
-    const token = signToken({ sub: user._id.toString(), email });
+    const userId = User.generateUserId();
+    const user = await User.create({ userId, email, passwordHash, name, phone, avatar });
+    const token = signToken({ sub: user.userId, email });
 
     // Fire-and-forget: initialize notification preferences in alerts-service
     (async () => {
@@ -34,7 +35,7 @@ export const register = async (req, res) => {
         
         // Create service-to-service token for internal communication
         const serviceToken = signToken({ 
-          sub: user._id.toString(), 
+          sub: user.userId, 
           email: email,
           role: 'service',
           service: 'auth-service'
@@ -101,6 +102,7 @@ export const register = async (req, res) => {
       }
     });
   } catch (err) {
+    logger.error('Registration error:', err);
     res.status(500).json({ error: 'registration_failed' });
   }
 };
@@ -122,7 +124,7 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'invalid_credentials' });
     }
 
-    const token = signToken({ sub: user._id.toString(), email });
+    const token = signToken({ sub: user.userId, email });
 
     res.json({
       token,
