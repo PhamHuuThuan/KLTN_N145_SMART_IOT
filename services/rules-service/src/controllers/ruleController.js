@@ -43,6 +43,7 @@ export const getAllRules = async (req, res) => {
 export const createRule = async (req, res) => {
   try {
     logger.debug('Create rule request body:', JSON.stringify(req.body, null, 2));
+    logger.debug('User info:', JSON.stringify(req.user, null, 2));
     
     const { 
       name, 
@@ -58,11 +59,19 @@ export const createRule = async (req, res) => {
     } = req.body;
     
     const createdBy = (req.user && (req.user.userId || req.user.sub || req.user.id)) || null;
+    logger.debug('Extracted createdBy:', createdBy);
 
     if (!name || !deviceId || !conditions?.length || !actions?.length) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: name, deviceId, conditions, actions'
+      });
+    }
+
+    if (!createdBy) {
+      return res.status(400).json({
+        success: false,
+        message: 'User authentication required to create rule'
       });
     }
 
@@ -86,6 +95,13 @@ export const createRule = async (req, res) => {
 
     await rule.save();
 
+    // Ensure ruleId is generated
+    if (!rule.ruleId) {
+      rule.ruleId = Rule.generateRuleId();
+      await rule.save();
+    }
+
+    logger.info('Rule created successfully:', { ruleId: rule.ruleId, name: rule.name });
     res.status(201).json({
       success: true,
       data: rule,

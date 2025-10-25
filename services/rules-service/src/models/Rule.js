@@ -4,7 +4,7 @@ const ruleSchema = new mongoose.Schema({
   ruleId: {
     type: String,
     unique: true,
-    required: true,
+    required: false,
     trim: true
   },
   name: {
@@ -270,7 +270,7 @@ ruleSchema.statics.generateRuleId = function() {
 
 ruleSchema.pre('save', function(next) {
   if (!this.ruleId) {
-    this.ruleId = Rule.generateRuleId();
+    this.ruleId = this.constructor.generateRuleId();
   }
   next();
 });
