@@ -28,7 +28,12 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
   // Function to get translated rule name and description
   const getTranslatedRuleName = (ruleName) => {
     // Check if rule name is a template key
-    const templateKeys = ['gasLeakDetection', 'smokeDetection', 'highTemperature', 'lowHumidity', 'flameDetection'];
+    const templateKeys = [
+      'tempEmergency', 'tempHigh', 'tempLow',
+      'humidityEmergency', 'humidityHigh', 'humidityLow', 
+      'gasEmergency', 'gasHigh', 'gasMedium',
+      'smokeEmergency', 'smokeHigh', 'smokeMedium'
+    ];
     
     if (templateKeys.includes(ruleName)) {
       return t(`rules.templates.${ruleName}.name`);
@@ -47,7 +52,12 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
 
   const getTranslatedRuleDescription = (ruleDescription) => {
     // Check if rule description is a template key
-    const templateKeys = ['gasLeakDetection', 'smokeDetection', 'highTemperature', 'lowHumidity', 'flameDetection'];
+    const templateKeys = [
+      'tempEmergency', 'tempHigh', 'tempLow',
+      'humidityEmergency', 'humidityHigh', 'humidityLow', 
+      'gasEmergency', 'gasHigh', 'gasMedium',
+      'smokeEmergency', 'smokeHigh', 'smokeMedium'
+    ];
     
     if (templateKeys.includes(ruleDescription)) {
       return t(`rules.templates.${ruleDescription}.description`);
@@ -240,14 +250,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     flexShrink: 1,
-  },
-  priorityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginLeft: 8,
   },
   priorityBadgeAbsolute: {
     position: 'absolute',
