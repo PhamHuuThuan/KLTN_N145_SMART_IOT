@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
 import DeviceSelector from '../components/DeviceSelector';
 import RuleCard from '../components/RuleCard';
 import TemplateCard from '../components/RuleTemplateCard';
@@ -14,7 +13,6 @@ import CONFIG from '../constants/config';
 
 const RulesScreen = () => {
   const { t } = useTranslation();
-  const { user } = useAuth();
   const templatesListRef = useRef(null);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
@@ -27,7 +25,6 @@ const RulesScreen = () => {
     maxTriggersPerDay: 10,
     cooldownPeriod: 300000,
     conditionLogic: 'AND',
-    sensorValue: '',
   });
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedRule, setSelectedRule] = useState(null);
@@ -40,7 +37,6 @@ const RulesScreen = () => {
     maxTriggersPerDay: 10,
     cooldownPeriod: 300000,
     conditionLogic: 'AND',
-    sensorValue: '',
   });
   const { rules, templates, devices, loading, refreshing, loadRules, onRefresh } = useRulesData();
   const { creatingRule, creatingTemplateId, toggleRuleStatus, deleteRule, createRuleFromTemplate, updateRule } = useRuleActions(loadRules);
@@ -84,30 +80,25 @@ const RulesScreen = () => {
       cooldownPeriod: template.cooldownPeriod || 300000,
       conditionLogic: template.conditionLogic || 'AND',
       conditions: template.conditions || [],
-      sensorValue: template?.conditions?.[0]?.type === 'sensor' ? `${template.conditions[0].value}` : '',
     });
     setCustomizeVisible(true);
   };
 
   const handleCreateRuleFromTemplate = async (template, overrides = {}) => {
-    const success = await createRuleFromTemplate(template, user, selectedDevice, overrides);
+    // Ensure we pass device ID string, not device object
+    const deviceId = typeof selectedDevice === 'string' ? selectedDevice : selectedDevice?.deviceId || selectedDevice?._id;
+    
+    if (!deviceId) {
+      console.error('No device ID available for rule creation');
+      return;
+    }
+    
+    const success = await createRuleFromTemplate(template, deviceId, overrides);
     if (success) {
       setShowTemplatesModal(false);
       setCustomizeVisible(false);
     }
   };
-
-  const getPriorityColor = (priority) => {
-    const priorityMap = {
-      'urgent': '#F44336',
-      'high': '#FF5722', 
-      'medium': '#FF9800',
-      'low': '#4CAF50'
-    };
-    return priorityMap[priority] || '#FF9800';
-  };
-
-  const filteredRules = rules;
 
   const openRuleDetail = (rule) => {
     setSelectedRule(rule);
@@ -120,7 +111,6 @@ const RulesScreen = () => {
       cooldownPeriod: rule.cooldownPeriod || 300000,
       conditionLogic: rule.conditionLogic || 'AND',
       conditions: rule.conditions || [],
-      sensorValue: rule?.conditions?.[0]?.type === 'sensor' ? String(rule.conditions[0].value) : '',
     });
     setDetailVisible(true);
   };
@@ -160,7 +150,6 @@ const RulesScreen = () => {
       onPress={() => openRuleDetail(rule)}
       onToggleStatus={toggleRuleStatus}
       onDelete={deleteRule}
-      getPriorityColor={getPriorityColor}
     />
   );
 
@@ -224,7 +213,7 @@ const RulesScreen = () => {
         </View>
 
         <FlatList
-          data={filteredRules}
+          data={rules}
           renderItem={renderRuleItem}
           keyExtractor={(item) => item._id}
           refreshControl={
