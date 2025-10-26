@@ -98,17 +98,15 @@ const initializeServices = async () => {
         [TOPICS.NOTIFICATION_REQUESTS]: (topic, message) => notificationConsumer.handleNotificationRequest(topic, message),
         [TOPICS.USER_ACTIONS]: (topic, message) => notificationConsumer.handleUserAction(topic, message),
         [TOPICS.SYSTEM_EVENTS]: (topic, message) => notificationConsumer.handleSystemEvent(topic, message),
-        [TOPICS.OUTLET_TOGGLED]: (topic, message) => notificationConsumer.handleUserAction(topic, message)
+        //[TOPICS.OUTLET_TOGGLED]: (topic, message) => notificationConsumer.handleUserAction(topic, message)
       };
       
       await consumeMessages((topic, message) => {
         logger.info(`Alerts-service received message from topic: ${topic}`);
-        logger.info(`Message content:`, JSON.stringify(message, null, 2));
-        
+      
         const handler = messageHandlers[topic];
         if (handler) {
           try {
-            logger.info(`Calling handler for topic: ${topic}`);
             handler(topic, message);
             logger.info(`Handler completed for topic: ${topic}`);
           } catch (error) {
@@ -125,9 +123,9 @@ const initializeServices = async () => {
         }
       });
       
-      logger.info('🚀 All services initialized successfully with Kafka');
+      logger.info('Alerts-service initialized successfully with Kafka');
     } else {
-      logger.info('🚀 Core services initialized successfully (Kafka disabled)');
+      logger.info('Alerts-service initialized successfully (Kafka disabled)');
     }
   } catch (error) {
     logger.error('Failed to initialize services:', error);
