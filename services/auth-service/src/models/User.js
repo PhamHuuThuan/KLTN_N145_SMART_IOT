@@ -2,6 +2,12 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
+  userId: {
+    type: String,
+    unique: true,
+    required: true,
+    trim: true
+  },
   email: {
     type: String,
     required: true,
@@ -41,14 +47,22 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
+  },
+  firebaseUid: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
   }
 }, {
   timestamps: true
 });
 
+userSchema.index({ userId: 1 });
 userSchema.index({ email: 1 });
 userSchema.index({ status: 1 });
 userSchema.index({ role: 1 });
+userSchema.index({ firebaseUid: 1 });
 
 userSchema.virtual('password')
   .set(function(password) {
@@ -75,6 +89,19 @@ userSchema.statics.findByRole = function(role) {
   return this.find({ role });
 };
 
+userSchema.statics.generateUserId = function() {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substr(2, 5);
+  return `user_${timestamp}_${random}`;
+};
+
 const User = mongoose.model('User', userSchema);
+
+userSchema.pre('save', function(next) {
+  if (!this.userId) {
+    this.userId = this.constructor.generateUserId();
+  }
+  next();
+});
 
 export default User;

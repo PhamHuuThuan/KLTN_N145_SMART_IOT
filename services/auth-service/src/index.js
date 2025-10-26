@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import connectDB from './config/database.js';
 import authRoute from './routes/authRoutes.js';
+import logger from './utils/logger.js';
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -35,17 +36,17 @@ function createServer() {
 
 async function bootstrap() {
   await connectDB();
-  console.log('📦 MongoDB connected to Auth Service');
+  logger.info('📦 MongoDB connected to Auth Service');
   
   const app = createServer();
   const port = process.env.PORT || 4001;
   
   app.listen(port, () => {
-    console.log(`🚀 Auth Service listening on port ${port}`);
-    console.log(`📊 Health check: http://localhost:${port}/health`);
-    console.log(`🔐 Register: http://localhost:${port}/auth/register`);
-    console.log(`🔑 Login: http://localhost:${port}/auth/login`);
+    logger.info(`🚀 Auth Service listening on port ${port}`);
+    logger.info(`📊 Health check: http://localhost:${port}/health`);
+    logger.info(`🔐 Register: http://localhost:${port}/auth/register`);
+    logger.info(`🔑 Login: http://localhost:${port}/auth/login`);
   });
 }
 
-bootstrap().catch(console.error);
+bootstrap().catch(logger.error);

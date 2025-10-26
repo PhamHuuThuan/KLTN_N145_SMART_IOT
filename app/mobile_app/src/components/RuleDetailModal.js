@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../contexts/AuthContext';
 import CONFIG from '../constants/config';
 
 const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onSave }) => {
   if (!selectedRule) return null;
   const { t } = useTranslation();
+  const { token } = useAuth();
   const [pausing, setPausing] = useState(false);
   const [unpausing, setUnpausing] = useState(false);
   const [pausedUntilLocal, setPausedUntilLocal] = useState(selectedRule?.pausedUntil || null);
@@ -55,9 +57,28 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
     return labelMap[sensor] || sensor;
   };
 
-  // Validate conditions for logical consistency
+  // Validate conditions for logical consistency and value ranges
   const validateConditions = (conditions) => {
-    if (!conditions || conditions.length < 2) return { valid: true, message: '' };
+    if (!conditions || conditions.length === 0) return { valid: false, message: 'Cần ít nhất 1 điều kiện' };
+
+    // Check each condition for value validation
+    for (const condition of conditions) {
+      if (!condition.sensor || !condition.operator || condition.value === undefined || condition.value === '') {
+        return { valid: false, message: 'Tất cả điều kiện phải có đầy đủ thông tin' };
+      }
+
+      // Validate sensor value range based on priority
+      if (!validateSensorValue(condition.sensor, condition.value, editFields.priority)) {
+        const constraints = getSensorConstraints(condition.sensor, editFields.priority);
+        return { 
+          valid: false, 
+          message: `Giá trị ${condition.sensor} phải trong khoảng ${constraints.min}-${constraints.max} cho mức độ ${editFields.priority}` 
+        };
+      }
+    }
+
+    // If only one condition, it's valid
+    if (conditions.length < 2) return { valid: true, message: '' };
 
     // Group conditions by sensor
     const sensorGroups = {};
@@ -129,14 +150,50 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
     return unitMap[sensor] || '';
   };
 
-  const getValueHint = (sensor) => {
-    const hintMap = {
-      'temperature': ' (0-100°C)',
-      'humidity': ' (0-100%)',
-      'gas_ppm': ' (0-1000 ppm)',
-      'smoke': ' (0-500 ppm)'
+  // Validation constraints for sensor values based on priority
+  const getSensorConstraints = (sensor, priority = 'medium') => {
+    const constraints = {
+      'temperature': {
+        'urgent': { min: 40, max: 100, step: 1 },
+        'high': { min: 31, max: 40, step: 1 },
+        'medium': { min: 15, max: 30, step: 1 },
+        'low': { min: 0, max: 15, step: 1 }
+      },
+      'humidity': {
+        'urgent': { min: 80, max: 100, step: 1 },
+        'high': { min: 61, max: 80, step: 1 },
+        'medium': { min: 30, max: 60, step: 1 },
+        'low': { min: 0, max: 30, step: 1 }
+      },
+      'gas_ppm': {
+        'urgent': { min: 1000, max: 2000, step: 10 },
+        'high': { min: 401, max: 1000, step: 10 },
+        'medium': { min: 200, max: 400, step: 10 },
+        'low': { min: 0, max: 200, step: 10 }
+      },
+      'smoke': {
+        'urgent': { min: 700, max: 1000, step: 1 },
+        'high': { min: 301, max: 700, step: 1 },
+        'medium': { min: 100, max: 300, step: 1 },
+        'low': { min: 0, max: 100, step: 1 }
+      }
     };
-    return hintMap[sensor] || '';
+    return constraints[sensor]?.[priority] || { min: 0, max: 1000, step: 1 };
+  };
+
+  const validateSensorValue = (sensor, value, priority = 'medium') => {
+    const constraints = getSensorConstraints(sensor, priority);
+    const numValue = parseFloat(value);
+    
+    if (isNaN(numValue)) return false;
+    if (numValue < constraints.min || numValue > constraints.max) return false;
+    
+    return true;
+  };
+
+  const getValueHint = (sensor, priority = 'medium') => {
+    const constraints = getSensorConstraints(sensor, priority);
+    return ` (${constraints.min}-${constraints.max})`;
   };
 
   return (
@@ -161,7 +218,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                 try {
                   setUnpausing(true);
                   const rulesService = (await import('../services/rulesService')).default;
-                  await rulesService.updateRule(selectedRule._id, { pausedUntil: null });
+                  await rulesService.updateRule(selectedRule._id, { pausedUntil: null }, token);
                   setPausedUntilLocal(null);
                 } finally {
                   setUnpausing(false);
@@ -264,7 +321,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                             newConditions[index] = { 
                               ...newConditions[index], 
                               sensor: sensor.key,
-                              unit: sensor.key === 'temperature' ? '°C' : sensor.key === 'humidity' ? '%' : sensor.key === 'gas_ppm' ? 'ppm' : ''
+                              unit: getSensorUnit(sensor.key)
                             };
                             setEditFields(prev => ({ ...prev, conditions: newConditions }));
                           }}
@@ -312,19 +369,31 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                   <View style={styles.valueInput}>
                     <Text style={styles.inputLabel}>
                       {t('rules.value')} {getSensorUnit(condition.sensor)}
-                      {getValueHint(condition.sensor)}
+                      {getValueHint(condition.sensor, editFields.priority)}
                     </Text>
                     <TextInput
-                      style={styles.input}
+                      style={[
+                        styles.input,
+                        editFields.conditions?.[index]?.value !== undefined && 
+                        !validateSensorValue(condition.sensor, editFields.conditions[index].value, editFields.priority) && 
+                        styles.inputError
+                      ]}
                       value={editFields.conditions?.[index]?.value !== undefined ? String(editFields.conditions[index].value) : ''}
                       onChangeText={(text) => {
                         const newConditions = [...editFields.conditions];
-                        newConditions[index] = { ...newConditions[index], value: text === '' ? '' : parseFloat(text) || 0 };
+                        const numValue = text === '' ? '' : parseFloat(text);
+                        newConditions[index] = { ...newConditions[index], value: numValue };
                         setEditFields(prev => ({ ...prev, conditions: newConditions }));
                       }}
                       placeholder={String(condition.value)}
                       keyboardType="numeric"
                     />
+                    {editFields.conditions?.[index]?.value !== undefined && 
+                     !validateSensorValue(condition.sensor, editFields.conditions[index].value, editFields.priority) && (
+                      <Text style={styles.errorText}>
+                        {t('rules.valueOutOfRange')} {getValueHint(condition.sensor, editFields.priority)}
+                      </Text>
+                    )}
                   </View>
                 </View>
               </View>
@@ -491,7 +560,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
               try {
                 setPausing(true);
                 const rulesService = (await import('../services/rulesService')).default;
-                await rulesService.respondToAlert(selectedRule._id, 'acknowledged', { ruleName: selectedRule.name });
+                await rulesService.respondToAlert(selectedRule._id, 'acknowledged', { ruleName: selectedRule.name }, undefined, token);
                 onClose && onClose();
               } finally {
                 setPausing(false);
@@ -508,7 +577,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
               try {
                 setPausing(true);
                 const rulesService = (await import('../services/rulesService')).default;
-                await rulesService.respondToAlert(selectedRule._id, 'dismissed', { ruleName: selectedRule.name });
+                await rulesService.respondToAlert(selectedRule._id, 'dismissed', { ruleName: selectedRule.name }, undefined, token);
                 onClose && onClose();
               } finally {
                 setPausing(false);
@@ -525,7 +594,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
               try {
                 setPausing(true);
                 const rulesService = (await import('../services/rulesService')).default;
-                await rulesService.respondToAlert(selectedRule._id, 'false_alarm', { ruleName: selectedRule.name });
+                await rulesService.respondToAlert(selectedRule._id, 'false_alarm', { ruleName: selectedRule.name }, undefined, token);
                 onClose && onClose();
               } finally {
                 setPausing(false);
@@ -733,16 +802,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: CONFIG.COLORS.gray,
   },
-  rowContainer: {
-    flexDirection: 'row',
-    marginTop: 16,
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  inputContainer: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
   inputLabel: {
     marginBottom: 6,
     color: CONFIG.COLORS.gray,
@@ -807,6 +866,16 @@ const styles = StyleSheet.create({
   sensorButtonLabelSelected: {
     color: 'white',
     fontWeight: '600',
+  },
+  inputError: {
+    borderColor: '#F44336',
+    borderWidth: 2,
+  },
+  errorText: {
+    color: '#F44336',
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '500',
   },
 });
 

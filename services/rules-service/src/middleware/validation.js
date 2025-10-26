@@ -1,9 +1,9 @@
 export const validateRule = (req, res, next) => {
-  const { name, ownerId, deviceId, conditions, actions, cooldownPeriod, maxTriggersPerDay, duration } = req.body || {};
+  const { name, deviceId, conditions, actions, cooldownPeriod, maxTriggersPerDay } = req.body || {};
   
   // Required fields
-  if (!name || !ownerId || !deviceId || !Array.isArray(conditions) || !Array.isArray(actions) || conditions.length === 0 || actions.length === 0) {
-    return res.status(400).json({ success: false, message: 'Missing required fields: name, ownerId, deviceId, conditions, actions' });
+  if (!name || !deviceId || !Array.isArray(conditions) || !Array.isArray(actions) || conditions.length === 0 || actions.length === 0) {
+    return res.status(400).json({ success: false, message: 'Missing required fields: name, deviceId, conditions, actions' });
   }
   
   // Validate cooldownPeriod
@@ -20,24 +20,17 @@ export const validateRule = (req, res, next) => {
     }
   }
   
-  // Validate duration
-  if (duration !== undefined) {
-    if (typeof duration !== 'number' || duration < 0 || duration > 3600000) {
-      return res.status(400).json({ success: false, message: 'duration must be a number between 0 and 3600000 (1 hour in ms)' });
-    }
-  }
-  
   next();
 };
 
 export const validateRuleUpdate = (req, res, next) => {
-  const { name, ownerId, deviceId, conditions, actions, priority, pausedUntil, cooldownPeriod, maxTriggersPerDay, duration } = req.body || {};
+  const { name, deviceId, conditions, actions, priority, pausedUntil, cooldownPeriod, maxTriggersPerDay } = req.body || {};
   
   // Check if any valid fields are provided
   if (
-    name === undefined && ownerId === undefined && deviceId === undefined &&
+    name === undefined && deviceId === undefined &&
     conditions === undefined && actions === undefined && priority === undefined && 
-    pausedUntil === undefined && cooldownPeriod === undefined && maxTriggersPerDay === undefined && duration === undefined
+    pausedUntil === undefined && cooldownPeriod === undefined && maxTriggersPerDay === undefined
   ) {
     return res.status(400).json({ success: false, message: 'No valid fields provided for update' });
   }
@@ -56,13 +49,6 @@ export const validateRuleUpdate = (req, res, next) => {
     }
   }
   
-  // Validate duration if provided
-  if (duration !== undefined) {
-    if (typeof duration !== 'number' || duration < 0 || duration > 3600000) {
-      return res.status(400).json({ success: false, message: 'duration must be a number between 0 and 3600000 (1 hour in ms)' });
-    }
-  }
-  
   next();
 };
 
@@ -72,8 +58,4 @@ export const validateRuleStatus = (req, res, next) => {
     return res.status(400).json({ success: false, message: 'isActive must be a boolean value' });
   }
   next();
-};
-
-export const validateBulkUpdate = (req, res, next) => {
-  return res.status(400).json({ success: false, message: 'Bulk update disabled in minimal service' });
 };

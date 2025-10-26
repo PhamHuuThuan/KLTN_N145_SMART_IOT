@@ -1,77 +1,141 @@
 // Rule templates with multi-language support
 export const RULE_TEMPLATES = {
   vi: {
-    gas_leak_detection: {
-      name: 'rules.templates.gasLeakDetection.name',
-      description: 'rules.templates.gasLeakDetection.description',
+    // 🌡️ TEMPERATURE - NHIỆT ĐỘ
+    // 🔴 URGENT - Khẩn cấp
+    temp_emergency: {
+      name: 'rules.templates.tempEmergency.name',
+      description: 'rules.templates.tempEmergency.description',
       priority: 'urgent',
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'gas_ppm',
-          operator: '>',
-          value: 1000,
-          unit: 'ppm'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_alert',
-          message: 'rules.templates.gasLeakDetection.message'
-        }
-      ]
-    },
-    smoke_detection: {
-      name: 'rules.templates.smokeDetection.name',
-      description: 'rules.templates.smokeDetection.description',
-      priority: 'high',
-      cooldownPeriod: 300000,
-      maxTriggersPerDay: 20,
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '==',
-          value: 1,
-          unit: ''
-        }
-      ],
-      actions: [
-        {
-          type: 'send_alert',
-          message: 'rules.templates.smokeDetection.message'
-        }
-      ]
-    },
-    high_temperature: {
-      name: 'rules.templates.highTemperature.name',
-      description: 'rules.templates.highTemperature.description',
-      priority: 'medium',
-      cooldownPeriod: 600000,
-      maxTriggersPerDay: 10,
+      cooldownPeriod: null,
+      maxTriggersPerDay: null,
       conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
           sensor: 'temperature',
           operator: '>',
-          value: 35,
+          value: 40,
           unit: '°C'
         }
       ],
       actions: [
         {
           type: 'send_alert',
-          message: 'rules.templates.highTemperature.message'
+          message: 'rules.templates.tempEmergency.message'
         }
       ]
     },
-    low_humidity: {
-      name: 'rules.templates.lowHumidity.name',
-      description: 'rules.templates.lowHumidity.description',
+    
+    // 🟠 HIGH - Cao
+    temp_high: {
+      name: 'rules.templates.tempHigh.name',
+      description: 'rules.templates.tempHigh.description',
+      priority: 'high',
+      cooldownPeriod: 300000, // 5 phút
+      maxTriggersPerDay: 20,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'temperature',
+          operator: '>',
+          value: 31,
+          unit: '°C'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.tempHigh.message'
+        }
+      ]
+    },
+    
+    // 🔵 LOW - Thấp
+    temp_low: {
+      name: 'rules.templates.tempLow.name',
+      description: 'rules.templates.tempLow.description',
       priority: 'low',
-      cooldownPeriod: 1800000,
+      cooldownPeriod: 1800000, // 30 phút
       maxTriggersPerDay: 5,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'temperature',
+          operator: '<',
+          value: 15,
+          unit: '°C'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.tempLow.message'
+        }
+      ]
+    },
+
+    // 💧 HUMIDITY - ĐỘ ẨM
+    // 🔴 URGENT - Khẩn cấp
+    humidity_emergency: {
+      name: 'rules.templates.humidityEmergency.name',
+      description: 'rules.templates.humidityEmergency.description',
+      priority: 'urgent',
+      cooldownPeriod: null,
+      maxTriggersPerDay: null,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'humidity',
+          operator: '>',
+          value: 80,
+          unit: '%'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.humidityEmergency.message'
+        }
+      ]
+    },
+    
+    // 🟠 HIGH - Cao
+    humidity_high: {
+      name: 'rules.templates.humidityHigh.name',
+      description: 'rules.templates.humidityHigh.description',
+      priority: 'high',
+      cooldownPeriod: 600000, // 10 phút
+      maxTriggersPerDay: 15,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'humidity',
+          operator: '>',
+          value: 61,
+          unit: '%'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.humidityHigh.message'
+        }
+      ]
+    },
+    
+    // 🔵 LOW - Thấp
+    humidity_low: {
+      name: 'rules.templates.humidityLow.name',
+      description: 'rules.templates.humidityLow.description',
+      priority: 'low',
+      cooldownPeriod: 1800000, // 30 phút
+      maxTriggersPerDay: 5,
+      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
@@ -84,36 +148,20 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: 'rules.templates.lowHumidity.message'
+          message: 'rules.templates.humidityLow.message'
         }
       ]
     },
-    flame_detection: {
-      name: 'rules.templates.flameDetection.name',
-      description: 'rules.templates.flameDetection.description',
+
+    // 🧪 GAS - KHÍ GAS
+    // 🔴 URGENT - Khẩn cấp
+    gas_emergency: {
+      name: 'rules.templates.gasEmergency.name',
+      description: 'rules.templates.gasEmergency.description',
       priority: 'urgent',
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '==',
-          value: 1,
-          unit: ''
-        }
-      ],
-      actions: [
-        {
-          type: 'send_alert',
-          message: 'rules.templates.flameDetection.message'
-        }
-      ]
-    },
-  },
-  en: {
-    gas_leak_detection: {
-      name: 'rules.templates.gasLeakDetection.name',
-      description: 'rules.templates.gasLeakDetection.description',
-      priority: 'urgent',
+      cooldownPeriod: null,
+      maxTriggersPerDay: null,
+      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
@@ -126,60 +174,267 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: 'rules.templates.gasLeakDetection.message'
+          message: 'rules.templates.gasEmergency.message'
         }
       ]
     },
-    smoke_detection: {
-      name: 'rules.templates.smokeDetection.name',
-      description: 'rules.templates.smokeDetection.description',
+    
+    // 🟠 HIGH - Cao
+    gas_high: {
+      name: 'rules.templates.gasHigh.name',
+      description: 'rules.templates.gasHigh.description',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 300000, // 5 phút
       maxTriggersPerDay: 20,
+      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
-          sensor: 'smoke',
-          operator: '==',
-          value: 1,
-          unit: ''
+          sensor: 'gas_ppm',
+          operator: '>',
+          value: 401,
+          unit: 'ppm'
         }
       ],
       actions: [
         {
           type: 'send_alert',
-          message: 'rules.templates.smokeDetection.message'
+          message: 'rules.templates.gasHigh.message'
         }
       ]
     },
-    high_temperature: {
-      name: 'rules.templates.highTemperature.name',
-      description: 'rules.templates.highTemperature.description',
+    
+    // 🟢 MEDIUM - Trung bình
+    gas_medium: {
+      name: 'rules.templates.gasMedium.name',
+      description: 'rules.templates.gasMedium.description',
       priority: 'medium',
-      cooldownPeriod: 600000,
+      cooldownPeriod: 900000, // 15 phút
       maxTriggersPerDay: 10,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'gas_ppm',
+          operator: '>',
+          value: 200,
+          unit: 'ppm'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.gasMedium.message'
+        }
+      ]
+    },
+
+    // 🚬 SMOKE - KHÓI
+    // 🔴 URGENT - Khẩn cấp
+    smoke_emergency: {
+      name: 'rules.templates.smokeEmergency.name',
+      description: 'rules.templates.smokeEmergency.description',
+      priority: 'urgent',
+      cooldownPeriod: null,
+      maxTriggersPerDay: null,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'smoke',
+          operator: '>',
+          value: 700,
+          unit: 'ppm'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.smokeEmergency.message'
+        }
+      ]
+    },
+    
+    // 🟠 HIGH - Cao
+    smoke_high: {
+      name: 'rules.templates.smokeHigh.name',
+      description: 'rules.templates.smokeHigh.description',
+      priority: 'high',
+      cooldownPeriod: 300000, // 5 phút
+      maxTriggersPerDay: 20,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'smoke',
+          operator: '>',
+          value: 301,
+          unit: 'ppm'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.smokeHigh.message'
+        }
+      ]
+    },
+    
+    // 🟢 MEDIUM - Trung bình
+    smoke_medium: {
+      name: 'rules.templates.smokeMedium.name',
+      description: 'rules.templates.smokeMedium.description',
+      priority: 'medium',
+      cooldownPeriod: 900000, // 15 phút
+      maxTriggersPerDay: 10,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'smoke',
+          operator: '>',
+          value: 100,
+          unit: 'ppm'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.smokeMedium.message'
+        }
+      ]
+    }
+  },
+  en: {
+    // 🌡️ TEMPERATURE
+    temp_emergency: {
+      name: 'rules.templates.tempEmergency.name',
+      description: 'rules.templates.tempEmergency.description',
+      priority: 'urgent',
+      cooldownPeriod: null,
+      maxTriggersPerDay: null,
+      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
           sensor: 'temperature',
           operator: '>',
-          value: 35,
+          value: 40,
           unit: '°C'
         }
       ],
       actions: [
         {
           type: 'send_alert',
-          message: 'rules.templates.highTemperature.message'
+          message: 'rules.templates.tempEmergency.message'
         }
       ]
     },
-    low_humidity: {
-      name: 'rules.templates.lowHumidity.name',
-      description: 'rules.templates.lowHumidity.description',
+    
+    temp_high: {
+      name: 'rules.templates.tempHigh.name',
+      description: 'rules.templates.tempHigh.description',
+      priority: 'high',
+      cooldownPeriod: 300000,
+      maxTriggersPerDay: 20,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'temperature',
+          operator: '>',
+          value: 31,
+          unit: '°C'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.tempHigh.message'
+        }
+      ]
+    },
+    
+    temp_low: {
+      name: 'rules.templates.tempLow.name',
+      description: 'rules.templates.tempLow.description',
       priority: 'low',
       cooldownPeriod: 1800000,
       maxTriggersPerDay: 5,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'temperature',
+          operator: '<',
+          value: 15,
+          unit: '°C'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.tempLow.message'
+        }
+      ]
+    },
+
+    // 💧 HUMIDITY
+    humidity_emergency: {
+      name: 'rules.templates.humidityEmergency.name',
+      description: 'rules.templates.humidityEmergency.description',
+      priority: 'urgent',
+      cooldownPeriod: null,
+      maxTriggersPerDay: null,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'humidity',
+          operator: '>',
+          value: 80,
+          unit: '%'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.humidityEmergency.message'
+        }
+      ]
+    },
+    
+    humidity_high: {
+      name: 'rules.templates.humidityHigh.name',
+      description: 'rules.templates.humidityHigh.description',
+      priority: 'high',
+      cooldownPeriod: 600000,
+      maxTriggersPerDay: 15,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'humidity',
+          operator: '>',
+          value: 61,
+          unit: '%'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.humidityHigh.message'
+        }
+      ]
+    },
+    
+    humidity_low: {
+      name: 'rules.templates.humidityLow.name',
+      description: 'rules.templates.humidityLow.description',
+      priority: 'low',
+      cooldownPeriod: 1800000,
+      maxTriggersPerDay: 5,
+      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
@@ -192,30 +447,156 @@ export const RULE_TEMPLATES = {
       actions: [
         {
           type: 'send_alert',
-          message: 'rules.templates.lowHumidity.message'
+          message: 'rules.templates.humidityLow.message'
         }
       ]
     },
-    flame_detection: {
-      name: 'rules.templates.flameDetection.name',
-      description: 'rules.templates.flameDetection.description',
+
+    // 🧪 GAS
+    gas_emergency: {
+      name: 'rules.templates.gasEmergency.name',
+      description: 'rules.templates.gasEmergency.description',
       priority: 'urgent',
+      cooldownPeriod: null,
+      maxTriggersPerDay: null,
+      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
-          sensor: 'smoke',
-          operator: '==',
-          value: 1,
-          unit: ''
+          sensor: 'gas_ppm',
+          operator: '>',
+          value: 1000,
+          unit: 'ppm'
         }
       ],
       actions: [
         {
           type: 'send_alert',
-          message: 'rules.templates.flameDetection.message'
+          message: 'rules.templates.gasEmergency.message'
         }
       ]
     },
+    
+    gas_high: {
+      name: 'rules.templates.gasHigh.name',
+      description: 'rules.templates.gasHigh.description',
+      priority: 'high',
+      cooldownPeriod: 300000,
+      maxTriggersPerDay: 20,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'gas_ppm',
+          operator: '>',
+          value: 401,
+          unit: 'ppm'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.gasHigh.message'
+        }
+      ]
+    },
+    
+    gas_medium: {
+      name: 'rules.templates.gasMedium.name',
+      description: 'rules.templates.gasMedium.description',
+      priority: 'medium',
+      cooldownPeriod: 900000,
+      maxTriggersPerDay: 10,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'gas_ppm',
+          operator: '>',
+          value: 200,
+          unit: 'ppm'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.gasMedium.message'
+        }
+      ]
+    },
+
+    // 🚬 SMOKE
+    smoke_emergency: {
+      name: 'rules.templates.smokeEmergency.name',
+      description: 'rules.templates.smokeEmergency.description',
+      priority: 'urgent',
+      cooldownPeriod: null,
+      maxTriggersPerDay: null,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'smoke',
+          operator: '>',
+          value: 700,
+          unit: 'ppm'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.smokeEmergency.message'
+        }
+      ]
+    },
+    
+    smoke_high: {
+      name: 'rules.templates.smokeHigh.name',
+      description: 'rules.templates.smokeHigh.description',
+      priority: 'high',
+      cooldownPeriod: 300000,
+      maxTriggersPerDay: 20,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'smoke',
+          operator: '>',
+          value: 301,
+          unit: 'ppm'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.smokeHigh.message'
+        }
+      ]
+    },
+    
+    smoke_medium: {
+      name: 'rules.templates.smokeMedium.name',
+      description: 'rules.templates.smokeMedium.description',
+      priority: 'medium',
+      cooldownPeriod: 900000,
+      maxTriggersPerDay: 10,
+      conditionLogic: 'AND',
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'smoke',
+          operator: '>',
+          value: 100,
+          unit: 'ppm'
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.smokeMedium.message'
+        }
+      ]
+    }
   }
 };
 

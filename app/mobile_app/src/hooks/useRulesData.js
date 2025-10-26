@@ -9,7 +9,7 @@ import { useLanguage } from './useLanguage';
 const log = createLogger('useRulesData');
 
 export const useRulesData = () => {
-  const { user } = useAuth();
+  const { token } = useAuth();
   const { language } = useLanguage();
   const [rules, setRules] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -33,9 +33,9 @@ export const useRulesData = () => {
 
   const loadRules = async (selectedDevice) => {
     try {
-      log.info('Loading rules for user:', user?.id);
+      log.info('Loading rules for device:', selectedDevice);
       const params = selectedDevice ? { deviceId: selectedDevice } : {};
-      const response = await rulesService.getAllRules(user?.id, params);
+      const response = await rulesService.getAllRules(params, token);
       log.debug('Rules response:', response);
       
       if (response.success) {

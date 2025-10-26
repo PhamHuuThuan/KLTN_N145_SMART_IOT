@@ -138,7 +138,6 @@ const styles = StyleSheet.create({
   templateMeta: {
     marginTop: 8,
   },
-  // category removed
   templateStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',

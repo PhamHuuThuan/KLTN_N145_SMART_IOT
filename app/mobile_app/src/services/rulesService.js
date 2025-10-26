@@ -1,94 +1,96 @@
 import environment from '../config/environment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createLogger } from '../utils/logger';
 
 class RulesService {
   constructor() {
     this.baseURL = environment.getApiUrl('GATEWAY');
-  }
-
-  async getAuthHeaders(extra = {}) {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      return {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        ...extra
-      };
-    } catch (_) {
-      return { 'Content-Type': 'application/json', ...extra };
-    }
+    this.log = createLogger('RulesService');
   }
 
   // Get authentication token from storage
   async getAuthToken() {
     try {
       const token = await AsyncStorage.getItem('authToken');
+      if (!token || token === 'null' || token === 'undefined') {
+        this.log.warn('Invalid token from AsyncStorage, user may need to login again');
+        return null;
+      }
+      this.log.debug('Token retrieved from AsyncStorage');
       return token;
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      this.log.error('Error getting auth token:', error);
       return null;
     }
   }
 
+
   // Get all rules for a user
-  async getAllRules(ownerId, params = {}) {
+  async getAllRules(params = {}, token = null) {
     try {
       const queryParams = new URLSearchParams({
         ...params
       });
       
-      const token = await this.getAuthToken();
+      const authToken = token || await this.getAuthToken();
+      
+      if (!authToken) {
+        throw new Error('No authentication token available');
+      }
 
       const response = await fetch(`${this.baseURL}/api/rules?${queryParams}`, {
         method: 'GET',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
         },
       });
 
-      console.log('Rules API response status:', response.status);
+      this.log.debug('Rules API response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Rules API error response:', errorText);
+        this.log.error('Rules API error response:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Rules API response data:', data);
+      this.log.debug('Rules loaded successfully:', data?.data?.length || 0, 'rules');
       return data;
     } catch (error) {
-      console.error('Error fetching rules:', error);
+      this.log.error('Error fetching rules:', error);
       throw error;
     }
   }
 
 
   // Create new rule
-  async createRule(ruleData) {
+  async createRule(ruleData, token = null) {
     try {
-      const token = await this.getAuthToken();     
+      // Use provided token or get from storage
+      const authToken = token || await this.getAuthToken();
       
-      // Ensure ownerId is included in ruleData
-      if (!ruleData.ownerId) {
-        console.warn('⚠️ No ownerId in ruleData, this may cause issues');
+      if (!authToken) {
+        throw new Error('No authentication token available');
       }
       
-      console.log('📤 Creating rule with data:', JSON.stringify(ruleData, null, 2));
+      if (!ruleData.deviceId) {
+        this.log.warn('No deviceId in ruleData, this may cause issues');
+      }
+      
+      this.log.info('Creating rule:', ruleData.name);
 
       const response = await fetch(`${this.baseURL}/api/rules`, {
         method: 'POST',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify(ruleData),
       });
 
       const responseText = await response.text();
+      this.log.debug('Create rule response:', response.status);
 
       if (!response.ok) {
         let errorMessage = `HTTP error! status: ${response.status}`;
@@ -102,67 +104,58 @@ class RulesService {
       }
 
       const data = JSON.parse(responseText);
-      console.log('Parsed response data:', data);
+      this.log.info('Rule created successfully:', data?.data?.name || 'Unknown');
       return data;
     } catch (error) {
-      console.error('Error creating rule:', error);
+      this.log.error('Error creating rule:', error);
       throw error;
     }
   }
 
   // Create rule from template
-  async createRuleFromTemplate(template, ownerId, deviceId, customizations = {}) {
+  async createRuleFromTemplate(template, deviceId, customizations = {}, token = null) {
     try {
-      console.log('createRuleFromTemplate called with:', { template, ownerId, deviceId, customizations });
+      this.log.info('Creating rule from template:', template.name);
       
-      // Validate required parameters
       if (!template) {
         throw new Error('Template is required');
-      }
-      if (!ownerId) {
-        throw new Error('Owner ID is required');
       }
       if (!deviceId) {
         throw new Error('Device ID is required');
       }
 
-      // Create rule data from template
       const ruleData = {
         name: customizations.name || template.name,
         description: customizations.description || template.description,
-        ownerId,
         deviceId,
         priority: template.priority || 'medium',
         maxTriggersPerDay: template.maxTriggersPerDay || (template.priority === 'urgent' ? null : 10),
         cooldownPeriod: template.cooldownPeriod || (template.priority === 'urgent' ? null : 300000),
-        isActive: true, // Always active by default when created from template
+        isActive: true,
         conditions: template.conditions,
         conditionLogic: template.conditionLogic || 'AND',
         actions: template.actions,
         ...customizations
       };
 
-      // Create the rule
-      const result = await this.createRule(ruleData);
-      console.log('Create rule result:', result);
+      const result = await this.createRule(ruleData, token);
       return result;
     } catch (error) {
-      console.error('Error creating rule from template:', error);
+      this.log.error('Error creating rule from template:', error);
       throw error;
     }
   }
 
   // Update rule
-  async updateRule(ruleId, updateData) {
+  async updateRule(ruleId, updateData, token = null) {
     try {
-      const token = await this.getAuthToken();
+      const authToken = token || await this.getAuthToken();
       
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
         method: 'PATCH',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify(updateData),
       });
@@ -173,25 +166,24 @@ class RulesService {
       }
 
       const data = await response.json();
-      console.log('Update rule result:', data);
+      this.log.info('Rule updated successfully');
       return data;
     } catch (error) {
-      console.error('Error updating rule:', error);
+      this.log.error('Error updating rule:', error);
       throw error;
     }
   }
 
   // Delete rule
-  async deleteRule(ruleId) {
+  async deleteRule(ruleId, token = null) {
     try {
-      const token = await this.getAuthToken();
+      const authToken = token || await this.getAuthToken();
       
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
         method: 'DELETE',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
         },
       });
 
@@ -201,25 +193,24 @@ class RulesService {
       }
 
       const data = await response.json();
-      console.log('Delete rule result:', data);
+      this.log.info('Rule deleted successfully');
       return data;
     } catch (error) {
-      console.error('Error deleting rule:', error);
+      this.log.error('Error deleting rule:', error);
       throw error;
     }
   }
 
   // Toggle rule status
-  async toggleRuleStatus(ruleId, isActive) {
+  async toggleRuleStatus(ruleId, isActive, token = null) {
     try {
-      const token = await this.getAuthToken();
+      const authToken = token || await this.getAuthToken();
       
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}/status`, {
         method: 'PATCH',
-        headers: await this.getAuthHeaders(),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({ isActive }),
       });
@@ -230,16 +221,16 @@ class RulesService {
       }
 
       const data = await response.json();
-      console.log('Toggle rule status result:', data);
+      this.log.info('Rule status toggled successfully');
       return data;
     } catch (error) {
-      console.error('Error toggling rule status:', error);
+      this.log.error('Error toggling rule status:', error);
       throw error;
     }
   }
 
   // Respond to an alert related to a rule (acknowledged | dismissed | false_alarm)
-  async respondToAlert(ruleId, response, metadata = {}, timeoutMs = undefined) {
+  async respondToAlert(ruleId, response, metadata = {}, timeoutMs = undefined, token = null) {
     try {
       if (!ruleId || !response) {
         throw new Error('ruleId and response are required');
@@ -249,12 +240,12 @@ class RulesService {
         throw new Error('Invalid response type');
       }
 
-      const token = await this.getAuthToken();
+      const authToken = token || await this.getAuthToken();
       const res = await fetch(`${this.baseURL}/api/rules/${ruleId}/respond`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({ response, metadata, ...(timeoutMs ? { timeoutMs } : {}) }),
       });
@@ -265,7 +256,7 @@ class RulesService {
       }
       return await res.json();
     } catch (error) {
-      console.error('respondToAlert error:', error);
+      this.log.error('respondToAlert error:', error);
       throw error;
     }
   }

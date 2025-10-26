@@ -13,7 +13,7 @@ const notificationSchema = Joi.object({
   }),
   title: Joi.string().max(200).required(),
   message: Joi.string().max(1000).required(),
-  type: Joi.string().valid('device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion', 'acknowledged', 'dismissed', 'false_alarm', 'consolidated_alert').required(),
+  type: Joi.string().valid('device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion', 'acknowledged', 'dismissed', 'false_alarm', 'consolidated_alert', 'escalation_alert').required(),
   priority: Joi.string().valid('low', 'medium', 'high', 'urgent').default('medium'),
   metadata: Joi.object({
     deviceId: Joi.string(),

@@ -27,7 +27,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion', 'acknowledged', 'dismissed', 'false_alarm', 'consolidated_alert'],
+    enum: ['device_alert', 'system_notification', 'security_alert', 'maintenance', 'promotion', 'acknowledged', 'dismissed', 'false_alarm', 'consolidated_alert', 'escalation_alert'],
     required: true
   },
   priority: {

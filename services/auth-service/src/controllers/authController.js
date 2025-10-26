@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import axios from 'axios';
+import logger from '../utils/logger.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-strong-secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
@@ -23,8 +24,9 @@ export const register = async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, passwordHash, name, phone, avatar });
-    const token = signToken({ sub: user._id.toString(), email });
+    const userId = User.generateUserId();
+    const user = await User.create({ userId, email, passwordHash, name, phone, avatar });
+    const token = signToken({ sub: user.userId, email });
 
     // Fire-and-forget: initialize notification preferences in alerts-service
     (async () => {
@@ -33,7 +35,7 @@ export const register = async (req, res) => {
         
         // Create service-to-service token for internal communication
         const serviceToken = signToken({ 
-          sub: user._id.toString(), 
+          sub: user.userId, 
           email: email,
           role: 'service',
           service: 'auth-service'
@@ -80,61 +82,10 @@ export const register = async (req, res) => {
           }
         });
         
-        console.log('✅ UserNotificationPreferences created for user:', user._id.toString(), 'Response:', response.status);
+        logger.info('✅ UserNotificationPreferences created for user:', user._id.toString());
       } catch (e) {
         // Log only, do not block registration
-        console.warn('❌ Failed to initialize notification preferences:', e?.message || e);
-        console.warn('❌ Error details:', {
-          status: e.response?.status,
-          data: e.response?.data,
-          url: e.config?.url,
-          headers: e.config?.headers
-        });
-        
-        // Retry after 2 seconds
-        setTimeout(async () => {
-          try {
-            console.log('🔄 Retrying to create notification preferences...');
-            const alertsBaseUrl = process.env.ALERTS_SERVICE_URL || 'http://localhost:3004';
-            const serviceToken = signToken({ 
-              sub: user._id.toString(), 
-              email: email,
-              role: 'service',
-              service: 'auth-service'
-            });
-            
-            const retryClient = axios.create({
-              baseURL: `${alertsBaseUrl}/api/notifications`,
-              timeout: 10000,
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${serviceToken}`
-              }
-            });
-            
-            await retryClient.put(`/user/${user._id.toString()}/preferences`, {
-              email: { enabled: true, address: email, verified: false },
-              sms: { enabled: false, phoneNumber: '', verified: false },
-              fcm: { enabled: true, tokens: [] },
-              inApp: { enabled: true },
-              quietHours: {
-                enabled: false,
-                startTime: '22:00',
-                endTime: '08:00',
-                timezone: 'UTC',
-                exceptions: [
-                  { type: 'urgent', enabled: true },
-                  { type: 'security', enabled: true },
-                  { type: 'system', enabled: true }
-                ]
-              }
-            });
-            
-            console.log('✅ UserNotificationPreferences created on retry for user:', user._id.toString());
-          } catch (retryError) {
-            console.error('❌ Retry failed to create notification preferences:', retryError?.message || retryError);
-          }
-        }, 2000);
+        logger.warn('❌ Failed to initialize notification preferences:', e?.message || e);
       }
     })();
 
@@ -151,6 +102,7 @@ export const register = async (req, res) => {
       }
     });
   } catch (err) {
+    logger.error('Registration error:', err);
     res.status(500).json({ error: 'registration_failed' });
   }
 };
@@ -172,7 +124,7 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'invalid_credentials' });
     }
 
-    const token = signToken({ sub: user._id.toString(), email });
+    const token = signToken({ sub: user.userId, email });
 
     res.json({
       token,

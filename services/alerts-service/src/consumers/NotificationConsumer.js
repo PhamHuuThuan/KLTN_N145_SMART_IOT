@@ -45,7 +45,7 @@ class NotificationConsumer {
         userId,
         title: this._getAlertTitle(alertType, sensorType),
         message: this._getAlertMessage(alertType, sensorType, sensorValue, threshold),
-        type: effectiveCategory === 'security' ? 'security_alert' : 'device_alert',
+        type: message.type || (effectiveCategory === 'security' ? 'security_alert' : 'device_alert'),
         category: effectiveCategory,
         priority: effectivePriority,
         metadata: {

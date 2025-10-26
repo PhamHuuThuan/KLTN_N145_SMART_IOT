@@ -1,6 +1,8 @@
+import logger from '../utils/logger.js';
+
 // Global error handler middleware
 export const errorHandler = (err, req, res, next) => {
-  console.error('❌ Error:', err);
+  logger.error('❌ Error:', err);
 
   if (err?.name === 'ValidationError') {
     const errors = Object.values(err.errors || {}).map(e => e.message);
