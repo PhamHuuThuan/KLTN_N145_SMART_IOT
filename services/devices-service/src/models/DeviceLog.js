@@ -68,10 +68,11 @@ const deviceLogSchema = new mongoose.Schema({
     type: Date
   },
   metadata: {
-    source: { type: String, default: 'esp32' },
-    version: { type: String, default: '1.0' },
-    ip: { type: String },
-    mac: { type: String }
+    type: mongoose.Schema.Types.Mixed,
+    default: {
+      source: 'esp32',
+      version: '1.0'
+    }
   }
 }, {
   timestamps: true

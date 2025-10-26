@@ -35,10 +35,10 @@ class FCMService {
           });
         }
         this.initialized = true;
-        logger.info('🔔 FCM service initialized successfully');
+        logger.info('FCM service initialized successfully');
       } else {
         // Only log as info, not warning, since FCM is optional
-        logger.info('🔔 FCM service disabled - Firebase credentials not provided');
+        logger.info('FCM service disabled - Firebase credentials not provided');
       }
     } catch (error) {
       logger.error('Failed to initialize FCM service:', error);
