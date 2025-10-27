@@ -511,19 +511,7 @@ export const getDeviceStatus = async (req, res) => {
     }
     
     const device = ownershipCheck.device;
-    const latestLog = await DeviceLog.findOne({ deviceId })
-      .sort({ createdAt: -1 });
-    const status = {
-      deviceId: device.deviceId,
-      name: device.name,
-      status: device.status,
-      online: device.isOnline(),
-      lastSeenAt: device.lastSeenAt,
-      emergencyMode: device.emergencyMode,
-      outlets: device.outlets,
-      latestTelemetry: latestLog ? latestLog.payload : null,
-      lastUpdate: latestLog ? latestLog.createdAt : null
-    };
+    const status = device;
     
     res.json({
       success: true,
