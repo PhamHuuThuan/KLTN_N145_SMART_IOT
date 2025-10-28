@@ -127,14 +127,27 @@ async function startLogConsumer() {
     
     logger.info('Subscribed to topics: iot.telemetry.logs, iot.events.logs');
 
+    // Utility: per-op timeout to avoid stalling the consumer
+    const withTimeout = async (promise, ms, label) => {
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${label} after ${ms}ms`)), ms));
+      return Promise.race([promise, timeout]);
+    };
+
     await consumer.run({
       autoCommit: true,
       autoCommitInterval: 5000,
+      // optionally: partitionsConsumedConcurrently: 3,
       eachMessage: async ({ topic, partition, message }) => {
         try {
           logger.info(`LogConsumer received message from topic: ${topic}, partition: ${partition}`);
           
-          const logData = JSON.parse(message.value.toString());
+          let logData;
+          try {
+            logData = JSON.parse(message.value.toString());
+          } catch (parseErr) {
+            logger.error(`Invalid JSON message, skipping: ${parseErr.message}`);
+            return; // skip this message
+          }
           logger.info(`Processing ${logData.type} from ${logData.deviceId}`);
 
           // Create and save device log (including event/ack)
@@ -169,27 +182,36 @@ async function startLogConsumer() {
             }
             
             const deviceLog = new DeviceLog(logToSave);
-            await deviceLog.save();
+            await withTimeout(deviceLog.save(), 2000, 'saving device log');
             savedLog = deviceLog;
           } catch (saveError) {
-            logger.error(`Error saving device log:`, saveError);
+            logger.error(`Error saving device log (skipped): ${saveError.message}`);
           }
           
           // Update device status if it's telemetry or event data (skip ack events)
           if ((logData.type === 'telemetry' || (logData.type === 'event' && !logData.payload?.ack)) && logData.deviceId) {
-            logger.info(`Updating device status for ${logData.deviceId}`);
-            await updateDeviceStatus(logData);
-            logger.info(`Device status updated for ${logData.deviceId}`);
+            try {
+              logger.info(`Updating device status for ${logData.deviceId}`);
+              await withTimeout(updateDeviceStatus(logData), 1500, 'updating device status');
+              logger.info(`Device status updated for ${logData.deviceId}`);
+            } catch (updErr) {
+              logger.error(`Update device status failed (skipped): ${updErr.message}`);
+            }
           }
           
           // Mark log as processed when we created one
           if (savedLog) {
-            savedLog.markAsProcessed();
-            await savedLog.save();
+            try {
+              savedLog.markAsProcessed();
+              await withTimeout(savedLog.save(), 1500, 'mark processed');
+            } catch (markErr) {
+              logger.error(`Mark processed failed (skipped): ${markErr.message}`);
+            }
           }
 
         } catch (error) {
-          logger.error(`Error processing message from ${topic}:`, error);
+          // Keep errors contained per-message, never throw to KafkaJS runner
+          logger.error(`Error processing message from ${topic}: ${error.message}`);
         }
       },
     });
