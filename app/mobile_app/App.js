@@ -19,6 +19,9 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import NotificationScreen from './src/screens/NotificationScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import VerifyResetCodeScreen from './src/screens/VerifyResetCodeScreen';
+import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import CONFIG from './src/constants/config';
 import apiService from './src/services/apiService';
 import rulesService from './src/services/rulesService';
@@ -92,13 +95,19 @@ function AppContent() {
           return <LoginScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Login') }} />;
         case 'Register':
           return <RegisterScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Login') }} />;
+        case 'ForgotPassword':
+          return <ForgotPasswordScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Login') }} />;
+        case 'VerifyResetCode':
+          return <VerifyResetCodeScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('ForgotPassword') }} />;
+        case 'ResetPassword':
+          return <ResetPasswordScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('VerifyResetCode') }} />;
         default:
           return <LoginScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Login') }} />;
       }
     }
 
     // Reset to Main screen and Home tab when authenticated (fix for registration/login redirect issue)
-    if (currentScreen !== 'Main' && !['Notifications', 'NotificationSettingsFromNotifications', 'NotificationSettingsFromSettings', 'Profile', 'ChangePassword'].includes(currentScreen)) {
+    if (currentScreen !== 'Main' && !['Notifications', 'NotificationSettingsFromNotifications', 'NotificationSettingsFromSettings', 'Profile', 'ChangePassword', 'ForgotPassword', 'VerifyResetCode', 'ResetPassword'].includes(currentScreen)) {
       setCurrentScreen('Main');
       setActiveTab('Home'); // Always go to Home tab after login
     }
