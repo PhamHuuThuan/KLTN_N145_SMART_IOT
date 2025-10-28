@@ -27,8 +27,6 @@ class SensorConsumer:
                         msg_pack = self.consumer.poll(timeout_ms=1000)
                         for _tp, messages in msg_pack.items():
                             for msg in messages:
-                                logger.info(f"Kafka message received on topic: {msg.topic}")
-                                logger.debug(f"Kafka raw value: {msg.value}")
                                 await self._handle_message(msg.value)
                     except Exception as e:
                         logger.error(f"Consumer loop error: {e}")
@@ -50,25 +48,23 @@ class SensorConsumer:
 
     async def _handle_message(self, doc: Dict):
         try:
-            logger.info(f"Consumer.handle_message input keys: {list(doc.keys())}")
             device_id = doc.get('deviceId') or doc.get('device_id') or 'unknown'
             payload = doc.get('payload', {})
-            mapping = {
+            
+            # Map all sensors at once
+            all_sensors = {
                 'temperature': payload.get('temp'),
                 'humidity': payload.get('humid'),
                 'smoke': payload.get('smoke'),
                 'gas': payload.get('gas_ppm') or payload.get('gas'),
             }
-            mapping = {k: v for k, v in mapping.items() if v is not None}
-            for sensor_type, value in mapping.items():
-                sensor_data = {
-                    'device_id': device_id,
-                    'sensor_type': sensor_type,
-                    'value': float(value),
-                    'timestamp': payload.get('ts'),
-                }
-                logger.info(f"Consumer.mapped -> {sensor_type}={value} for {device_id}")
-                await self.ml_service.process_sensor_data(sensor_data)
+            # Only keep non-None values
+            all_sensors = {k: v for k, v in all_sensors.items() if v is not None}
+            
+            if all_sensors:
+                # Process all sensors together for multi-sensor correlation
+                result = await self.ml_service.process_multi_sensor(device_id, all_sensors)
+                logger.info(f"Kafka: {device_id} -> {len(all_sensors)} sensors, alert={result.get('alert_level') if result else 'none'}")
         except Exception as e:
             logger.error(f"Failed to process message: {e}")
 

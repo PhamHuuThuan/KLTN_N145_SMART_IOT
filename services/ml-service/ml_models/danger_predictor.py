@@ -42,7 +42,12 @@ class DangerPredictor:
         self.scaler = StandardScaler()
         self.is_trained = False
         self.feature_names = []
-        self.threshold = 0.7
+        # Allow threshold override via env var
+        import os as _os
+        try:
+            self.threshold = float(_os.getenv("PREDICTION_THRESHOLD", "0.7"))
+        except Exception:
+            self.threshold = 0.7
         
     def prepare_features(self, data: List[dict]) -> Tuple[np.ndarray, np.ndarray]:
         """Prepare features and labels from sensor data"""
