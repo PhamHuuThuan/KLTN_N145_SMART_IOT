@@ -3,6 +3,7 @@ Kafka consumer that reads device-service events and feeds MLService
 """
 import asyncio
 import logging
+import os
 from typing import Dict
 from config.kafka_config import kafka_config
 
@@ -65,6 +66,45 @@ class SensorConsumer:
                 # Process all sensors together for multi-sensor correlation
                 result = await self.ml_service.process_multi_sensor(device_id, all_sensors)
                 logger.info(f"Kafka: {device_id} -> {len(all_sensors)} sensors, alert={result.get('alert_level') if result else 'none'}")
+
+                # Publish compact device-level alert to Kafka
+                if result:
+                    try:
+                        producer = kafka_config.get_producer()
+                        topic = os.getenv('ALERTS_TOPIC', 'iot.alerts.ml')
+                        msg = {
+                            'device_id': result.get('device_id'),
+                            'overall_score': result.get('overall_score'),
+                            'alert_level': result.get('alert_level'),
+                            'is_danger': result.get('is_danger'),
+                            'correlation_risk': result.get('correlation_risk'),
+                            'max_individual_score': result.get('max_individual_score'),
+                            'timestamp': result.get('timestamp').isoformat() if result.get('timestamp') else None
+                        }
+
+                        # Optional: include top sensors for explainability (top 2 by combined_score)
+                        try:
+                            indiv = result.get('individual_results', {})
+                            top = sorted(
+                                [
+                                    (s, d.get('combined_score', 0.0), d.get('alert_level'))
+                                    for s, d in indiv.items()
+                                ],
+                                key=lambda x: x[1],
+                                reverse=True
+                            )[:2]
+                            msg['top_sensors'] = [
+                                {'sensor': s, 'prediction_score': sc, 'alert_level': lvl}
+                                for (s, sc, lvl) in top
+                            ]
+                        except Exception:
+                            pass
+
+                        producer.send(topic, value=msg, key=device_id)
+                        producer.flush(1)
+                        logger.info(f"KafkaAlert published: topic={topic}, device={device_id}, level={msg['alert_level']}")
+                    except Exception as e:
+                        logger.error(f"Failed to publish alert: {e}")
         except Exception as e:
             logger.error(f"Failed to process message: {e}")
 

@@ -34,6 +34,11 @@ async function createTopics() {
         topic: 'device.emergency',
         numPartitions: 1,
         replicationFactor: 1
+      },
+      {
+        topic: 'iot.alerts.ml',
+        numPartitions: 3,
+        replicationFactor: 1
       }
     ];
 
