@@ -96,9 +96,7 @@ const initializeServices = async () => {
       const messageHandlers = {
         [TOPICS.DEVICE_ALERTS]: (topic, message) => notificationConsumer.handleDeviceAlert(topic, message),
         [TOPICS.NOTIFICATION_REQUESTS]: (topic, message) => notificationConsumer.handleNotificationRequest(topic, message),
-        [TOPICS.USER_ACTIONS]: (topic, message) => notificationConsumer.handleUserAction(topic, message),
-        [TOPICS.SYSTEM_EVENTS]: (topic, message) => notificationConsumer.handleSystemEvent(topic, message),
-        //[TOPICS.OUTLET_TOGGLED]: (topic, message) => notificationConsumer.handleUserAction(topic, message)
+        [TOPICS.USER_ACTIONS]: (topic, message) => notificationConsumer.handleUserAction(topic, message)
       };
       
       await consumeMessages((topic, message) => {

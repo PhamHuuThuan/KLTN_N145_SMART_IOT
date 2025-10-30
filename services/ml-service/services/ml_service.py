@@ -1,0 +1,390 @@
+"""
+Main ML service that coordinates models and predictions (no external deps)
+"""
+import os
+from datetime import datetime
+from typing import Dict, List, Tuple, Optional
+from collections import defaultdict, deque
+from ml_models.anomaly_detector import AnomalyDetector
+from ml_models.danger_predictor import DangerPredictor
+import logging
+
+logger = logging.getLogger(__name__)
+
+class MLService:
+    """Main ML service coordinating models and predictions"""
+
+    def __init__(self):
+        self.anomaly_detector = AnomalyDetector(
+            model_dir=os.getenv("MODEL_SAVE_DIR", "./models")
+        )
+        self.danger_predictor = DangerPredictor(
+            model_dir=os.getenv("MODEL_SAVE_DIR", "./models")
+        )
+
+        # Load models if they exist
+        self.anomaly_detector.load_models()
+        self.danger_predictor.load_models()
+        
+        # In-memory history: device_id -> sensor_type -> last 3 values
+        self.history: Dict[str, Dict[str, deque]] = defaultdict(lambda: defaultdict(lambda: deque(maxlen=3)))
+        
+    async def process_multi_sensor(self, device_id: str, all_sensors: Dict[str, float]) -> Dict:
+        """
+        Process multiple sensors together with correlation analysis
+        
+        Args:
+            device_id: Device identifier
+            all_sensors: Dict of sensor_type -> value
+            
+        Returns:
+            Combined prediction result with correlation analysis
+        """
+        try:
+            logger.info(f"MLMulti: {device_id} -> {list(all_sensors.keys())}")
+            
+            # Individual predictions for each sensor
+            individual_results = {}
+            max_combined_score = 0.0
+            
+            for sensor_type, value in all_sensors.items():
+                if value is None:
+                    continue
+                
+                # Process single sensor
+                anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type)
+                sensor_dict = {sensor_type: value}
+                danger_score, is_danger = self.danger_predictor.predict(sensor_dict)
+                
+                # Domain rule overrides
+                try:
+                    v = float(value)
+                    if sensor_type == "gas":
+                        if v >= 800:
+                            danger_score = max(danger_score, 0.9)
+                        elif v >= 500:
+                            danger_score = max(danger_score, 0.75)
+                        elif v >= 200:
+                            danger_score = max(danger_score, 0.6)
+                    elif sensor_type == "smoke":
+                        if v >= 300:
+                            danger_score = max(danger_score, 0.8)
+                        elif v >= 200:
+                            danger_score = max(danger_score, 0.6)
+                    elif sensor_type == "temperature":
+                        if v >= 50:
+                            danger_score = max(danger_score, 0.9)
+                        elif v >= 45:
+                            danger_score = max(danger_score, 0.7)
+                except Exception:
+                    pass
+                
+                # Update history and analyze trend
+                trend_info = self._update_and_analyze_trend(device_id, sensor_type, float(value))
+                
+                # Combine predictions
+                combined_score = max(anomaly_score, danger_score)
+                if trend_info.get("increasing") or trend_info.get("sudden_spike"):
+                    combined_score = min(1.0, combined_score + 0.1)
+                
+                max_combined_score = max(max_combined_score, combined_score)
+                
+                individual_results[sensor_type] = {
+                    "value": value,
+                    "anomaly_score": anomaly_score,
+                    "danger_score": danger_score,
+                    "combined_score": combined_score,
+                    "is_anomaly": is_anomaly,
+                    "is_danger": is_danger,
+                    "alert_level": self._determine_alert_level(combined_score),
+                    "trend": trend_info
+                }
+            
+            # Multi-sensor correlation analysis
+            correlation_risk = self._analyze_multi_sensor_correlation(all_sensors)
+            
+            # Overall risk (weighted: 70% max individual, 30% correlation)
+            overall_score = 0.7 * max_combined_score + 0.3 * correlation_risk
+            overall_alert = self._determine_alert_level(overall_score)
+            
+            # Determine if critical based on multi-sensor evidence
+            is_critical = (max_combined_score >= 0.7) or (correlation_risk >= 0.8)
+            
+            result = {
+                "device_id": device_id,
+                "overall_score": float(overall_score),
+                "is_danger": is_critical,
+                "alert_level": overall_alert,
+                "max_individual_score": float(max_combined_score),
+                "correlation_risk": float(correlation_risk),
+                "individual_results": individual_results,
+                "timestamp": datetime.now()
+            }
+            
+            logger.info(f"MLMultiOutput: {device_id}, overall={overall_score:.3f}, max_indiv={max_combined_score:.3f}, correlation={correlation_risk:.3f}, alert={overall_alert}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error processing multi-sensor data: {e}")
+            return None
+    
+    def _analyze_multi_sensor_correlation(self, sensors: Dict[str, float]) -> float:
+        """
+        Analyze correlation between multiple sensors to detect fire/danger
+        
+        Returns:
+            Risk score (0-1) based on multi-sensor patterns
+        """
+        try:
+            temp = sensors.get("temperature", 0)
+            humid = sensors.get("humidity", 0)
+            smoke = sensors.get("smoke", 0)
+            gas = sensors.get("gas", 0)
+            
+            risk = 0.0
+            
+            # Fire risk: temp + smoke + gas
+            if temp > 40 or smoke > 100 or gas > 500:
+                fire_score = 0.0
+                if temp > 50:
+                    fire_score += 0.4
+                elif temp > 40:
+                    fire_score += 0.3
+                if smoke > 300:
+                    fire_score += 0.4
+                elif smoke > 200:
+                    fire_score += 0.3
+                elif smoke > 100:
+                    fire_score += 0.2
+                if gas > 800:
+                    fire_score += 0.2
+                elif gas > 500:
+                    fire_score += 0.15
+                elif gas > 200:
+                    fire_score += 0.1
+                
+                # Combination bonus
+                if (temp > 40 and smoke > 100 and gas > 500):
+                    fire_score = min(1.0, fire_score + 0.3)  # Fire triple combo
+                elif (temp > 40 and smoke > 100) or (temp > 40 and gas > 500):
+                    fire_score = min(1.0, fire_score + 0.2)  # Double combo
+                
+                risk = max(risk, fire_score)
+            
+            # Air quality: gas + smoke
+            if gas > 300 or smoke > 150:
+                aqi_score = 0.0
+                if gas > 800:
+                    aqi_score += 0.6
+                elif gas > 500:
+                    aqi_score += 0.4
+                elif gas > 300:
+                    aqi_score += 0.2
+                if smoke > 200:
+                    aqi_score += 0.4
+                elif smoke > 150:
+                    aqi_score += 0.2
+                
+                if gas > 500 and smoke > 200:
+                    aqi_score = min(1.0, aqi_score + 0.2)
+                
+                risk = max(risk, aqi_score)
+            
+            # Overheating: temp + low humidity
+            if temp > 45:
+                overheat_score = 0.5 if temp > 45 else 0.3
+                if humid < 30:
+                    overheat_score += 0.2
+                risk = max(risk, overheat_score)
+            
+            return min(risk, 1.0)
+            
+        except Exception as e:
+            logger.error(f"Error in correlation analysis: {e}")
+            return 0.0
+        
+    async def process_sensor_data(self, sensor_data: Dict) -> Dict:
+        """
+        Process incoming sensor data and generate predictions (single sensor)
+        
+        Args:
+            sensor_data: Dictionary containing sensor data
+            
+        Returns:
+            Dictionary with predictions and alert status
+        """
+        try:
+            logger.info(f"MLInput: {sensor_data.get('device_id')}/{sensor_data.get('sensor_type')}={sensor_data.get('value')}")
+            device_id = sensor_data.get("device_id")
+            sensor_type = sensor_data.get("sensor_type")
+            value = sensor_data.get("value")
+            
+            if not all([device_id, sensor_type, value is not None]):
+                logger.warning("Incomplete sensor data")
+                return None
+            
+            # Anomaly detection
+            anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type)
+            
+            # Danger prediction using all available sensor data
+            sensor_dict = {sensor_type: value}
+            danger_score, is_danger = self.danger_predictor.predict(sensor_dict)
+            
+            # Domain rule overrides (gas/smoke/temperature)
+            try:
+                v = float(value)
+                if sensor_type == "gas":
+                    if v >= 800:
+                        danger_score = max(danger_score, 0.9)
+                        logger.info(f"DomainOverride: gas={v} => danger_score>=0.9")
+                    elif v >= 500:
+                        danger_score = max(danger_score, 0.75)
+                        logger.info(f"DomainOverride: gas={v} => danger_score>=0.75")
+                    elif v >= 200:
+                        danger_score = max(danger_score, 0.6)
+                        logger.info(f"DomainOverride: gas={v} => danger_score>=0.6")
+                elif sensor_type == "smoke":
+                    if v >= 300:
+                        danger_score = max(danger_score, 0.8)
+                        logger.info(f"DomainOverride: smoke={v} => danger_score>=0.8")
+                    elif v >= 200:
+                        danger_score = max(danger_score, 0.6)
+                        logger.info(f"DomainOverride: smoke={v} => danger_score>=0.6")
+                elif sensor_type == "temperature":
+                    if v >= 50:
+                        danger_score = max(danger_score, 0.9)
+                        logger.info(f"DomainOverride: temperature={v} => danger_score>=0.9")
+                    elif v >= 45:
+                        danger_score = max(danger_score, 0.7)
+                        logger.info(f"DomainOverride: temperature={v} => danger_score>=0.7")
+            except Exception:
+                pass
+
+            # Update history and analyze trend
+            trend_info = self._update_and_analyze_trend(device_id, sensor_type, float(value))
+
+            # Combine predictions
+            combined_score = max(anomaly_score, danger_score)
+            if trend_info.get("increasing") or trend_info.get("sudden_spike"):
+                combined_score = min(1.0, combined_score + 0.1)
+                logger.info("TrendBoost: increasing/spike => +0.1 to combined_score")
+            is_critical = is_anomaly or is_danger
+            
+            # Determine alert level
+            alert_level = self._determine_alert_level(combined_score)
+            
+            # Simple session-based false alert filtering
+            should_alert = self._should_trigger_alert(combined_score, alert_level, trend_info)
+            
+            # Compose prediction result (no DB persistence)
+            prediction_result = {
+                "device_id": device_id,
+                "sensor_type": sensor_type,
+                "prediction_type": "danger" if is_danger else "normal",
+                "prediction_score": float(combined_score),
+                "is_danger": is_critical,
+                "is_false_alert": not should_alert,
+                "alert_level": alert_level,
+                "timestamp": datetime.now(),
+                "input_data": sensor_data,
+                "trend": trend_info
+            }
+
+            logger.info(f"MLOutput: {device_id}/{sensor_type}, score={prediction_result['prediction_score']:.3f}, is_danger={prediction_result['is_danger']}, alert={prediction_result['alert_level']}, trend={prediction_result['trend']['trend']}")
+            return prediction_result
+            
+        except Exception as e:
+            logger.error(f"Error processing sensor data: {e}")
+            return None
+    
+    # Alerting removed in minimal version
+    def _update_and_analyze_trend(self, device_id: str, sensor_type: str, value: float) -> Dict:
+        """Maintain last 3 readings and derive simple trend signals."""
+        try:
+            dq = self.history[device_id][sensor_type]
+            dq.append(value)
+            values = list(dq)
+            trend = "stable"
+            increasing = False
+            decreasing = False
+            sudden_spike = False
+            if len(values) >= 3:
+                v1, v2, v3 = values[-3], values[-2], values[-1]
+                increasing = v1 < v2 < v3
+                decreasing = v1 > v2 > v3
+                # Spike if last increases >25% over prev avg
+                prev_avg = (v1 + v2) / 2 if (v1 + v2) != 0 else v2 or v1 or 0
+                sudden_spike = (v3 > prev_avg * 1.25) if prev_avg != 0 else False
+                if increasing:
+                    trend = "increasing"
+                elif decreasing:
+                    trend = "decreasing"
+                elif sudden_spike:
+                    trend = "spike"
+            return {
+                "history": values,
+                "trend": trend,
+                "increasing": increasing,
+                "decreasing": decreasing,
+                "sudden_spike": sudden_spike
+            }
+        except Exception:
+            return {"history": [], "trend": "unknown", "increasing": False, "decreasing": False, "sudden_spike": False}
+
+    def _should_trigger_alert(self, score: float, alert_level: str, trend_info: Dict) -> bool:
+        """Decide alert using score thresholds enhanced by trend context."""
+        # Base threshold
+        base = 0.6
+        # Trend adjustments
+        if trend_info.get("increasing") or trend_info.get("sudden_spike"):
+            base -= 0.1  # more sensitive when rising
+        if trend_info.get("decreasing"):
+            base += 0.1  # less sensitive when falling
+        base = max(0.4, min(0.8, base))
+        return score >= base
+    
+    def _determine_alert_level(self, score: float) -> str:
+        """Determine alert level based on prediction score"""
+        if score >= 0.9:
+            return "critical"
+        elif score >= 0.75:
+            return "high"
+        elif score >= 0.6:
+            return "medium"
+        elif score >= 0.4:
+            return "low"
+        else:
+            return "info"
+    
+    async def train_models(self, training_data: List[Dict]) -> bool:
+        """Train both ML models with new data"""
+        try:
+            logger.info("Starting model training...")
+            
+            # Train anomaly detector
+            anomaly_success = self.anomaly_detector.train(training_data)
+            
+            # Train danger predictor
+            danger_success = self.danger_predictor.train(training_data)
+            
+            if anomaly_success and danger_success:
+                logger.info("✅ Model training completed successfully")
+                return True
+            else:
+                logger.warning("Model training completed with some failures")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error training models: {e}")
+            return False
+    
+    async def get_model_status(self) -> Dict:
+        """Get status of ML models"""
+        return {
+            "anomaly_detector": {
+                "is_trained": self.anomaly_detector.is_trained
+            },
+            "danger_predictor": {
+                "is_trained": self.danger_predictor.is_trained
+            }
+        }

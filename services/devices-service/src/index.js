@@ -41,7 +41,7 @@ const startKafka = async () => {
     
     logger.info('Kafka consumers started');
   } catch (error) {
-    logger.serror('Error connecting to Kafka:', error);
+    logger.error('Error connecting to Kafka:', error);
   }
 };
 

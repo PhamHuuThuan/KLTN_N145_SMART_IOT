@@ -19,9 +19,7 @@ const consumer = kafka.consumer({ groupId: 'alerts-service-group' });
 export const TOPICS = {
   DEVICE_ALERTS: 'device-alerts',
   NOTIFICATION_REQUESTS: 'notification-requests',
-  USER_ACTIONS: 'user-actions',
-  SYSTEM_EVENTS: 'system-events',
-  OUTLET_TOGGLED: 'outlet.toggled',
+  USER_ACTIONS: 'user-actions'
 };
 
 // Connect to Kafka

@@ -319,7 +319,6 @@ class NotificationController {
       
       let preferences = await UserNotificationPreferences.findOne({ userId });
       
-      // Create default preferences if not found
       if (!preferences) {
         logger.info(`Creating default preferences for user ${userId}`);
         preferences = new UserNotificationPreferences({

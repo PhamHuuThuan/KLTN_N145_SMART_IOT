@@ -40,8 +40,8 @@ const userNotificationPreferencesSchema = new mongoose.Schema({
   },
   quietHours: {
     enabled: { type: Boolean, default: false },
-    startTime: { type: String, default: '22:00' }, // HH:MM format
-    endTime: { type: String, default: '08:00' },   // HH:MM format
+    startTime: { type: String, default: '22:00' },
+    endTime: { type: String, default: '08:00' },
     timezone: { type: String, default: 'UTC' },
     exceptions: [{
       type: { type: String, enum: ['urgent', 'security', 'system'] },
@@ -54,9 +54,8 @@ const userNotificationPreferencesSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Method to check if notification should be sent via specific method
+// check if notification should be sent via specific method
 userNotificationPreferencesSchema.methods.shouldSendNotification = function(method, priority = 'medium') {
-  // Check if method is enabled
   if (method === 'email' && !this.email.enabled) {
     return false;
   }
@@ -70,19 +69,18 @@ userNotificationPreferencesSchema.methods.shouldSendNotification = function(meth
     return false;
   }
 
-  // Đơn giản hóa: chỉ urgent bypass tất cả, còn lại theo quiet hours
+  // urgent bypass tất cả, còn lại theo quiet hours
   if (priority === 'urgent') {
-    return true; // Urgent luôn gửi qua tất cả channels
+    return true;
   }
 
-  // Check quiet hours for non-urgent notifications
+  // Check quiet hours
   if (this.quietHours.enabled && priority !== 'urgent') {
     const now = new Date();
     const currentTime = now.toTimeString().slice(0, 5);
     const startTime = this.quietHours.startTime;
     const endTime = this.quietHours.endTime;
     
-    // Handle overnight quiet hours (e.g., 22:00 to 08:00)
     if (startTime > endTime) {
       if (currentTime >= startTime || currentTime <= endTime) {
         return false;
@@ -97,12 +95,10 @@ userNotificationPreferencesSchema.methods.shouldSendNotification = function(meth
   return true;
 };
 
-// Method to add FCM token
+// add FCM token
 userNotificationPreferencesSchema.methods.addFCMToken = function(token, platform) {
-  // Remove existing token if it exists
   this.fcm.tokens = this.fcm.tokens.filter(t => t.token !== token);
   
-  // Add new token
   this.fcm.tokens.push({
     token,
     platform,
@@ -113,13 +109,13 @@ userNotificationPreferencesSchema.methods.addFCMToken = function(token, platform
   return this.save();
 };
 
-// Method to remove FCM token
+// remove FCM token
 userNotificationPreferencesSchema.methods.removeFCMToken = function(token) {
   this.fcm.tokens = this.fcm.tokens.filter(t => t.token !== token);
   return this.save();
 };
 
-// Method to update last used time for FCM token
+// update last used time for FCM token
 userNotificationPreferencesSchema.methods.updateFCMTokenUsage = function(token) {
   const tokenObj = this.fcm.tokens.find(t => t.token === token);
   if (tokenObj) {
@@ -129,13 +125,12 @@ userNotificationPreferencesSchema.methods.updateFCMTokenUsage = function(token) 
   return Promise.resolve(this);
 };
 
-// Static method to get preferences for user
+// get preferences for user
 userNotificationPreferencesSchema.statics.getUserPreferences = function(userId) {
-  // Do not populate User to avoid MissingSchemaError in this service
   return this.findOne({ userId });
 };
 
-// Static method to create default preferences for new user
+// create default preferences for new user
 userNotificationPreferencesSchema.statics.createDefaultPreferences = function(userId, email, phoneNumber = null) {
   return this.create({
     userId,
