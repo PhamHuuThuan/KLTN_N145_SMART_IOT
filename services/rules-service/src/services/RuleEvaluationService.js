@@ -57,13 +57,6 @@ class RuleEvaluationService {
     return { sensorType, sensorValue, threshold, operator };
   }
 
-  // Compute severity elevation based on sensor
-  shouldElevateSecurity(sensorType, sensorValue) {
-    const isGasLeak = sensorType === 'gas_ppm';
-    const isSmoke = sensorType === 'smoke';
-    const tempHigh = sensorType === 'temperature' && Number(sensorValue) >= 80;
-    return isGasLeak || (isSmoke && Number(sensorValue) === 1) || tempHigh;
-  }
 
   // Default title by sensor type
   getDefaultTitle(sensorType) {
@@ -174,32 +167,12 @@ class RuleEvaluationService {
       // Đánh giá tất cả conditions với logic
       const conditionsMet = await this.evaluateConditions(rule.conditions, sensorData, rule.conditionLogic);
       if (!conditionsMet) {
-        // Reset duration tracking if conditions not met
-        if (rule.duration > 0) {
-          rule.resetDurationTracking();
-          await rule.save();
-        }
         return false;
-      }
-
-      // Check duration requirement
-      if (rule.duration > 0) {
-        const durationMet = rule.checkDurationMet();
-        if (!durationMet) {
-          await rule.save(); // Save duration tracking state
-          return false;
-        }
       }
       
       // Increment trigger count and update last triggered time (skip for urgent rules)
       if (!isUrgent) {
         await rule.incrementTriggerCount();
-      }
-      
-      // Reset duration tracking after successful trigger
-      if (rule.duration > 0) {
-        rule.resetDurationTracking();
-        await rule.save();
       }
       
       // Don't execute actions here - let evaluateRules handle it
@@ -222,7 +195,7 @@ class RuleEvaluationService {
     // 1. Kiểm tra daily limit trước
     const hasReachedDailyLimit = await rule.hasReachedDailyLimit();
     if (hasReachedDailyLimit) {
-      logger.warn(`📊 DAILY LIMIT: ${rule.name} đã đạt giới hạn ${rule.maxTriggersPerDay} triggers/ngày - chuyển sang escalation alert`);
+      logger.warn(`🚨 DAILY LIMIT: ${rule.name} đã đạt giới hạn ${rule.maxTriggersPerDay} triggers/ngày - CHUYỂN SANG URGENT`);
       
       // Tạo escalation alert cho daily limit
       await this.createEscalationAlert(rule, sensorData, {
@@ -235,71 +208,37 @@ class RuleEvaluationService {
       return true; // Vẫn trigger nhưng với escalation alert
     }
     
-    // 2. Kiểm tra cooldown cơ bản
-    const canTrigger = await rule.canTrigger();
+    // 2. Kiểm tra cooldown cơ bản VÀ escalation (truyền sensor data)
+    // Sử dụng hàm getSensorInfo() đã có sẵn để tránh duplicate code
+    const { sensorType, sensorValue } = this.getSensorInfo(rule, sensorData);
+    
+    const canTrigger = await rule.canTrigger(sensorValue, sensorType);
     if (canTrigger) {
       return true;
     }
     
-    // 3. Kiểm tra escalation cho từng sensor (chỉ cho non-urgent)
-    for (const condition of rule.conditions) {
-      const { sensor, value: threshold } = condition;
-      const currentValue = sensorData[sensor];
-      
-      if (this.shouldEscalate(sensor, currentValue, threshold, priority)) {
-        logger.warn(`🚨 ESCALATION: ${rule.name} bypassing cooldown - ${sensor}: ${currentValue} (threshold: ${threshold})`);
-        
-        // Track sensor value during cooldown
-        await rule.trackSensorValue(sensor, currentValue);
-        
-        // Tạo escalation alert
-        await this.createEscalationAlert(rule, sensorData, {
-          sensor,
-          currentValue,
-          threshold,
-          reason: 'escalation'
-        });
-        
-        return true;
+    // Nếu không trigger được và đã check escalation trong canTrigger
+    // thì cần check nếu có escalation để gửi alert
+    if (sensorValue && sensorType) {
+      const condition = rule.conditions.find(c => c.sensor === sensorType);
+      if (condition && condition.value) {
+        const escalationMet = rule.shouldEscalate(sensorValue, sensorType);
+        if (escalationMet) {
+          logger.warn(`🚨 ESCALATION → URGENT: ${rule.name} bypassing cooldown - ${sensorType}: ${sensorValue}`);
+          
+          await this.createEscalationAlert(rule, sensorData, {
+            sensor: sensorType,
+            currentValue: sensorValue,
+            threshold: condition.value,
+            reason: 'escalation'
+          });
+          
+          return true;
+        }
       }
     }
     
     return false;
-  }
-
-  // Kiểm tra escalation dựa trên priority (chỉ áp dụng cho non-urgent)
-  shouldEscalate(sensorType, currentValue, threshold, priority) {
-    // Urgent rules không có cooldown nên không cần escalation
-    if (priority === 'urgent') {
-      return false;
-    }
-    
-    const escalationMultipliers = {
-      high: {
-        temperature: 1.2,  // Tăng 20%
-        smoke: 1.5,       // Tăng 50%
-        gas_ppm: 2.0,     // Tăng 100%
-        humidity: 1.3     // Tăng 30%
-      },
-      medium: {
-        temperature: 1.3,  // Tăng 30%
-        smoke: 1.8,       // Tăng 80%
-        gas_ppm: 2.5,     // Tăng 150%
-        humidity: 1.5     // Tăng 50%
-      },
-      low: {
-        temperature: 1.5,  // Tăng 50%
-        smoke: 2.0,       // Tăng 100%
-        gas_ppm: 3.0,     // Tăng 200%
-        humidity: 2.0     // Tăng 100%
-      }
-    };
-    
-    const multipliers = escalationMultipliers[priority] || escalationMultipliers.medium;
-    const multiplier = multipliers[sensorType] || 1.3;
-    const escalationThreshold = threshold * multiplier;
-    
-    return currentValue >= escalationThreshold;
   }
 
   // Tạo escalation alert
@@ -310,26 +249,30 @@ class RuleEvaluationService {
     let title, message;
     
     if (reason === 'daily_limit_exceeded') {
-      title = `🚨 ESCALATION ALERT: ${name} - Daily Limit Exceeded`;
-      message = `⚠️ Rule đã vượt quá giới hạn ${rule.maxTriggersPerDay} triggers/ngày!\n\n` +
+      title = `🚨 CẢNH BÁO KHẨN CẤP: ${name} - Daily Limit Exceeded`;
+      message = `🚨 Rule đã vượt quá giới hạn an toàn ${rule.maxTriggersPerDay} triggers/ngày!\n\n` +
                `📊 Số lần trigger hôm nay: ${rule.triggerCount}/${rule.maxTriggersPerDay}\n` +
+               `⚠️ Tỷ lệ vượt: ${((rule.triggerCount / rule.maxTriggersPerDay - 1) * 100).toFixed(1)}%\n` +
                `⏰ Thời gian: ${new Date().toLocaleString()}\n\n` +
-               `🔄 Hệ thống đã chuyển sang chế độ cảnh báo khẩn cấp để đảm bảo an toàn!`;
+               `🚨 ĐÁNH GIÁ: Tình trạng bất thường - Hệ thống chuyển sang chế độ khẩn cấp!`;
     } else {
-      title = `🚨 ESCALATION ALERT: ${name}`;
-      message = `⚠️ ${sensor} đã tăng đáng kể trong thời gian cooldown!\n\n` +
+      title = `🚨 CẢNH BÁO KHẨN CẤP: ${name}`;
+      const deviationPercent = ((currentValue - threshold) / threshold * 100).toFixed(1);
+      message = `🚨 ${sensor} đã tăng ĐỘT NGỘT và có nguy cơ nguy hiểm!\n\n` +
                `📊 Giá trị hiện tại: ${currentValue}\n` +
                `📈 Ngưỡng ban đầu: ${threshold}\n` +
+               `⚠️ Độ lệch: +${deviationPercent}%\n` +
                `⏰ Thời gian: ${new Date().toLocaleString()}\n\n` +
-               `🔄 Cooldown đã được bỏ qua để cảnh báo kịp thời.`;
+               `🚨 ĐÁNH GIÁ: Tình trạng NGHIÊM TRỌNG - Cần xử lý ngay!`;
     }
     
     const escalationMessage = {
       userId: createdBy,
       title,
       message,
-      priority: priority === 'urgent' ? 'urgent' : 'high',
+      priority: 'urgent', // ✅ LUÔN là URGENT khi có escalation
       type: 'escalation_alert',
+      category: 'security', // ✅ Chuyển sang security để FE hiển thị emergency
       metadata: {
         ruleId: rule._id,
         ruleName: name,
@@ -346,7 +289,7 @@ class RuleEvaluationService {
     };
     
     await this.sendToAlertsService(escalationMessage);
-    logger.info(`Escalation alert sent for rule: ${name} - Reason: ${reason}`);
+    logger.info(`🚨 ESCALATION ALERT sent as URGENT for rule: ${name} - Reason: ${reason}`);
   }
 
   // Đánh giá tất cả conditions của rule với logic AND/OR
@@ -515,7 +458,10 @@ class RuleEvaluationService {
         detailedMessage = this.replacePlaceholders(detailedMessage, sensorData, sensorType, sensorValue, threshold, operator);
       }
 
-      const elevateSecurity = this.shouldElevateSecurity(sensorType, sensorValue);
+      // Determine if this should be elevated to security alert
+      const elevateSecurity = sensorType === 'gas_ppm' || 
+                              (sensorType === 'smoke' && Number(sensorValue) === 1) || 
+                              (sensorType === 'temperature' && Number(sensorValue) >= 80);
 
       // Tạo title với placeholder replacement
       let title = action.title || this.getDefaultTitle(sensorType);
@@ -554,7 +500,9 @@ class RuleEvaluationService {
   // Gửi alert action
   async sendAlertAction(action, rule, sensorData) {
     const { sensorType, sensorValue, threshold } = this.getSensorInfo(rule, sensorData);
-    const elevateSecurity = this.shouldElevateSecurity(sensorType, sensorValue);
+    const elevateSecurity = sensorType === 'gas_ppm' || 
+                            (sensorType === 'smoke' && Number(sensorValue) === 1) || 
+                            (sensorType === 'temperature' && Number(sensorValue) >= 80);
 
     if (!rule.createdBy) {
       logger.error(`Rule ${rule.name} has no createdBy, skipping alert`);
