@@ -23,7 +23,7 @@ let latestData = {
 };
 
 function startMqtt() {
-  console.log(`🔌 Connecting to MQTT: ${config.mqtt.host}:${config.mqtt.port}`);
+  logger.info(`Connecting to MQTT: ${config.mqtt.host}:${config.mqtt.port}`);
 
   mqttClient = mqtt.connect(`mqtt://${config.mqtt.host}:${config.mqtt.port}`, {
     clientId: 'mqtt-service-' + Math.random().toString(16).substr(2, 8),
@@ -59,20 +59,22 @@ function startMqtt() {
 
   mqttClient.on('offline', () => {
     mqttConnected = false;
-    console.log('📴 MQTT client offline');
+    logger.info('MQTT client offline');
   });
 
   mqttClient.on('disconnect', () => {
     mqttConnected = false;
-    console.log('🔌 MQTT client disconnected');
+    logger.info('MQTT client disconnected');
   });
 
   mqttClient.on('message', async (topic, message) => {
     try {
       // Extract deviceId from topic (format: iot/{deviceId}/telemetry or iot/{deviceId}/ack)
       const topicParts = topic.split('/');
+      logger.info(`Topic: ${topic}`);
+      logger.info(`Topic parts: ${topicParts}`);
       if (topicParts.length !== 3 || topicParts[0] !== 'iot') {
-        console.error(`❌ Invalid topic format: ${topic}`);
+        logger.error(`Invalid topic format: ${topic}`);
         return;
       }
       
@@ -82,14 +84,14 @@ function startMqtt() {
       // Validate deviceId from database
       const isValidDevice = await deviceService.isValidDevice(deviceId);
       if (!isValidDevice) {
-        console.error(`❌ Invalid or inactive device: ${deviceId}`);
+        logger.error(`Invalid or inactive device: ${deviceId}`);
         return;
       }
       
       const data = JSON.parse(message.toString());
 
       if (messageType === 'telemetry') {
-        console.log(`🌡️ Telemetry from ${deviceId}: temp=${data.temp}°C, humid=${data.humid}%, smoke=${data.smoke}, gas=${data.gas_ppm}ppm`);
+        logger.info(`Telemetry from ${deviceId}: temp=${data.temp}°C, humid=${data.humid}%, smoke=${data.smoke}, gas=${data.gas_ppm}ppm`);
         
         // Store data for this specific device
         const deviceData = {
@@ -153,44 +155,55 @@ function startMqtt() {
 
         publishTelemetryLog(telemetryData)
           .catch(error => {
-            console.error(`❌ Failed to publish to Kafka: ${error.message}`);
+            logger.error(`Failed to publish to Kafka: ${error.message}`);
           });
       } else if (messageType === 'ack') {
-        console.log('✅ ACK received');
+        logger.info('ACK received', data);
         mqttEvents.emit('ack', data);
         
-        // Publish ACK event to Kafka
+        // Get device info to get ownerId
+        const deviceInfo = await deviceService.getDevice(deviceId);
+        const ownerId = deviceInfo?.ownerId;
+        
+        // Publish ACK event to Kafka with outlet info if available
         const ackData = {
           type: 'event',
           deviceId: deviceId,
+          ownerId: ownerId,
           topic,
           payload: {
             ts: Date.now(),
-            ack: true
+            ack: true,
+            // Include outlet info if ESP32 sends it in ACK
+            ...(data.o && { o: data.o })
           },
           severity: 'low',
           metadata: {
             source: 'esp32',
             version: '1.0',
-            ackData: data
+            ackData: data, // Store full ACK data for debugging
+            timestamp: new Date().toISOString(),
+            // Store ACK-specific fields
+            action: data.action,
+            message: data.message,
+            status: data.status
           }
         };
 
         publishEventLog(ackData)
           .catch(error => {
-            console.error(`❌ Failed to publish ACK to Kafka: ${error.message}`);
+            logger.error(`Failed to publish ACK to Kafka: ${error.message}`);
           });
       }
     } catch (err) {
-      console.error(`❌ Error processing MQTT message: ${err.message}`);
-      console.error('📋 Topic:', topic);
+      logger.error(`Error processing MQTT message: ${err.message}`);
     }
   });
 }
 
 function isConnected() {
   const connected = !!mqttClient && mqttConnected;
-  console.log(`🔌 MQTT connection status: ${connected ? '✅ CONNECTED' : '❌ DISCONNECTED'}`);
+  logger.info(`MQTT connection status: ${connected ? 'CONNECTED' : 'DISCONNECTED'}`);
   return connected;
 }
 
@@ -215,27 +228,27 @@ function getDevicesList() {
 }
 
 async function sendCommand(deviceId, action, payload = {}) {
-  console.log(`🔌 sendCommand: ${deviceId}, action: ${action}, payload:`, payload);
+  logger.info(`sendCommand: ${deviceId}, action: ${action}, payload:`, payload);
   
   if (!mqttClient) {
-    console.error('❌ Cannot send command: MQTT client not initialized');
+    logger.error('Cannot send command: MQTT client not initialized');
     return false;
   }
   
   if (!mqttClient.connected) {
-    console.error('❌ Cannot send command: MQTT client not connected');
+    logger.error('Cannot send command: MQTT client not connected');
     return false;
   }
 
   if (!deviceId) {
-    console.error('❌ Cannot send command: deviceId is required');
+    logger.error('Cannot send command: deviceId is required');
     return false;
   }
 
   // Validate deviceId from database
   const isValidDevice = await deviceService.isValidDevice(deviceId);
   if (!isValidDevice) {
-    console.error(`❌ Cannot send command: Invalid or inactive device ${deviceId}`);
+    logger.error(`Cannot send command: Invalid or inactive device ${deviceId}`);
     return false;
   }
 
@@ -247,15 +260,13 @@ async function sendCommand(deviceId, action, payload = {}) {
   };
 
   const cmdTopic = `iot/${deviceId}/cmd`;
-
-  console.log(`📡 Publishing MQTT command to topic: ${cmdTopic}`);
-  console.log(`📋 Command payload:`, JSON.stringify(command, null, 2));
   
   mqttClient.publish(cmdTopic, JSON.stringify(command), { qos: 1 }, (err) => {
     if (err) {
-      console.error(`❌ Failed to publish command: ${err.message}`);
+      logger.error(`Failed to publish command to topic: ${cmdTopic}: ${err.message}`);
     } else {
-      console.log(`✅ MQTT command published successfully`);
+      
+      logger.info(`Command published successfully to topic: ${cmdTopic}`);
     }
   });
 

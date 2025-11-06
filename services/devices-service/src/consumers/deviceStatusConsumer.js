@@ -24,7 +24,6 @@ async function startDeviceStatusConsumer() {
 
     await consumer.subscribe({ 
       topics: [
-        'device.status.updated'
       ],
       fromBeginning: false 
     });

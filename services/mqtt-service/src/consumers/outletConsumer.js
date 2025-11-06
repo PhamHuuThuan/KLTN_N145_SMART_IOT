@@ -16,8 +16,7 @@ async function startOutletConsumer() {
 
     await consumer.subscribe({ 
       topics: [
-        'outlet.toggled',
-        'outlet.settings.updated'
+        'outlet.toggled'
       ],
       fromBeginning: false 
     });
@@ -31,9 +30,6 @@ async function startOutletConsumer() {
           switch (topic) {
             case 'outlet.toggled':
               await handleOutletToggle(messageData);
-              break;
-            case 'outlet.settings.updated':
-              await handleOutletSettingsUpdate(messageData);
               break;
             default:
               logger.warn(`Unknown topic: ${topic}`);
@@ -70,26 +66,12 @@ async function handleOutletToggle(data) {
     if (success) {
       logger.info(`Outlet toggle command sent to device ${deviceId}`);
       
-      // Publish status update to Kafka for real-time updates
       await publishOutletStatusUpdate(deviceId, outletId, status);
     } else {
       logger.error(`Failed to send outlet toggle command to device ${deviceId}`);
     }
   } catch (error) {
     logger.error('Error handling outlet toggle:', error);
-  }
-}
-
-async function handleOutletSettingsUpdate(data) {
-  const { deviceId, outletId, name, type } = data;
-  
-  logger.info(`Processing outlet settings update: ${deviceId}/${outletId} -> ${name} (${type})`);
-
-  try {
-    await mqttClient.updateDeviceOutletSettings(deviceId, outletId, { name, type });
-    logger.info(`Outlet settings updated for device ${deviceId}`);
-  } catch (error) {
-    logger.error('Error handling outlet settings update:', error);
   }
 }
 
@@ -102,21 +84,6 @@ async function publishOutletStatusUpdate(deviceId, outletId, status) {
       return;
     }
     
-    await producer.send({
-      topic: 'device.status.updated',
-      messages: [{
-        key: deviceId,
-        value: JSON.stringify({
-          deviceId,
-          outletId,
-          status,
-          action: 'outlet_status_updated',
-          timestamp: new Date().toISOString()
-        })
-      }]
-    });
-
-    logger.info(`Published outlet status update for ${deviceId}/${outletId}`);
   } catch (error) {
     logger.error('Error publishing outlet status update:', error);
   }

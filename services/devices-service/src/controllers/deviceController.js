@@ -121,21 +121,6 @@ export const createDevice = async (req, res) => {
       existingDevice.name = name || existingDevice.name;
       await existingDevice.save();
       
-      producer.send({
-        topic: 'device.assigned',
-        messages: [{
-          key: deviceId,
-          value: JSON.stringify({
-            deviceId,
-            ownerId: userId,
-            action: 'assigned',
-            timestamp: new Date()
-          })
-        }]
-      }).catch((kafkaError) => {
-        logger.error('Failed to publish device assignment event to Kafka:', kafkaError);
-      });
-      
       return res.status(200).json({
         success: true,
         data: existingDevice,
@@ -160,21 +145,6 @@ export const createDevice = async (req, res) => {
     });
     
     await device.save();
-    
-    producer.send({
-      topic: 'device.created',
-      messages: [{
-        key: deviceId,
-        value: JSON.stringify({
-          deviceId,
-          ownerId: userId,
-          action: 'created',
-          timestamp: new Date()
-        })
-      }]
-    }).catch((kafkaError) => {
-      logger.error('Failed to publish device creation event to Kafka:', kafkaError);
-    });
     
     res.status(201).json({
       success: true,
@@ -215,20 +185,6 @@ export const updateDevice = async (req, res) => {
       { new: true, runValidators: true }
     );
     
-    producer.send({
-      topic: 'device.updated',
-      messages: [{
-        key: deviceId,
-        value: JSON.stringify({
-          deviceId,
-          action: 'updated',
-          timestamp: new Date()
-        })
-      }]
-    }).catch((kafkaError) => {
-      logger.error('Failed to publish device update event to Kafka:', kafkaError);
-    });
-    
     res.json({
       success: true,
       data: device,
@@ -268,20 +224,6 @@ export const deleteDevice = async (req, res) => {
         message: 'Device not found'
       });
     }
-    
-    producer.send({
-      topic: 'device.deleted',
-      messages: [{
-        key: deviceId,
-        value: JSON.stringify({
-          deviceId,
-          action: 'deleted',
-          timestamp: new Date()
-        })
-      }]
-    }).catch((kafkaError) => {
-      logger.error('Failed to publish device deletion event to Kafka:', kafkaError);
-    });
     
     res.json({
       success: true,
@@ -569,19 +511,7 @@ export const getDeviceStatus = async (req, res) => {
     }
     
     const device = ownershipCheck.device;
-    const latestLog = await DeviceLog.findOne({ deviceId })
-      .sort({ createdAt: -1 });
-    const status = {
-      deviceId: device.deviceId,
-      name: device.name,
-      status: device.status,
-      online: device.isOnline(),
-      lastSeenAt: device.lastSeenAt,
-      emergencyMode: device.emergencyMode,
-      outlets: device.outlets,
-      latestTelemetry: latestLog ? latestLog.payload : null,
-      lastUpdate: latestLog ? latestLog.createdAt : null
-    };
+    const status = device;
     
     res.json({
       success: true,
@@ -617,21 +547,6 @@ export const removeDeviceOwnership = async (req, res) => {
     
     device.ownerId = null;
     await device.save();
-    
-    producer.send({
-      topic: 'device.unassigned',
-      messages: [{
-        key: deviceId,
-        value: JSON.stringify({
-          deviceId,
-          previousOwnerId: userId,
-          action: 'unassigned',
-          timestamp: new Date()
-        })
-      }]
-    }).catch((kafkaError) => {
-      logger.error('Failed to publish device unassignment event to Kafka:', kafkaError);
-    });
     
     logger.info(`Device ${deviceId} ownership removed from user ${userId}`);
     

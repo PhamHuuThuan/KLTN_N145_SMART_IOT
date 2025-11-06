@@ -1,5 +1,6 @@
 const { Kafka } = require('kafkajs');
 const config = require('./index');
+const { logger } = require('../utils/logger');
 
 const kafka = new Kafka({
   clientId: 'mqtt-service',
@@ -14,12 +15,12 @@ const producer = kafka.producer();
 
 async function connectKafka() {
   try {
-    console.log('🔌 Connecting to Kafka...');
+    logger.info('Connecting to Kafka...');
     await producer.connect();
-    console.log('✅ Kafka producer connected');
+    logger.info('Kafka producer connected');
     return producer;
   } catch (error) {
-    console.error('❌ Kafka connection failed:', error.message);
+    logger.error('Kafka connection failed:', error.message);
     throw error;
   }
 }
@@ -36,10 +37,10 @@ async function publishTelemetryLog(telemetryData) {
     };
 
     await producer.send(message);
-    console.log(`📤 Published telemetry to Kafka: ${telemetryData.deviceId}`);
+    logger.info(`Published telemetry to Kafka: ${telemetryData.deviceId}`);
     return true;
   } catch (error) {
-    console.error('❌ Failed to publish to Kafka:', error.message);
+    logger.error('Failed to publish to Kafka:', error.message);
     throw error;
   }
 }
@@ -56,10 +57,10 @@ async function publishEventLog(eventData) {
     };
 
     await producer.send(message);
-    console.log(`📤 Published event to Kafka: ${eventData.deviceId}`);
+    logger.info(`Published event to Kafka: ${eventData.deviceId}`);
     return true;
   } catch (error) {
-    console.error('❌ Failed to publish event to Kafka:', error.message);
+    logger.error('Failed to publish event to Kafka:', error.message);
     throw error;
   }
 }
@@ -67,9 +68,9 @@ async function publishEventLog(eventData) {
 async function disconnectKafka() {
   try {
     await producer.disconnect();
-    console.log('🔌 Kafka producer disconnected');
+    logger.info('Kafka producer disconnected');
   } catch (error) {
-    console.error('❌ Error disconnecting Kafka:', error.message);
+    logger.error('Error disconnecting Kafka:', error.message);
   }
 }
 

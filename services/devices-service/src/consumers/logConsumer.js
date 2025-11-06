@@ -27,10 +27,15 @@ const consumer = kafka.consumer({
 async function updateDeviceStatus(data) {
   try {
     const { deviceId, payload, type } = data;
-    logger.info(`Processing ${type} data for device: ${deviceId}`);
     
     if (!deviceId || !payload) {
       logger.error(`Missing deviceId or payload:`, { deviceId, payload });
+      return;
+    }
+    
+    // Skip device update for ACK events (they don't have sensor data)
+    if (type === 'event' && payload.ack) {
+      logger.debug(`ACK event - skipping device update`);
       return;
     }
     
@@ -57,13 +62,12 @@ async function updateDeviceStatus(data) {
           const oldStatus = outlet.status;
           outlet.status = newVal;
           outlet.lastToggleAt = new Date();
-          logger.info(`Outlet ${outletId}: ${oldStatus} -> ${outlet.status}`);
         } else {
           logger.error(`Outlet not found: ${outletId}`);
         }
       });
     } else {
-      logger.error(`No outlet data found in payload for ${type} log`);
+      logger.warn(`No outlet data found in payload for ${type} log`);
     }
     
     let shouldPersist = true;
@@ -79,40 +83,25 @@ async function updateDeviceStatus(data) {
         gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : prev.gas_ppm,
         o: (payload.o || payload.outlets || prev.o || {})
       };
-      logger.info(`Updated latest telemetry:`);
       // Emit to socket clients
+      logger.info(`Emitting telemetry to socket for ${deviceId}`, device.latestTelemetry);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else if (type === 'event' && payload.o) {
-      // For event logs, only update outlet status in latestTelemetry
+      // For event logs with outlet data, update outlet status in latestTelemetry
       if (!device.latestTelemetry) {
         device.latestTelemetry = { ts: Date.now(), o: {} };
       }
       device.latestTelemetry.o = payload.o || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();
-      logger.info(`Updated outlet status in latestTelemetry`);
       // Emit to socket clients
+      logger.info(`Emitting event telemetry to socket for ${deviceId}`, device.latestTelemetry);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
-    } else if (type === 'event' && payload.ack) {
-      // For ack events, only update timestamp and keep existing telemetry
-      logger.info(`ACK event received for device ${deviceId}`);
-      if (!device.latestTelemetry) {
-        device.latestTelemetry = { ts: Date.now(), o: {} };
-      } else {
-        // Only update timestamp, preserve existing sensor values
-        device.latestTelemetry.ts = payload.ts || Date.now();
-      }
-      logger.info(`Updated timestamp for ACK event`);
-      emitDeviceTelemetry(deviceId, device.latestTelemetry);
-      shouldPersist = false;
     } else {
       logger.error(`No sensor data found in ${type} log, keeping existing telemetry`);
     }
     
     if (shouldPersist) {
       await device.save();
-      logger.info(`Device status updated successfully: ${deviceId}`);
-    } else {
-      logger.info(`Skipped DB save for ACK-only update: ${deviceId}`);
     }
     
   } catch (error) {
@@ -129,48 +118,100 @@ async function updateDeviceStatus(data) {
 async function startLogConsumer() {
   try {
     await consumer.connect();
+    logger.info('Kafka consumer connected');
 
     await consumer.subscribe({ 
-      topic: 'iot.telemetry.logs', 
+      topics: ['iot.telemetry.logs', 'iot.events.logs'],
       fromBeginning: false 
     });
+    
+    logger.info('Subscribed to topics: iot.telemetry.logs, iot.events.logs');
 
-    await consumer.subscribe({ 
-      topic: 'iot.events.logs', 
-      fromBeginning: false 
-    });
+    // Utility: per-op timeout to avoid stalling the consumer
+    const withTimeout = async (promise, ms, label) => {
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${label} after ${ms}ms`)), ms));
+      return Promise.race([promise, timeout]);
+    };
 
     await consumer.run({
       autoCommit: true,
       autoCommitInterval: 5000,
+      // optionally: partitionsConsumedConcurrently: 3,
       eachMessage: async ({ topic, partition, message }) => {
         try {
           logger.info(`LogConsumer received message from topic: ${topic}, partition: ${partition}`);
           
-          const logData = JSON.parse(message.value.toString());
+          let logData;
+          try {
+            logData = JSON.parse(message.value.toString());
+          } catch (parseErr) {
+            logger.error(`Invalid JSON message, skipping: ${parseErr.message}`);
+            return; // skip this message
+          }
+          logger.info(`Processing ${logData.type} from ${logData.deviceId}`);
 
-          // Create and save device log 
+          // Create and save device log (including event/ack)
           let savedLog = null;
-          if (!(logData.type === 'event' && logData.payload?.ack === true)) {
-            const deviceLog = new DeviceLog(logData);
-            await deviceLog.save();
+          try {
+            // Handle event/ack logs with minimal payload
+            let logToSave = logData;
+            if (logData.type === 'event' && logData.payload?.ack === true) {
+              // Extract outlet info from ACK if available
+              const ackOutlets = logData.payload.o || logData.metadata?.ackData?.o || {};
+              
+              logToSave = {
+                ...logData,
+                payload: {
+                  ts: logData.payload.ts || Date.now(),
+                  temp: 0,
+                  humid: 0,
+                  smoke: 0,
+                  gas_ppm: 0,
+                  o: {
+                    o1: ackOutlets.o1 ?? false,
+                    o2: ackOutlets.o2 ?? false,
+                    o3: ackOutlets.o3 ?? false,
+                    o4: ackOutlets.o4 ?? false,
+                    o5: ackOutlets.o5 ?? false
+                  }
+                },
+                metadata: {
+                  ...logData.metadata
+                }
+              };
+            }
+            
+            const deviceLog = new DeviceLog(logToSave);
+            await withTimeout(deviceLog.save(), 2000, 'saving device log');
             savedLog = deviceLog;
-          };
+          } catch (saveError) {
+            logger.error(`Error saving device log (skipped): ${saveError.message}`);
+          }
           
-          // Update device status if it's telemetry or event data
-          if ((logData.type === 'telemetry' || logData.type === 'event') && logData.deviceId) {
-            await updateDeviceStatus(logData);
+          // Update device status if it's telemetry or event data (skip ack events)
+          if ((logData.type === 'telemetry' || (logData.type === 'event' && !logData.payload?.ack)) && logData.deviceId) {
+            try {
+              logger.info(`Updating device status for ${logData.deviceId}`);
+              await withTimeout(updateDeviceStatus(logData), 1500, 'updating device status');
+              logger.info(`Device status updated for ${logData.deviceId}`);
+            } catch (updErr) {
+              logger.error(`Update device status failed (skipped): ${updErr.message}`);
+            }
           }
           
           // Mark log as processed when we created one
           if (savedLog) {
-            savedLog.markAsProcessed();
-            await savedLog.save();
-            logger.info(`Device log marked as processed`);
+            try {
+              savedLog.markAsProcessed();
+              await withTimeout(savedLog.save(), 1500, 'mark processed');
+            } catch (markErr) {
+              logger.error(`Mark processed failed (skipped): ${markErr.message}`);
+            }
           }
 
         } catch (error) {
-          logger.error(`Error processing message from ${topic}:`, error);
+          // Keep errors contained per-message, never throw to KafkaJS runner
+          logger.error(`Error processing message from ${topic}: ${error.message}`);
         }
       },
     });
