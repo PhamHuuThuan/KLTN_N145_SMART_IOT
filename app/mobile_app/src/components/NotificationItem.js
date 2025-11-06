@@ -45,6 +45,8 @@ const NotificationItem = ({ notification, onPress }) => {
         return 'construct-outline';
       case 'marketing':
         return 'megaphone-outline';
+      case 'escalation':
+        return 'trending-up-outline';
       default:
         return 'notifications-outline';
     }
@@ -62,6 +64,8 @@ const NotificationItem = ({ notification, onPress }) => {
         return '#8E8E93';
       case 'promotion':
         return '#AF52DE';
+      case 'escalation_alert':
+        return '#FF6B35';
       default:
         return '#8E8E93';
     }
@@ -177,6 +181,26 @@ const NotificationItem = ({ notification, onPress }) => {
                 Ngưỡng: {notification.metadata.threshold}
               </Text>
             )}
+            {notification.metadata.escalationReason && (
+              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
+                Lý do: {notification.metadata.escalationReason}
+              </Text>
+            )}
+            {notification.metadata.cooldownBypassed && (
+              <Text style={[styles.metadataText, { color: '#FF6B35', fontWeight: 'bold' }]}>
+                ⚠️ Cooldown đã được bỏ qua
+              </Text>
+            )}
+            {notification.metadata.dailyLimitExceeded && (
+              <Text style={[styles.metadataText, { color: '#FF0000', fontWeight: 'bold' }]}>
+                🚨 Đã vượt giới hạn daily limit
+              </Text>
+            )}
+            {notification.metadata.triggerCount && notification.metadata.maxTriggersPerDay && (
+              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
+                📊 Triggers: {notification.metadata.triggerCount}/{notification.metadata.maxTriggersPerDay}
+              </Text>
+            )}
           </View>
         )}
 
@@ -184,7 +208,8 @@ const NotificationItem = ({ notification, onPress }) => {
           <View style={styles.badges}>
             <View style={[styles.badge, { backgroundColor: getTypeColor(notification.type || 'system_notification') }]}>
               <Text style={styles.badgeText}>
-                {(notification.type || 'system_notification').replace('_', ' ').toUpperCase()}
+                {notification.type === 'escalation_alert' ? 'ESCALATION' : 
+                 (notification.type || 'system_notification').replace('_', ' ').toUpperCase()}
               </Text>
             </View>
             <View style={[styles.badge, { backgroundColor: getPriorityColor(notification.priority || 'low') }]}>
