@@ -153,14 +153,6 @@ const RulesScreen = () => {
     />
   );
 
-  const renderTemplateItem = ({ item: template }) => (
-    <TemplateCard
-      template={template}
-      onPress={() => openCustomize(template)}
-      isCreating={creatingTemplateId === template.id}
-    />
-  );
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
