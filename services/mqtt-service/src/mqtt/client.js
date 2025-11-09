@@ -17,7 +17,7 @@ let latestData = {
   humidity: null,
   smoke: false,
   gasPpm: null,
-  outlets: { o1: false, o2: false, o3: false, o4: false, o5: false },
+  outlets: { o1: false, o2: false, o3: false, o4: false },
   timestamp: null,
   deviceId: null,
 };
@@ -109,8 +109,7 @@ function startMqtt() {
             o1: (data.o?.o1 ?? null),
             o2: (data.o?.o2 ?? null),
             o3: (data.o?.o3 ?? null),
-            o4: (data.o?.o4 ?? null),
-            o5: (data.o?.o5 ?? null),
+            o4: (data.o?.o4 ?? null)
           },
           timestamp: new Date().toISOString(),
         };
@@ -145,8 +144,7 @@ function startMqtt() {
               o1: (data.o?.o1 ?? null),
               o2: (data.o?.o2 ?? null),
               o3: (data.o?.o3 ?? null),
-              o4: (data.o?.o4 ?? null),
-              o5: (data.o?.o5 ?? null),
+              o4: (data.o?.o4 ?? null)
             }
           },
           severity: 'low',

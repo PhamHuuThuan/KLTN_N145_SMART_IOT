@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { OUTLET_VALUES } from '../constants/outlets.js';
 
 // Device validation schemas
 export const deviceSchema = Joi.object({
@@ -10,7 +11,7 @@ export const deviceSchema = Joi.object({
     floor: Joi.string().trim().max(10)
   }),
   outlets: Joi.array().items(Joi.object({
-    id: Joi.string().valid('o1', 'o2', 'o3', 'o4', 'o5').required(),
+    id: Joi.string().valid(...OUTLET_VALUES).required(),
     name: Joi.string().required().trim().min(2).max(100),
     type: Joi.string().valid('kitchen', 'safety').required(),
     status: Joi.boolean().default(false),
@@ -41,7 +42,7 @@ export const deviceUpdateSchema = Joi.object({
     floor: Joi.string().trim().max(10)
   }),
   outlets: Joi.array().items(Joi.object({
-    id: Joi.string().valid('o1', 'o2', 'o3', 'o4', 'o5').required(),
+    id: Joi.string().valid(...OUTLET_VALUES).required(),
     name: Joi.string().required().trim().min(2).max(100),
     type: Joi.string().valid('kitchen', 'safety').required(),
     status: Joi.boolean().default(false),
@@ -80,8 +81,7 @@ export const deviceLogSchema = Joi.object({
       o1: Joi.boolean().default(false),
       o2: Joi.boolean().default(false),
       o3: Joi.boolean().default(false),
-      o4: Joi.boolean().default(false),
-      o5: Joi.boolean().default(false)
+      o4: Joi.boolean().default(false)
     }).required()
   }).required(),
   severity: Joi.string().valid('low', 'medium', 'high', 'critical').default('low'),

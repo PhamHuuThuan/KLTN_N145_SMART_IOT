@@ -29,8 +29,7 @@ const telemetrySchema = new mongoose.Schema({
     o1: { type: Boolean, default: false },
     o2: { type: Boolean, default: false },
     o3: { type: Boolean, default: false },
-    o4: { type: Boolean, default: false },
-    o5: { type: Boolean, default: false }
+    o4: { type: Boolean, default: false }
   }
 }, { _id: false });
 

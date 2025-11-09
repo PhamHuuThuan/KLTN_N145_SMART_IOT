@@ -25,11 +25,6 @@
         "id": "o4",
         "name": "Kitchen Outlet 4",
         "status": false
-      },
-      {
-        "id": "o5",
-        "name": "Kitchen Outlet 5",
-        "status": false
       }
     ],
     "emergencyMode": false,

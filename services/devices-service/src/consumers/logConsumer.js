@@ -199,12 +199,11 @@ async function startLogConsumer() {
                   smoke: 0,
                   gas_ppm: 0,
                   o: {
-                    o1: ackOutlets.o1 ?? false,
-                    o2: ackOutlets.o2 ?? false,
-                    o3: ackOutlets.o3 ?? false,
-                    o4: ackOutlets.o4 ?? false,
-                    o5: ackOutlets.o5 ?? false
-                  }
+                        o1: ackOutlets.o1 ?? false,
+                        o2: ackOutlets.o2 ?? false,
+                        o3: ackOutlets.o3 ?? false,
+                        o4: ackOutlets.o4 ?? false
+                      }
                 },
                 metadata: {
                   ...logData.metadata
