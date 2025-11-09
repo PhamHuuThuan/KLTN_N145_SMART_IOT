@@ -40,7 +40,15 @@ function startMqtt() {
   mqttClient.on('connect', () => {
     mqttConnected = true;
     logger.info('MQTT connected');
-    mqttClient.subscribe(['iot/+/telemetry', 'iot/+/ack']);
+    const topics = ['iot/+/telemetry', 'iot/+/ack'];
+    logger.info(`Subscribing to topics: ${topics.join(', ')}`);
+    mqttClient.subscribe(topics, (err, granted) => {
+      if (err) {
+        logger.error(`Subscription error: ${err.message}`);
+      } else {
+        logger.info(`Subscription successful. Granted:`, granted);
+      }
+    });
   });
 
   mqttClient.on('close', () => {
@@ -71,10 +79,7 @@ function startMqtt() {
     try {
       // Extract deviceId from topic (format: iot/{deviceId}/telemetry or iot/{deviceId}/ack)
       const topicParts = topic.split('/');
-      logger.info(`Topic: ${topic}`);
-      logger.info(`Topic parts: ${topicParts}`);
       if (topicParts.length !== 3 || topicParts[0] !== 'iot') {
-        logger.error(`Invalid topic format: ${topic}`);
         return;
       }
       
@@ -84,14 +89,12 @@ function startMqtt() {
       // Validate deviceId from database
       const isValidDevice = await deviceService.isValidDevice(deviceId);
       if (!isValidDevice) {
-        logger.error(`Invalid or inactive device: ${deviceId}`);
         return;
       }
       
       const data = JSON.parse(message.toString());
 
       if (messageType === 'telemetry') {
-        logger.info(`Telemetry from ${deviceId}: temp=${data.temp}°C, humid=${data.humid}%, smoke=${data.smoke}, gas=${data.gas_ppm}ppm`);
         
         // Store data for this specific device
         const deviceData = {
@@ -158,7 +161,7 @@ function startMqtt() {
             logger.error(`Failed to publish to Kafka: ${error.message}`);
           });
       } else if (messageType === 'ack') {
-        logger.info('ACK received', data);
+        logger.info(`ACK received from ${deviceId}:`, data);
         mqttEvents.emit('ack', data);
         
         // Get device info to get ownerId
@@ -191,6 +194,9 @@ function startMqtt() {
         };
 
         publishEventLog(ackData)
+          .then(() => {
+            logger.info(`Published event to Kafka: ${deviceId}`);
+          })
           .catch(error => {
             logger.error(`Failed to publish ACK to Kafka: ${error.message}`);
           });
