@@ -1,4 +1,5 @@
 import Device from '../models/Device.js';
+import { OUTLET_TYPES } from '../constants/outletTypes.js';
 import DeviceLog from '../models/DeviceLog.js';
 import { producer } from '../config/kafka.js';
 import logger from '../utils/logger.js';
@@ -128,13 +129,12 @@ export const createDevice = async (req, res) => {
       });
     }
     
-    // Create default outlets
+    // Create default outlets (use centralized OUTLET_TYPES)
     const defaultOutlets = outlets || [
-      { id: 'o1', type: 'kitchen', name: 'Kitchen Outlet 1' },
-      { id: 'o2', type: 'kitchen', name: 'Kitchen Outlet 2' },
-      { id: 'o3', type: 'kitchen', name: 'Kitchen Outlet 3' },
-      { id: 'o4', type: 'safety',  name: 'Safety Outlet 1' },
-      { id: 'o5', type: 'safety',  name: 'Safety Outlet 2' }
+      { id: 'o1', type: OUTLET_TYPES.KITCHEN, name: 'Kitchen Outlet 1' },
+      { id: 'o2', type: OUTLET_TYPES.KITCHEN, name: 'Kitchen Outlet 2' },
+      { id: 'o3', type: OUTLET_TYPES.KITCHEN, name: 'Kitchen Outlet 3' },
+      { id: 'o4', type: OUTLET_TYPES.SAFETY,  name: 'Safety Outlet 1' }
     ];
     
     const device = new Device({

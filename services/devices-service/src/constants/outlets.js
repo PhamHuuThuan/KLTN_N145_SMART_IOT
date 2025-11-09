@@ -1,5 +1,3 @@
-// Centralized outlet identifiers
-// Keys are UPPERCASE (for clarity in code), values remain the string ids used in DB and protocol
 const OUTLETS = {
   O1: 'o1',
   O2: 'o2',

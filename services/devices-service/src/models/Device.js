@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import { OUTLET_VALUES } from '../constants/outlets.js';
+import { OUTLET_TYPE_VALUES, OUTLET_TYPES } from '../constants/outletTypes.js';
+import { DEVICE_STATUS_VALUES, DEVICE_STATUS } from '../constants/deviceStatus.js';
 
 const outletSchema = new mongoose.Schema({
   id: {
@@ -9,8 +11,8 @@ const outletSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['kitchen', 'safety'],
-    default: 'kitchen'
+    enum: OUTLET_TYPE_VALUES,
+    default: OUTLET_TYPES.KITCHEN
   },
   name: {
     type: String,
@@ -47,8 +49,8 @@ const deviceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['online', 'offline', 'maintenance', 'error'],
-    default: 'offline'
+    enum: DEVICE_STATUS_VALUES,
+    default: DEVICE_STATUS.OFFLINE
   },
   lastSeenAt: {
     type: Date,
