@@ -1,6 +1,7 @@
 import { Kafka } from 'kafkajs';
 import DeviceLog from '../models/DeviceLog.js';
 import Device from '../models/Device.js';
+import MessageCount from '../models/MessageCount.js';
 import { emitDeviceTelemetry } from '../realtime/socket.js';
 import dotenv from 'dotenv';
 import logger from '../utils/logger.js'; 
@@ -150,6 +151,36 @@ async function startLogConsumer() {
           }
           logger.info(`Processing ${logData.type} from ${logData.deviceId}`);
 
+          // Increment persisted counters: per-topic (daily) and per-device (daily)
+          try {
+            const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+            // topic counter
+            await MessageCount.increment({ kind: 'topic', topic, date });
+            // device counter (if present)
+            if (logData.deviceId) {
+              await MessageCount.increment({ kind: 'device', deviceId: logData.deviceId, date });
+            }
+
+            // Read back counters to confirm (best-effort, non-critical)
+            try {
+              const topicKey = [ 'topic', topic, date ].join('|');
+              const topicDoc = await MessageCount.findOne({ key: topicKey }).lean();
+              const topicCount = topicDoc ? topicDoc.count : 0;
+              logger.info(`MessageCount topic=${topic} date=${date} => ${topicCount}`);
+
+              if (logData.deviceId) {
+                const deviceKey = [ 'device', logData.deviceId, date ].join('|');
+                const deviceDoc = await MessageCount.findOne({ key: deviceKey }).lean();
+                const deviceCount = deviceDoc ? deviceDoc.count : 0;
+                logger.info(`MessageCount device=${logData.deviceId} date=${date} => ${deviceCount}`);
+              }
+            } catch (readErr) {
+              logger.warn(`Could not read message counters after increment: ${readErr.message}`);
+            }
+          } catch (incErr) {
+            logger.error(`Failed to increment message counters: ${incErr.message}`);
+          }
+
           // Create and save device log (including event/ack)
           let savedLog = null;
           try {
@@ -168,12 +199,11 @@ async function startLogConsumer() {
                   smoke: 0,
                   gas_ppm: 0,
                   o: {
-                    o1: ackOutlets.o1 ?? false,
-                    o2: ackOutlets.o2 ?? false,
-                    o3: ackOutlets.o3 ?? false,
-                    o4: ackOutlets.o4 ?? false,
-                    o5: ackOutlets.o5 ?? false
-                  }
+                        o1: ackOutlets.o1 ?? false,
+                        o2: ackOutlets.o2 ?? false,
+                        o3: ackOutlets.o3 ?? false,
+                        o4: ackOutlets.o4 ?? false
+                      }
                 },
                 metadata: {
                   ...logData.metadata

@@ -1,4 +1,9 @@
 import Joi from 'joi';
+import { OUTLET_VALUES } from '../constants/outlets.js';
+import { OUTLET_TYPE_VALUES } from '../constants/outletTypes.js';
+import { DEVICE_STATUS_VALUES } from '../constants/deviceStatus.js';
+import { LOG_TYPE_VALUES } from '../constants/logTypes.js';
+import { LOG_SEVERITY_VALUES } from '../constants/logSeverity.js';
 
 // Device validation schemas
 export const deviceSchema = Joi.object({
@@ -10,9 +15,9 @@ export const deviceSchema = Joi.object({
     floor: Joi.string().trim().max(10)
   }),
   outlets: Joi.array().items(Joi.object({
-    id: Joi.string().valid('o1', 'o2', 'o3', 'o4', 'o5').required(),
+    id: Joi.string().valid(...OUTLET_VALUES).required(),
     name: Joi.string().required().trim().min(2).max(100),
-    type: Joi.string().valid('kitchen', 'safety').required(),
+    type: Joi.string().valid(...OUTLET_TYPE_VALUES).required(),
     status: Joi.boolean().default(false),
     powerConsumption: Joi.number().min(0).default(0)
   })),
@@ -41,9 +46,9 @@ export const deviceUpdateSchema = Joi.object({
     floor: Joi.string().trim().max(10)
   }),
   outlets: Joi.array().items(Joi.object({
-    id: Joi.string().valid('o1', 'o2', 'o3', 'o4', 'o5').required(),
+    id: Joi.string().valid(...OUTLET_VALUES).required(),
     name: Joi.string().required().trim().min(2).max(100),
-    type: Joi.string().valid('kitchen', 'safety').required(),
+    type: Joi.string().valid(...OUTLET_TYPE_VALUES).required(),
     status: Joi.boolean().default(false),
     powerConsumption: Joi.number().min(0).default(0)
   })),
@@ -67,7 +72,7 @@ export const deviceUpdateSchema = Joi.object({
 
 // Device log validation schemas
 export const deviceLogSchema = Joi.object({
-  type: Joi.string().valid('telemetry', 'event', 'command', 'error').default('telemetry'),
+  type: Joi.string().valid(...LOG_TYPE_VALUES).default(LOG_TYPE_VALUES[0]),
   deviceId: Joi.string().required().trim().min(3).max(50),
   topic: Joi.string().required().trim().min(3).max(200),
   payload: Joi.object({
@@ -80,11 +85,10 @@ export const deviceLogSchema = Joi.object({
       o1: Joi.boolean().default(false),
       o2: Joi.boolean().default(false),
       o3: Joi.boolean().default(false),
-      o4: Joi.boolean().default(false),
-      o5: Joi.boolean().default(false)
+      o4: Joi.boolean().default(false)
     }).required()
   }).required(),
-  severity: Joi.string().valid('low', 'medium', 'high', 'critical').default('low'),
+  severity: Joi.string().valid(...LOG_SEVERITY_VALUES).default(LOG_SEVERITY_VALUES[0]),
   metadata: Joi.object({
     source: Joi.string().trim().max(50),
     version: Joi.string().trim().max(20),

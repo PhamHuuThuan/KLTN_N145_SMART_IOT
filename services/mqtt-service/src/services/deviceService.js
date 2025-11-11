@@ -46,12 +46,20 @@ class DeviceService {
       
       return null;
     } catch (error) {
-      console.error(`❌ Error fetching device ${deviceId}:`, error.message);
       
       // Fallback: if devices-service is down, allow known devices
-      const knownDevices = ['KITCHEN-ESP32-LED1', 'LIVING-ROOM-ESP32'];
+      const knownDevices = ['KITCHEN-ESP32-LED1', 
+                            'KITCHEN-ESP32-LED2', 
+                            'KITCHEN-ESP32-LED3', 
+                            'KITCHEN-ESP32-LED4',
+                            'KITCHEN-ESP32-LED5',
+                            'KITCHEN-ESP32-LED6',
+                            'KITCHEN-ESP32-LED7',
+                            'KITCHEN-ESP32-LED8',
+                            'KITCHEN-ESP32-LED9',
+                            'KITCHEN-ESP32-LED10',
+                            'LIVING-ROOM-ESP32'];
       if (knownDevices.includes(deviceId)) {
-        console.log(`⚠️ Using fallback for known device: ${deviceId}`);
         return { deviceId, status: 'online' };
       }
       
@@ -95,7 +103,11 @@ class DeviceService {
     const device = await this.getDevice(deviceId);
     if (device) {
       // Device is valid if it exists and is not in error or maintenance mode
-      return device.status !== 'error' && device.status !== 'maintenance';
+      const isValid = device.status !== 'error' && device.status !== 'maintenance';
+      if (!isValid) {
+        console.log(`[DeviceService] Device ${deviceId} is invalid: status=${device.status}`);
+      }
+      return isValid;
     }
     return false;
   }

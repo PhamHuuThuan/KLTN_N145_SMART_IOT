@@ -45,8 +45,7 @@ export const createDeviceLog = async (req, res) => {
         o1: Boolean(payload.o?.o1) || false,
         o2: Boolean(payload.o?.o2) || false,
         o3: Boolean(payload.o?.o3) || false,
-        o4: Boolean(payload.o?.o4) || false,
-        o5: Boolean(payload.o?.o5) || false,
+        o4: Boolean(payload.o?.o4) || false
       }
     };
 

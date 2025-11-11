@@ -67,12 +67,11 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         return { valid: false, message: 'Tất cả điều kiện phải có đầy đủ thông tin' };
       }
 
-      // Validate sensor value range based on priority
+      // Only validate if value is a valid number (not blocking on range)
       if (!validateSensorValue(condition.sensor, condition.value, editFields.priority)) {
-        const constraints = getSensorConstraints(condition.sensor, editFields.priority);
         return { 
           valid: false, 
-          message: `Giá trị ${condition.sensor} phải trong khoảng ${constraints.min}-${constraints.max} cho mức độ ${editFields.priority}` 
+          message: `Giá trị ${condition.sensor} phải là số hợp lệ` 
         };
       }
     }
@@ -154,34 +153,41 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
   const getSensorConstraints = (sensor, priority = 'medium') => {
     const constraints = {
       'temperature': {
-        'urgent': { min: 40, max: 100, step: 1 },
-        'high': { min: 31, max: 40, step: 1 },
-        'medium': { min: 15, max: 30, step: 1 },
-        'low': { min: 0, max: 15, step: 1 }
+        'urgent': { min: 40, max: 100, step: 1, defaultValue: 50 },
+        'high': { min: 31, max: 40, step: 1, defaultValue: 35 },
+        'medium': { min: 15, max: 30, step: 1, defaultValue: 25 },
+        'low': { min: 0, max: 15, step: 1, defaultValue: 10 }
       },
       'humidity': {
-        'urgent': { min: 80, max: 100, step: 1 },
-        'high': { min: 61, max: 80, step: 1 },
-        'medium': { min: 30, max: 60, step: 1 },
-        'low': { min: 0, max: 30, step: 1 }
+        'urgent': { min: 80, max: 100, step: 1, defaultValue: 80 },
+        'high': { min: 61, max: 80, step: 1, defaultValue: 70 },
+        'medium': { min: 30, max: 60, step: 1, defaultValue: 45 },
+        'low': { min: 0, max: 30, step: 1, defaultValue: 15 }
       },
       'gas_ppm': {
-        'urgent': { min: 1000, max: 2000, step: 10 },
-        'high': { min: 401, max: 1000, step: 10 },
-        'medium': { min: 200, max: 400, step: 10 },
-        'low': { min: 0, max: 200, step: 10 }
+        'urgent': { min: 1000, max: 2000, step: 10, defaultValue: 1500 },
+        'high': { min: 401, max: 1000, step: 10, defaultValue: 500 },
+        'medium': { min: 200, max: 400, step: 10, defaultValue: 300 },
+        'low': { min: 0, max: 200, step: 10, defaultValue: 100 }
       },
       'smoke': {
-        'urgent': { min: 700, max: 1000, step: 1 },
-        'high': { min: 301, max: 700, step: 1 },
-        'medium': { min: 100, max: 300, step: 1 },
-        'low': { min: 0, max: 100, step: 1 }
+        'urgent': { min: 700, max: 1000, step: 1, defaultValue: 850 },
+        'high': { min: 301, max: 700, step: 1, defaultValue: 500 },
+        'medium': { min: 100, max: 300, step: 1, defaultValue: 200 },
+        'low': { min: 0, max: 100, step: 1, defaultValue: 50 }
       }
     };
-    return constraints[sensor]?.[priority] || { min: 0, max: 1000, step: 1 };
+    return constraints[sensor]?.[priority] || { min: 0, max: 1000, step: 1, defaultValue: 100 };
   };
 
-  const validateSensorValue = (sensor, value, priority = 'medium') => {
+  // Get default value for sensor + priority (for auto-setup)
+  const getDefaultValue = (sensor, priority = 'medium') => {
+    const constraints = getSensorConstraints(sensor, priority);
+    return constraints.defaultValue || 0;
+  };
+
+  // Check if value is in recommended range (warning only, not blocking)
+  const isValueInRecommendedRange = (sensor, value, priority = 'medium') => {
     const constraints = getSensorConstraints(sensor, priority);
     const numValue = parseFloat(value);
     
@@ -191,9 +197,15 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
     return true;
   };
 
+  // Validate sensor value (only check if valid number, not range)
+  const validateSensorValue = (sensor, value, priority = 'medium') => {
+    const numValue = parseFloat(value);
+    return !isNaN(numValue) && numValue >= 0;
+  };
+
   const getValueHint = (sensor, priority = 'medium') => {
     const constraints = getSensorConstraints(sensor, priority);
-    return ` (${constraints.min}-${constraints.max})`;
+    return ` (Khuyến nghị: ${constraints.min}-${constraints.max}, Mặc định: ${constraints.defaultValue})`;
   };
 
   return (
@@ -318,10 +330,12 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                           ]}
                           onPress={() => {
                             const newConditions = [...editFields.conditions];
+                            const currentPriority = editFields.priority || 'medium';
                             newConditions[index] = { 
                               ...newConditions[index], 
                               sensor: sensor.key,
-                              unit: getSensorUnit(sensor.key)
+                              unit: getSensorUnit(sensor.key),
+                              value: getDefaultValue(sensor.key, currentPriority)
                             };
                             setEditFields(prev => ({ ...prev, conditions: newConditions }));
                           }}
@@ -385,13 +399,20 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                         newConditions[index] = { ...newConditions[index], value: numValue };
                         setEditFields(prev => ({ ...prev, conditions: newConditions }));
                       }}
-                      placeholder={String(condition.value)}
+                      placeholder={String(getDefaultValue(condition.sensor, editFields.priority))}
                       keyboardType="numeric"
                     />
                     {editFields.conditions?.[index]?.value !== undefined && 
                      !validateSensorValue(condition.sensor, editFields.conditions[index].value, editFields.priority) && (
                       <Text style={styles.errorText}>
-                        {t('rules.valueOutOfRange')} {getValueHint(condition.sensor, editFields.priority)}
+                        Giá trị phải là số hợp lệ
+                      </Text>
+                    )}
+                    {editFields.conditions?.[index]?.value !== undefined && 
+                     validateSensorValue(condition.sensor, editFields.conditions[index].value, editFields.priority) &&
+                     !isValueInRecommendedRange(condition.sensor, editFields.conditions[index].value, editFields.priority) && (
+                      <Text style={styles.warningText}>
+                        ⚠️ Giá trị ngoài khoảng khuyến nghị {getSensorConstraints(condition.sensor, editFields.priority).min}-{getSensorConstraints(condition.sensor, editFields.priority).max} cho mức {editFields.priority}. Bạn vẫn có thể sử dụng giá trị này.
                       </Text>
                     )}
                   </View>
@@ -412,7 +433,19 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                     editFields.priority === priority && styles.priorityOptionSelected,
                     { borderColor: getPriorityColor(priority) }
                   ]}
-                  onPress={() => setEditFields(prev => ({ ...prev, priority }))}
+                  onPress={() => {
+                    const newPriority = priority;
+                    // Auto-update condition values when priority changes
+                    if (editFields.conditions && editFields.conditions.length > 0) {
+                      const updatedConditions = editFields.conditions.map(condition => ({
+                        ...condition,
+                        value: getDefaultValue(condition.sensor, newPriority)
+                      }));
+                      setEditFields(prev => ({ ...prev, priority: newPriority, conditions: updatedConditions }));
+                    } else {
+                      setEditFields(prev => ({ ...prev, priority: newPriority }));
+                    }
+                  }}
                 >
                   <Text style={[
                     styles.priorityOptionText,
@@ -876,6 +909,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     fontWeight: '500',
+  },
+  warningText: {
+    color: '#FF9800',
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '500',
+    fontStyle: 'italic',
   },
 });
 

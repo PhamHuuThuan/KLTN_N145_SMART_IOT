@@ -1,15 +1,18 @@
 import mongoose from 'mongoose';
+import { OUTLET_VALUES } from '../constants/outlets.js';
+import { OUTLET_TYPE_VALUES, OUTLET_TYPES } from '../constants/outletTypes.js';
+import { DEVICE_STATUS_VALUES, DEVICE_STATUS } from '../constants/deviceStatus.js';
 
 const outletSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    enum: ['o1', 'o2', 'o3', 'o4', 'o5']
+    enum: OUTLET_VALUES
   },
   type: {
     type: String,
-    enum: ['kitchen', 'safety'],
-    default: 'kitchen'
+    enum: OUTLET_TYPE_VALUES,
+    default: OUTLET_TYPES.KITCHEN
   },
   name: {
     type: String,
@@ -46,8 +49,8 @@ const deviceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['online', 'offline', 'maintenance', 'error'],
-    default: 'offline'
+    enum: DEVICE_STATUS_VALUES,
+    default: DEVICE_STATUS.OFFLINE
   },
   lastSeenAt: {
     type: Date,
@@ -98,17 +101,16 @@ deviceSchema.methods.toggleOutlet = function(outletId, status) {
 
 // Method to enter emergency mode
 deviceSchema.methods.enterEmergencyMode = function() {
-  
   // Emergency rule: kitchen -> OFF, safety -> ON
   this.outlets.forEach(outlet => {
     const outletType = (outlet.type || '').toLowerCase();
-    // Backward compatibility: infer by id if type missing
-    const inferredSafety = !outletType && (outlet.id === 'o4' || outlet.id === 'o5');
+    // Backward compatibility: infer safety by id if type missing (only o4 is safety now)
+    const inferredSafety = !outletType && outlet.id === 'o4';
     const isSafety = outletType === 'safety' || inferredSafety;
     outlet.status = isSafety; // safety ON, kitchen OFF
     outlet.lastToggleAt = new Date();
   });
-  
+
   return this;
 };
 

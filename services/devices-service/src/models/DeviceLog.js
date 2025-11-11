@@ -1,4 +1,6 @@
 import mongoose from 'mongoose';
+import { LOG_TYPES, LOG_TYPE_VALUES } from '../constants/logTypes.js';
+import { LOG_SEVERITY, LOG_SEVERITY_VALUES } from '../constants/logSeverity.js';
 
 const telemetrySchema = new mongoose.Schema({
   ts: {
@@ -29,8 +31,7 @@ const telemetrySchema = new mongoose.Schema({
     o1: { type: Boolean, default: false },
     o2: { type: Boolean, default: false },
     o3: { type: Boolean, default: false },
-    o4: { type: Boolean, default: false },
-    o5: { type: Boolean, default: false }
+    o4: { type: Boolean, default: false }
   }
 }, { _id: false });
 
@@ -38,8 +39,8 @@ const deviceLogSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['telemetry', 'event', 'command', 'error'],
-    default: 'telemetry'
+  enum: LOG_TYPE_VALUES,
+  default: LOG_TYPES.TELEMETRY
   },
   deviceId: {
     type: String,
@@ -57,8 +58,8 @@ const deviceLogSchema = new mongoose.Schema({
   },
   severity: {
     type: String,
-    enum: ['low', 'medium', 'high', 'critical'],
-    default: 'low'
+    enum: LOG_SEVERITY_VALUES,
+    default: LOG_SEVERITY.LOW
   },
   processed: {
     type: Boolean,

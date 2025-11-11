@@ -39,8 +39,7 @@
         "o1": { "type": ["boolean","null"] },
         "o2": { "type": ["boolean","null"] },
         "o3": { "type": ["boolean","null"] },
-        "o4": { "type": ["boolean","null"] },
-        "o5": { "type": ["boolean","null"] }
+        "o4": { "type": ["boolean","null"] }
       },
       "additionalProperties": false
     }
@@ -57,8 +56,7 @@
         "o1": false,
         "o2": false,
         "o3": false,
-        "o4": false,
-        "o5": false
+        "o4": false
       }
     }
   ]
