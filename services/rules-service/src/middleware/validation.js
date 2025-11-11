@@ -1,27 +1,3 @@
-export const validateRule = (req, res, next) => {
-  const { name, deviceId, conditions, actions, cooldownPeriod, maxTriggersPerDay } = req.body || {};
-  
-  // Required fields
-  if (!name || !deviceId || !Array.isArray(conditions) || !Array.isArray(actions) || conditions.length === 0 || actions.length === 0) {
-    return res.status(400).json({ success: false, message: 'Missing required fields: name, deviceId, conditions, actions' });
-  }
-  
-  // Validate cooldownPeriod
-  if (cooldownPeriod !== undefined) {
-    if (typeof cooldownPeriod !== 'number' || cooldownPeriod < 0 || cooldownPeriod > 86400000) {
-      return res.status(400).json({ success: false, message: 'cooldownPeriod must be a number between 0 and 86400000 (24 hours in ms)' });
-    }
-  }
-  
-  // Validate maxTriggersPerDay
-  if (maxTriggersPerDay !== undefined) {
-    if (typeof maxTriggersPerDay !== 'number' || maxTriggersPerDay < 1 || maxTriggersPerDay > 1000) {
-      return res.status(400).json({ success: false, message: 'maxTriggersPerDay must be a number between 1 and 1000' });
-    }
-  }
-  
-  next();
-};
 
 export const validateRuleUpdate = (req, res, next) => {
   const { name, deviceId, conditions, actions, priority, pausedUntil, cooldownPeriod, maxTriggersPerDay } = req.body || {};

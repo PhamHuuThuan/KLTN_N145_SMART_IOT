@@ -146,7 +146,7 @@ class EmailService {
           }
           .header {
             padding: 16px 20px;
-            background: linear-gradient(135deg, #1f2937, #111827);
+            background: linear-gradient(135deg,rgb(77, 125, 193),rgb(77, 125, 193));
             color: #fff;
           }
           .brand { margin: 0; font-size: 18px; letter-spacing: .3px; }

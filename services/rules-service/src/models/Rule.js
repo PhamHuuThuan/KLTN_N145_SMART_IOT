@@ -101,10 +101,25 @@ const ruleSchema = new mongoose.Schema({
   escalationConfig: {
     enabled: { type: Boolean, default: true },
     escalationMultipliers: {
-      temperature: { type: Number, default: 1.3 },
-      smoke: { type: Number, default: 1.8 },
-      gas_ppm: { type: Number, default: 2.5 },
-      humidity: { type: Number, default: 1.5 }
+      // Multiplier theo priority (0=high, 1=medium, 2=low)
+      high: {
+        temperature: { type: Number, default: 1.2 },    // +20%
+        smoke: { type: Number, default: 1.5 },          // +50%
+        gas_ppm: { type: Number, default: 2.0 },       // +100%
+        humidity: { type: Number, default: 1.3 }         // +30%
+      },
+      medium: {
+        temperature: { type: Number, default: 1.3 },    // +30%
+        smoke: { type: Number, default: 1.8 },          // +80%
+        gas_ppm: { type: Number, default: 2.5 },       // +150%
+        humidity: { type: Number, default: 1.5 }        // +50%
+      },
+      low: {
+        temperature: { type: Number, default: 1.5 },    // +50%
+        smoke: { type: Number, default: 2.0 },         // +100%
+        gas_ppm: { type: Number, default: 3.0 },       // +200%
+        humidity: { type: Number, default: 2.0 }        // +100%
+      }
     },
     criticalThresholds: {
       temperature: { type: Number, default: 90 },
@@ -112,11 +127,6 @@ const ruleSchema = new mongoose.Schema({
       gas_ppm: { type: Number, default: 100 },
       humidity: { type: Number, default: 20 }
     }
-  },
-  cooldownTracking: {
-    maxValue: { type: Number, default: null },
-    escalationCount: { type: Number, default: 0 },
-    lastEscalation: { type: Date, default: null }
   }
 });
 
@@ -136,12 +146,6 @@ const sortByPriority = (a, b) =>
   PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
 
 // Statics
-ruleSchema.statics.findActiveRulesForDevice = async function (deviceId) {
-  const query = { deviceId, isActive: true, deletedAt: null };
-  const rules = await this.find(query).sort({ createdAt: 1 });
-  return rules.sort(sortByPriority);
-};
-
 // find by creator (người tạo rule)
 ruleSchema.statics.findByCreator = async function (createdBy, options = {}) {
   const { deviceId, isActive, limit = 50, page = 1, includeDeleted = false } = options;
@@ -190,7 +194,11 @@ ruleSchema.methods.shouldEscalate = function(currentValue, sensorType) {
     return true;
   }
   
-  const multiplier = this.escalationConfig.escalationMultipliers[sensorType];
+  // Lấy multiplier theo priority của rule
+  const priorityMultipliers = this.escalationConfig.escalationMultipliers[this.priority];
+  if (!priorityMultipliers) return false;
+  
+  const multiplier = priorityMultipliers[sensorType];
   if (!multiplier) return false;
   
   const condition = this.conditions.find(c => c.sensor === sensorType);
@@ -200,22 +208,6 @@ ruleSchema.methods.shouldEscalate = function(currentValue, sensorType) {
   const escalationThreshold = originalThreshold * multiplier;
   
   return currentValue >= escalationThreshold;
-};
-
-// Track sensor value
-ruleSchema.methods.trackSensorValue = function(sensorType, currentValue) {
-  if (!this.cooldownTracking) return;
-  
-  if (!this.cooldownTracking.maxValue || currentValue > this.cooldownTracking.maxValue) {
-    this.cooldownTracking.maxValue = currentValue;
-  }
-  
-  if (this.shouldEscalate(currentValue, sensorType)) {
-    this.cooldownTracking.escalationCount++;
-    this.cooldownTracking.lastEscalation = new Date();
-  }
-  
-  return this.save();
 };
 
 // Check if rule has reached daily limit

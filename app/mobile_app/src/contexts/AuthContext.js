@@ -97,10 +97,11 @@ export const AuthProvider = ({ children }) => {
         
         return { success: true };
       } else {
-        return { success: false, error: result.error };
+        return { success: false, error: result.error || 'Đăng nhập thất bại' };
       }
     } catch (error) {
-      return { success: false, error: 'Login failed' };
+      log.error('Login error:', error);
+      return { success: false, error: 'Đăng nhập thất bại' };
     } finally {
       setIsLoading(false);
     }
@@ -186,6 +187,33 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Password change failed' };
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const forgotPassword = async (email) => {
+    try {
+      const result = await authService.forgotPassword(email);
+      return result;
+    } catch (error) {
+      return { success: false, error: 'Failed to request password reset' };
+    }
+  };
+
+  const verifyResetCode = async (email, code) => {
+    try {
+      const result = await authService.verifyResetCode(email, code);
+      return result;
+    } catch (error) {
+      return { success: false, error: 'Failed to verify reset code' };
+    }
+  };
+
+  const resetPassword = async (email, code, newPassword) => {
+    try {
+      const result = await authService.resetPassword(email, code, newPassword);
+      return result;
+    } catch (error) {
+      return { success: false, error: 'Failed to reset password' };
     }
   };
 
@@ -310,6 +338,9 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateProfile,
     changePassword,
+    forgotPassword,
+    verifyResetCode,
+    resetPassword,
     refreshProfile,
     checkAuthStatus,
     registerFCMToken, // Export FCM token registration function

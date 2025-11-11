@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -20,7 +19,6 @@ import CONFIG from '../constants/config';
 import Header from '../components/Header';
 import OverlayLoader from '../components/OverlayLoader';
 import ActionFeedback from '../components/ActionFeedback';
-//import GoogleLoginButton from '../components/GoogleLoginButton';
 
 const log = createLogger('Login');
 
@@ -36,12 +34,12 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert(t('common.error'), t('auth.emailRequired') + ' ' + t('auth.passwordRequired'));
+      setFeedback({ visible: true, type: 'error', message: 'Vui lòng nhập email và mật khẩu' });
       return;
     }
 
     if (!isValidEmail(email)) {
-      Alert.alert(t('common.error'), t('auth.invalidEmail'));
+      setFeedback({ visible: true, type: 'error', message: 'Email không hợp lệ' });
       return;
     }
 
@@ -50,17 +48,29 @@ const LoginScreen = ({ navigation }) => {
       setShowLoader(true);
       const result = await login(email.trim(), password);
       
-      if (result.success) {
-        log.info('Login successful');
-        setFeedback({ visible: true, type: 'success', message: t('auth.loginSuccess') });
-      } else {
-        setFeedback({ visible: true, type: 'error', message: result.error || t('auth.loginError') });
-      }
-    } catch (error) {
-      setFeedback({ visible: true, type: 'error', message: t('auth.loginError') });
-    } finally {
+      // Hide loader first
       setIsLoading(false);
       setShowLoader(false);
+      
+      if (result.success) {
+        log.info('Login successful');
+        setFeedback({ visible: true, type: 'success', message: 'Đăng nhập thành công' });
+      } else {
+        console.log('Login failed, result:', result); // Debug log
+        // Force hide any existing feedback first
+        setFeedback({ visible: false, type: 'error', message: '' });
+        
+        // Then set new feedback after a small delay
+        setTimeout(() => {
+          const errorMessage = result.error || 'Đăng nhập thất bại';
+          console.log('Setting error message:', errorMessage); // Debug log
+          setFeedback({ visible: true, type: 'error', message: errorMessage });
+        }, 100);
+      }
+    } catch (error) {
+      setIsLoading(false);
+      setShowLoader(false);
+      setFeedback({ visible: true, type: 'error', message: 'Đăng nhập thất bại' });
     }
   };
 
@@ -93,13 +103,13 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.label}>{t('common.email')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder={t('auth.email')}
+                placeholder="Nhập email"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                editable={!isLoading}
+                editable={true}
               />
             </View>
 
@@ -108,13 +118,13 @@ const LoginScreen = ({ navigation }) => {
               <View style={styles.passwordContainer}>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder={t('auth.password')}
+                  placeholder="Nhập mật khẩu"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  editable={!isLoading}
+                  editable={true}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
@@ -140,6 +150,14 @@ const LoginScreen = ({ navigation }) => {
               ) : (
                 <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.forgotPasswordButton}
+              onPress={() => navigation.navigate('ForgotPassword')}
+              disabled={isLoading}
+            >
+              <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
 
             {/* <GoogleLoginButton 
@@ -278,6 +296,16 @@ const styles = StyleSheet.create({
     color: CONFIG.COLORS.white,
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  forgotPasswordButton: {
+    alignItems: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  forgotPasswordText: {
+    color: CONFIG.THEME.primary,
+    fontSize: 16,
+    fontWeight: '600',
   },
   footer: {
     flexDirection: 'row',
