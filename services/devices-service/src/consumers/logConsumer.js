@@ -1,6 +1,7 @@
 import { Kafka } from 'kafkajs';
 import DeviceLog from '../models/DeviceLog.js';
 import Device from '../models/Device.js';
+import { DEVICE_STATUS } from '../constants/deviceStatus.js';
 import MessageCount from '../models/MessageCount.js';
 import { emitDeviceTelemetry } from '../realtime/socket.js';
 import dotenv from 'dotenv';
@@ -47,9 +48,9 @@ async function updateDeviceStatus(data) {
     }
 
     // Update device online status
-    device.lastSeenAt = new Date();
-    device.status = 'online';
-    device.lastUpdate = new Date();
+  device.lastSeenAt = new Date();
+  device.status = DEVICE_STATUS.ONLINE;
+  device.lastUpdate = new Date();
     
     // Update outlet statuses if provided
     if (payload.o && typeof payload.o === 'object') {
