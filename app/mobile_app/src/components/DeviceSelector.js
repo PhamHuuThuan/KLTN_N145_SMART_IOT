@@ -37,11 +37,13 @@ const DeviceSelector = ({
 
   const selectedDeviceData = normalizedDevices.find((device) => device.deviceId === selectedDevice) || null;
 
-  const StatusBadge = ({ isOnline }) => {
+  const StatusBadge = ({ status, lastSeenAt }) => {
+    const isOnline = (status || '').toLowerCase() === 'online';
     const baseColor = isOnline ? colors.success : colors.danger;
     return (
       <View style={[
-        styles.statusBadge
+        styles.statusBadge,
+        { backgroundColor: `${baseColor}22` }
       ]}>
         <View style={[
           styles.statusDot,
@@ -69,7 +71,10 @@ const DeviceSelector = ({
               {selectedDeviceData?.name || selectedDeviceData?.deviceId || t('devices.selectDevice')}
             </Text>
             {selectedDeviceData?.deviceId && (
-              <StatusBadge isOnline={!!selectedDeviceData?.isOnline} />
+              <StatusBadge
+                status={selectedDeviceData?.status}
+                lastSeenAt={selectedDeviceData?.lastSeenAt || selectedDeviceData?.lastUpdate}
+              />
             )}
           </TouchableOpacity>
 
@@ -146,7 +151,10 @@ const DeviceSelector = ({
                         </Text>
                       )}
                     </View>
-                    <StatusBadge isOnline={!!item.isOnline} />
+                    <StatusBadge
+                      status={item.status}
+                      lastSeenAt={item.lastSeenAt}
+                    />
                     <TouchableOpacity
                       style={[styles.removeButton, { backgroundColor: colors.backgroundSecondary }]}
                       activeOpacity={0.7}

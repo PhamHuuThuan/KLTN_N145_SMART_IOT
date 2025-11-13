@@ -78,25 +78,45 @@ const HomeScreen = ({ navigation }) => {
           }}
           onDeviceRemoved={async (deviceId, newSelectedDevice = null) => {
             // Refresh devices list when a device is removed
+            if (selectedDevice === deviceId && !newSelectedDevice) {
+              await selectDevice(null);
+            }
+
             await fetchDevices(1, 20);
-            
-            // If the removed device was selected, auto-select another device
-            if (selectedDevice === deviceId) {
-              if (newSelectedDevice) {
-                // Auto-select the new device
-                await selectDevice(newSelectedDevice);
-                await fetchDeviceDetail(newSelectedDevice);
-              } else {
-                // No devices left, clear selection
-                setSelectedDevice(null);
-                setDeviceData(null);
-              }
+
+            if (newSelectedDevice) {
+              await selectDevice(newSelectedDevice);
+              await fetchDeviceDetail(newSelectedDevice);
             }
           }}
           hasMore={hasMore}
           loadingMore={loadingMore}
           onLoadMore={loadMoreDevices}
         />
+
+        {deviceData?.deviceId && (
+          <View style={[
+            styles.statusCard,
+            { backgroundColor: colors.surfaceSecondary }
+          ]}>
+            <View style={styles.statusRow}>
+              <View style={styles.statusInfo}>
+                <View style={[
+                  styles.statusIndicatorDot,
+                  { backgroundColor: deviceData?.isOnline ? colors.success : colors.danger }
+                ]} />
+                <Text style={[styles.statusLabel, { color: colors.text }]}>
+                  {deviceData?.isOnline ? t('devices.online', 'Online') : t('devices.offline', 'Offline')}
+                </Text>
+              </View>
+              {deviceData?.lastSeenAt || deviceData?.lastUpdate ? (
+                <Text style={[styles.statusTime, { color: colors.textSecondary }]}>
+                  {new Date(deviceData.lastSeenAt || deviceData.lastUpdate).toLocaleString()}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        )}
 
         <SensorGrid deviceData={deviceData} />
 
@@ -122,16 +142,12 @@ const HomeScreen = ({ navigation }) => {
         <DeviceInfoModal
           visible={showDeviceInfo}
           onClose={() => setShowDeviceInfo(false)}
-          deviceData={deviceDetail || deviceData}
+          deviceData={
+            deviceDetail && deviceData
+              ? { ...deviceDetail, ...deviceData }
+              : (deviceData || deviceDetail)
+          }
         />
-
-        {deviceData?.lastUpdate && (
-          <View style={[styles.section, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.lastUpdate, { color: colors.textSecondary }]}>
-              {t('devices.lastUpdate')}: {new Date(deviceData.lastUpdate).toLocaleString()}
-            </Text>
-          </View>
-        )}
 
         {error && (
           <View style={[styles.section, { backgroundColor: colors.surface }]}>
@@ -168,10 +184,39 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  lastUpdate: {
+  statusCard: {
+    borderRadius: CONFIG.DIMENSIONS.borderRadius,
+    padding: CONFIG.DIMENSIONS.cardPadding,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+    gap: 6,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  statusInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusIndicatorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  statusLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  statusTime: {
     fontSize: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
   errorText: {
     fontSize: 14,
