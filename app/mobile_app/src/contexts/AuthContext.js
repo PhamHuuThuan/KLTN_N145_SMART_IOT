@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import authService from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { setAuthToken, clearAuthToken } from '../services/apiService';
 import chatSessionManager from '../services/chatSessionManager';
 import * as Notifications from 'expo-notifications';
 import { createLogger } from '../utils/logger';
+import { LOGOUT_EVENT } from '../utils/authHandler';
 
 const log = createLogger('Auth');
 
@@ -23,9 +25,22 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState(null);
+  const logoutRef = useRef(null);
 
   useEffect(() => {
     checkAuthStatus();
+    
+    // Listen for logout events from services (e.g., when 401 occurs)
+    const logoutListener = DeviceEventEmitter.addListener(LOGOUT_EVENT, () => {
+      log.info('Logout event received - performing logout');
+      if (logoutRef.current) {
+        logoutRef.current();
+      }
+    });
+    
+    return () => {
+      logoutListener.remove();
+    };
   }, []);
 
   const checkAuthStatus = async () => {
@@ -158,6 +173,10 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(false);
     }
   };
+
+  // Store logout function in ref so it can be called from event listener
+  // Using direct assignment is safe for refs and avoids dependency issues
+  logoutRef.current = logout;
 
   const updateProfile = async (name, phone, avatar) => {
     try {

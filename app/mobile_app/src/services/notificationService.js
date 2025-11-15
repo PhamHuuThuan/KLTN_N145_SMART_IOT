@@ -1,6 +1,7 @@
 import axios from 'axios';
 import environment from '../config/environment';
 import { createLogger } from '../utils/logger';
+import { handleUnauthorized } from '../utils/authHandler';
 
 const log = createLogger('Notifications');
 
@@ -60,10 +61,16 @@ class NotificationService {
         log.info(`${response.status} ${response.config.url}`);
         return response;
       },
-      (error) => {
+      async (error) => {
         const status = error?.response?.status;
         const url = error?.config?.url;
         log.error('Response error', status ? `${status} ${url}` : error?.message || String(error));
+        
+        // Handle 401 Unauthorized - trigger logout
+        if (status === 401) {
+          await handleUnauthorized();
+        }
+        
         return Promise.reject(error);
       }
     );

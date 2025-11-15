@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import environment from '../config/environment';
 import { createLogger } from '../utils/logger';
+import { handleUnauthorized } from '../utils/authHandler';
 
 const authClient = axios.create({
   // Route auth via API Gateway as well
@@ -29,8 +30,7 @@ authClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('authToken');
-      await AsyncStorage.removeItem('userData');
+      await handleUnauthorized();
     }
     return Promise.reject(error);
   }
