@@ -472,6 +472,10 @@
     "noData": "Không có dữ liệu",
     "dataPoints": "điểm dữ liệu",
     "current": "Hiện tại",
+    "logDetail": "Chi tiết log",
+    "time": "Thời gian",
+    "allSensors": "Tất cả cảm biến",
+    "outlets": "Ổ cắm",
     "timeRange": {
       "1hour": "1 giờ",
       "6hours": "6 giờ",

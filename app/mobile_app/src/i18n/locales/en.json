@@ -471,6 +471,10 @@
     "noData": "No data available",
     "dataPoints": "data points",
     "current": "Current",
+    "logDetail": "Log Detail",
+    "time": "Time",
+    "allSensors": "All Sensors",
+    "outlets": "Outlets",
     "timeRange": {
       "1hour": "1 Hour",
       "6hours": "6 Hours",

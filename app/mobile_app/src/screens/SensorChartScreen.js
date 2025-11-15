@@ -39,7 +39,7 @@ const TIME_RANGES = [
 const SensorChartScreen = ({ navigation }) => {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { selectedDevice } = useDeviceData();
+  const { selectedDevice, deviceData, devicesList } = useDeviceData();
   
   const [selectedSensor, setSelectedSensor] = useState('temperature');
   const [selectedTimeRange, setSelectedTimeRange] = useState(24); // hours
@@ -48,6 +48,7 @@ const SensorChartScreen = ({ navigation }) => {
   const [error, setError] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customDateRange, setCustomDateRange] = useState(null);
+  const [selectedLog, setSelectedLog] = useState(null);
 
   // Format time label for chart
   const formatTimeLabel = useCallback((timestamp) => {
@@ -250,10 +251,67 @@ const SensorChartScreen = ({ navigation }) => {
   const handlePresetRange = (hours) => {
     setSelectedTimeRange(hours);
     setCustomDateRange(null); // Clear custom range
+    setSelectedLog(null); // Clear selected log
   };
+
+  // Handle point selection from chart
+  const handlePointSelect = useCallback((point, rawData) => {
+    if (!point || !point.timestamp) {
+      setSelectedLog(null);
+      return;
+    }
+
+    // Tìm log gốc từ telemetryData dựa trên timestamp
+    const timestamp = new Date(point.timestamp);
+    if (isNaN(timestamp.getTime())) {
+      setSelectedLog(null);
+      return;
+    }
+
+    // Tìm log gần nhất với timestamp (trong vòng 1 phút)
+    const tolerance = 60 * 1000; // 1 phút
+    const matchingLog = telemetryData.find(log => {
+      const logTime = new Date(log.createdAt || log.payload?.ts);
+      if (isNaN(logTime.getTime())) return false;
+      const diff = Math.abs(logTime.getTime() - timestamp.getTime());
+      return diff <= tolerance;
+    });
+
+    if (matchingLog) {
+      setSelectedLog({
+        ...matchingLog,
+        selectedValue: point.value,
+        selectedTimestamp: point.timestamp,
+      });
+    } else {
+      // Nếu không tìm thấy, tạo log từ point data
+      setSelectedLog({
+        payload: {
+          temp: selectedSensor === 'temperature' ? point.value : 0,
+          humid: selectedSensor === 'humidity' ? point.value : 0,
+          gas_ppm: selectedSensor === 'gas' ? point.value : 0,
+          smoke: selectedSensor === 'smoke' ? point.value : 0,
+          ts: point.timestamp.getTime(),
+        },
+        createdAt: point.timestamp,
+        selectedValue: point.value,
+        selectedTimestamp: point.timestamp,
+      });
+    }
+  }, [telemetryData, selectedSensor]);
 
   const sensorConfig = SENSOR_TYPES[selectedSensor];
   const sensorColor = sensorConfig ? colors[sensorConfig.colorKey] || colors.primary : colors.primary;
+
+  // Get device name
+  const deviceName = useMemo(() => {
+    if (!selectedDevice) return null;
+    // Try to get from deviceData first
+    if (deviceData?.name) return deviceData.name;
+    // Fallback to devicesList
+    const device = devicesList.find(d => d.deviceId === selectedDevice);
+    return device?.name || selectedDevice;
+  }, [selectedDevice, deviceData, devicesList]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -412,7 +470,20 @@ const SensorChartScreen = ({ navigation }) => {
             ) : (
               <View style={[styles.chartContainer, { backgroundColor: colors.surface }]}>
                 <View style={styles.chartHeader}>
-                  <View>
+                  <View style={styles.chartHeaderLeft}>
+                    {deviceName && (
+                      <View style={styles.deviceNameContainer}>
+                        <MaterialCommunityIcons 
+                          name="devices" 
+                          size={16} 
+                          color={colors.primary} 
+                          style={styles.deviceIcon}
+                        />
+                        <Text style={[styles.deviceName, { color: colors.primary }]} numberOfLines={1}>
+                          {deviceName}
+                        </Text>
+                      </View>
+                    )}
                     <Text style={[styles.chartTitle, { color: colors.text }]}>
                       {t(sensorConfig.label)}
                     </Text>
@@ -438,8 +509,62 @@ const SensorChartScreen = ({ navigation }) => {
                     color={sensorColor}
                     unit={sensorConfig.unit}
                     height={250}
+                    onPointSelect={handlePointSelect}
+                    rawData={telemetryData}
                   />
                 )}
+              </View>
+            )}
+            
+            {/* Selected Log Detail */}
+            {selectedLog && (
+              <View style={[styles.logDetailContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={[styles.logDetailHeader, { borderBottomColor: colors.border }]}>
+                  <MaterialCommunityIcons name="information" size={20} color={colors.primary} />
+                  <Text style={[styles.logDetailTitle, { color: colors.text }]}>
+                    {t('charts.logDetail')}
+                  </Text>
+                </View>
+                
+                <View style={styles.logDetailContent}>
+                  {/* Time */}
+                  <View style={styles.logDetailRow}>
+                    <Text style={[styles.logDetailLabel, { color: colors.textSecondary }]}>
+                      {t('charts.time')}:
+                    </Text>
+                    <Text style={[styles.logDetailValue, { color: colors.text }]}>
+                      {selectedLog.selectedTimestamp
+                        ? new Date(selectedLog.selectedTimestamp).toLocaleString('vi-VN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })
+                        : selectedLog.createdAt
+                        ? new Date(selectedLog.createdAt).toLocaleString('vi-VN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })
+                        : '-'}
+                    </Text>
+                  </View>
+                  
+                  {/* Selected Sensor Value */}
+                  <View style={styles.logDetailRow}>
+                    <Text style={[styles.logDetailLabel, { color: colors.textSecondary }]}>
+                      {t(sensorConfig.label)}:
+                    </Text>
+                    <Text style={[styles.logDetailValue, { color: sensorColor, fontWeight: 'bold' }]}>
+                      {selectedLog.selectedValue?.toFixed(1) || '0'}{sensorConfig.unit}
+                    </Text>
+                  </View>
+                </View>
               </View>
             )}
           </>
@@ -529,13 +654,35 @@ const styles = StyleSheet.create({
   chartHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 15,
     width: '100%',
+  },
+  chartHeaderLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  deviceNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  deviceIcon: {
+    marginRight: 6,
+  },
+  deviceName: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
   chartTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginTop: 2,
   },
   chartSubtitle: {
     fontSize: 12,
@@ -590,6 +737,92 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  logDetailContainer: {
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  logDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1.5,
+  },
+  logDetailTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 10,
+    letterSpacing: 0.3,
+  },
+  logDetailContent: {
+    gap: 16,
+  },
+  logDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  logDetailLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.7,
+  },
+  logDetailValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  logDetailDivider: {
+    height: 1.5,
+    marginVertical: 12,
+    opacity: 0.3,
+  },
+  logDetailSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginTop: 4,
+    marginBottom: 4,
+    letterSpacing: 0.5,
+    opacity: 0.6,
+  },
+  logDetailGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  logDetailGridItem: {
+    flex: 1,
+    minWidth: '47%',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  logDetailGridLabel: {
+    fontSize: 11,
+    marginTop: 6,
+    textAlign: 'center',
+    fontWeight: '500',
+    opacity: 0.7,
+  },
+  logDetailGridValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 4,
+    letterSpacing: 0.2,
   },
 });
 
