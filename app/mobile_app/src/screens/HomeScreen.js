@@ -118,7 +118,12 @@ const HomeScreen = ({ navigation }) => {
           </View>
         )}
 
-        <SensorGrid deviceData={deviceData} />
+        <SensorGrid 
+          deviceData={deviceData} 
+          onViewChart={(deviceId) => {
+            navigation?.navigate?.('SensorChart');
+          }}
+        />
 
         <OutletGrid
           selectedDevice={selectedDevice}

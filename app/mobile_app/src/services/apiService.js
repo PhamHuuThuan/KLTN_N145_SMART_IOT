@@ -268,9 +268,22 @@ class ApiService {
     }
   }
 
-}
+  // Get telemetry history for a device
+  async getTelemetryHistory(deviceId, hours = 24, limit = 1000) {
+    try {
+      // Correct endpoint: /api/logs/:deviceId/history (not /api/devices/logs/:deviceId/history)
+      const url = `/api/logs/${deviceId}/history?hours=${hours}&limit=${limit}`;
+      const response = await apiClient.get(url);
+      return response.data;
+    } catch (error) {
+      log.error('getTelemetryHistory error', error?.message || error);
+      throw new Error(`Failed to fetch telemetry history: ${error.message}`);
+    }
+  }
 
+}
 // Export singleton instance
 const apiService = new ApiService();
 export { apiService };
 export default apiService;
+

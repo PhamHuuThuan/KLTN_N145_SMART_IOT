@@ -19,6 +19,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import NotificationScreen from './src/screens/NotificationScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
+import SensorChartScreen from './src/screens/SensorChartScreen';
 import CONFIG from './src/constants/config';
 import apiService from './src/services/apiService';
 import rulesService from './src/services/rulesService';
@@ -98,7 +99,7 @@ function AppContent() {
     }
 
     // Reset to Main screen and Home tab when authenticated (fix for registration/login redirect issue)
-    if (currentScreen !== 'Main' && !['Notifications', 'NotificationSettingsFromNotifications', 'NotificationSettingsFromSettings', 'Profile', 'ChangePassword'].includes(currentScreen)) {
+    if (currentScreen !== 'Main' && !['Notifications', 'NotificationSettingsFromNotifications', 'NotificationSettingsFromSettings', 'Profile', 'ChangePassword', 'SensorChart'].includes(currentScreen)) {
       setCurrentScreen('Main');
       setActiveTab('Home'); // Always go to Home tab after login
     }
@@ -127,6 +128,8 @@ function AppContent() {
         return <ProfileScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
       case 'ChangePassword':
         return <ChangePasswordScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
+      case 'SensorChart':
+        return <SensorChartScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
       default:
         return <HomeScreen />;
     }

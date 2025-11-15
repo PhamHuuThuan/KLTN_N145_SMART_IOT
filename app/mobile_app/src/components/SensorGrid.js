@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
-const SensorGrid = ({ deviceData }) => {
+const SensorGrid = ({ deviceData, onViewChart }) => {
   const { colors } = useTheme();
   const { t } = useTranslation();
   
@@ -63,7 +63,20 @@ const SensorGrid = ({ deviceData }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      <Text style={[styles.title, { color: colors.primary }]}>📊 {t('sensors.title')}</Text>
+      <View style={styles.headerRow}>
+        <Text style={[styles.title, { color: colors.primary }]}>📊 {t('sensors.title')}</Text>
+        {onViewChart && deviceData?.deviceId && (
+          <TouchableOpacity
+            style={[styles.chartButton, { backgroundColor: colors.primary }]}
+            onPress={() => onViewChart(deviceData.deviceId)}
+          >
+            <MaterialCommunityIcons name="chart-line" size={18} color={colors.white} />
+            <Text style={[styles.chartButtonText, { color: colors.white }]}>
+              {t('sensors.viewChart')}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
       <View style={styles.grid}>
         {sensorData.map((sensor) => (
           <View key={sensor.id} style={[styles.sensorCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
@@ -96,11 +109,28 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
+    flex: 1,
+  },
+  chartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  chartButtonText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
   },
   grid: {
     flexDirection: 'row',
