@@ -1,173 +1,162 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Path, Line, Circle, G, Text as SvgText } from 'react-native-svg';
+import React, { useMemo, memo } from 'react';
+import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../contexts/ThemeContext';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CHART_WIDTH = SCREEN_WIDTH - 60; // Padding and margins
-const CHART_HEIGHT = 250;
-const PADDING_X = 40;
-const PADDING_Y = 40;
-const CHART_AREA_WIDTH = CHART_WIDTH - PADDING_X * 2;
-const CHART_AREA_HEIGHT = CHART_HEIGHT - PADDING_Y * 2;
+const PADDING_X = 20;
+const PADDING_Y = 20;
+const MAX_POINTS = 15;
+const MIN_HEIGHT = 120;
 
-const SensorChart = ({ data, color, unit, height = CHART_HEIGHT }) => {
+const SensorChart = memo(({ data, color, height = 160 }) => {
   const { colors } = useTheme();
-  
-  if (!data || !data.labels || !data.values || data.values.length === 0) {
+
+  const chartWidth = useMemo(() => {
+    try {
+      const { width: SCREEN_WIDTH } = Dimensions.get('window');
+      const calculatedWidth = SCREEN_WIDTH - 60;
+      const maxWidth = Platform.OS === 'web' ? 600 : 350;
+      return Math.min(calculatedWidth, maxWidth);
+    } catch {
+      return 350;
+    }
+  }, []);
+
+  const prepared = useMemo(() => {
+    try {
+      if (!data || !Array.isArray(data.values)) {
+        console.log('[SensorChart] no data or invalid');
+        return null;
+      }
+
+      const rawValues = data.values;
+      const len = rawValues.length;
+      if (!len) return null;
+
+      const numeric = [];
+      for (let i = 0; i < len; i++) {
+        const v = Number(rawValues[i]);
+        if (!isNaN(v) && isFinite(v)) {
+          numeric.push(v);
+        }
+      }
+
+      if (!numeric.length) return null;
+
+      let values = numeric;
+      if (numeric.length > MAX_POINTS) {
+        const step = Math.ceil(numeric.length / MAX_POINTS);
+        const tmp = [];
+        for (let i = 0; i < numeric.length; i += step) {
+          tmp.push(numeric[i]);
+        }
+        if (tmp[tmp.length - 1] !== numeric[numeric.length - 1]) {
+          tmp.push(numeric[numeric.length - 1]);
+        }
+        values = tmp;
+      }
+
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const valueRange = maxValue - minValue || 1;
+
+      console.log('[SensorChart] prepared values:', values.length);
+
+      return { values, minValue, valueRange };
+    } catch (e) {
+      console.log('[SensorChart] prepare error:', e);
+      return null;
+    }
+  }, [data]);
+
+  if (!prepared) return null;
+
+  const chartHeight = Math.max(height, MIN_HEIGHT);
+  const chartAreaWidth = Math.max(0, chartWidth - PADDING_X * 2);
+  const chartAreaHeight = Math.max(0, chartHeight - PADDING_Y * 2);
+
+  if (chartAreaWidth <= 0 || chartAreaHeight <= 0 || chartWidth <= 0) {
     return null;
   }
 
-  const values = data.values;
-  const labels = data.labels;
-  const timestamps = data.timestamps || [];
-  
-  // Calculate min/max for scaling
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const valueRange = maxValue - minValue || 1; // Avoid division by zero
-  
-  // Calculate Y-axis scale
-  const yAxisSteps = 5;
-  const yAxisValues = [];
-  for (let i = 0; i <= yAxisSteps; i++) {
-    yAxisValues.push(minValue + (valueRange * i) / yAxisSteps);
-  }
+  const pathD = useMemo(() => {
+    try {
+      const { values, minValue, valueRange } = prepared;
+      if (!values.length || chartAreaWidth <= 0 || chartAreaHeight <= 0) return '';
 
-  // Generate path for line chart
-  const points = values.map((value, index) => {
-    const x = PADDING_X + (CHART_AREA_WIDTH * index) / (values.length - 1 || 1);
-    const y = PADDING_Y + CHART_AREA_HEIGHT - ((value - minValue) / valueRange) * CHART_AREA_HEIGHT;
-    return { x, y, value };
-  });
+      const pxPerPoint = Platform.OS === 'web' ? 8 : 15;
+      const maxPointsForWidth = Math.min(MAX_POINTS, Math.floor(chartAreaWidth / pxPerPoint));
 
-  // Create smooth path using line segments
-  const createSmoothPath = (points) => {
-    if (points.length < 2) return '';
-    
-    let path = `M ${points[0].x} ${points[0].y}`;
-    
-    // Simple line path for better performance
-    for (let i = 1; i < points.length; i++) {
-      path += ` L ${points[i].x} ${points[i].y}`;
+      let finalValues = values;
+      if (values.length > maxPointsForWidth) {
+        const step = Math.ceil(values.length / maxPointsForWidth);
+        const tmp = [];
+        for (let i = 0; i < values.length; i += step) {
+          tmp.push(values[i]);
+        }
+        if (tmp[tmp.length - 1] !== values[values.length - 1]) {
+          tmp.push(values[values.length - 1]);
+        }
+        finalValues = tmp;
+      }
+
+      if (Platform.OS !== 'web' && finalValues.length > MAX_POINTS) {
+        finalValues = finalValues.slice(0, MAX_POINTS);
+      }
+
+      const lastIndex = Math.max(1, finalValues.length - 1);
+      const precision = Platform.OS === 'web' ? 2 : 1;
+
+      let d = '';
+
+      finalValues.forEach((v, idx) => {
+        const x = PADDING_X + (chartAreaWidth * idx) / lastIndex;
+        const ratio = (v - minValue) / valueRange;
+        const y = PADDING_Y + chartAreaHeight - ratio * chartAreaHeight;
+
+        const safeX = isNaN(x) ? PADDING_X : Math.min(PADDING_X + chartAreaWidth, Math.max(PADDING_X, x));
+        const safeY = isNaN(y) ? PADDING_Y + chartAreaHeight : Math.min(PADDING_Y + chartAreaHeight, Math.max(PADDING_Y, y));
+
+        if (idx === 0) {
+          d = `M ${safeX.toFixed(precision)} ${safeY.toFixed(precision)}`;
+        } else {
+          d += ` L ${safeX.toFixed(precision)} ${safeY.toFixed(precision)}`;
+        }
+      });
+
+      return d;
+    } catch (e) {
+      console.log('[SensorChart] path error:', e);
+      return '';
     }
-    
-    return path;
-  };
+  }, [prepared, chartAreaWidth, chartAreaHeight]);
 
-  const linePath = createSmoothPath(points);
-
-  // Area path (fill under line)
-  const areaPath = linePath + 
-    ` L ${points[points.length - 1].x} ${PADDING_Y + CHART_AREA_HEIGHT}` +
-    ` L ${points[0].x} ${PADDING_Y + CHART_AREA_HEIGHT} Z`;
-
-  // Format value for display
-  const formatValue = (value) => {
-    if (value >= 1000) {
-      return (value / 1000).toFixed(1) + 'k';
-    }
-    return value.toFixed(value % 1 === 0 ? 0 : 1);
-  };
-
-  // Show labels for every nth point
-  const labelStep = Math.max(1, Math.floor(labels.length / 6));
+  if (!pathD) return null;
 
   return (
-    <View style={styles.container}>
-      <Svg width={CHART_WIDTH} height={height} viewBox={`0 0 ${CHART_WIDTH} ${height}`}>
-        {/* Grid lines */}
-        <G stroke={colors.border} strokeWidth="1" opacity="0.3">
-          {yAxisValues.map((_, index) => {
-            const y = PADDING_Y + (CHART_AREA_HEIGHT * index) / yAxisSteps;
-            return (
-              <Line
-                key={`grid-${index}`}
-                x1={PADDING_X}
-                y1={y}
-                x2={PADDING_X + CHART_AREA_WIDTH}
-                y2={y}
-                strokeDasharray="4,4"
-              />
-            );
-          })}
-        </G>
-
-        {/* Y-axis labels */}
-        <G fill={colors.textSecondary} fontSize="10" textAnchor="end">
-          {yAxisValues.map((value, index) => {
-            const y = PADDING_Y + (CHART_AREA_HEIGHT * index) / yAxisSteps;
-            return (
-              <SvgText
-                key={`y-label-${index}`}
-                x={PADDING_X - 8}
-                y={y + 4}
-                fill={colors.textSecondary}
-              >
-                {formatValue(value)}
-              </SvgText>
-            );
-          })}
-        </G>
-
-        {/* X-axis labels */}
-        <G fill={colors.textSecondary} fontSize="10" textAnchor="middle">
-          {labels.map((label, index) => {
-            if (index % labelStep !== 0 && index !== labels.length - 1) return null;
-            const x = PADDING_X + (CHART_AREA_WIDTH * index) / (labels.length - 1 || 1);
-            return (
-              <SvgText
-                key={`x-label-${index}`}
-                x={x}
-                y={height - 8}
-                fill={colors.textSecondary}
-              >
-                {label}
-              </SvgText>
-            );
-          })}
-        </G>
-
-        {/* Area under line */}
+    <View style={[styles.container, { width: chartWidth, height: chartHeight }]}>
+      <Svg width={chartWidth} height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
         <Path
-          d={areaPath}
-          fill={color}
-          opacity="0.2"
-        />
-
-        {/* Line */}
-        <Path
-          d={linePath}
+          d={pathD}
           fill="none"
-          stroke={color}
-          strokeWidth="2"
+          stroke={color || colors.primary}
+          strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-
-        {/* Data points */}
-        {points.map((point, index) => (
-          <Circle
-            key={`point-${index}`}
-            cx={point.x}
-            cy={point.y}
-            r="4"
-            fill={color}
-            stroke={colors.surface}
-            strokeWidth="2"
-          />
-        ))}
       </Svg>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
 });
 
-export default SensorChart;
+SensorChart.displayName = 'SensorChart';
 
+export default SensorChart;

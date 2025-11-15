@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -49,16 +49,39 @@ const SensorChartScreen = ({ navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customDateRange, setCustomDateRange] = useState(null);
 
-  // Load telemetry data when device or time range changes
-  useEffect(() => {
-    if (selectedDevice) {
-      loadTelemetryData();
-    } else {
-      setTelemetryData([]);
+  // Format time label for chart
+  const formatTimeLabel = useCallback((timestamp) => {
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        return '';
+      }
+      
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      
+      if (isNaN(diffMs) || diffMs < 0) {
+        return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      }
+      
+      const diffHours = diffMs / (1000 * 60 * 60);
+      
+      if (diffHours < 1) {
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        return `${diffMins}m`;
+      } else if (diffHours < 24) {
+        return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      } else {
+        return date.toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }) + ' ' +
+               date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      }
+    } catch (err) {
+      log.warn('Error formatting time label:', err);
+      return '';
     }
-  }, [selectedDevice, selectedTimeRange, customDateRange]);
+  }, []);
 
-  const loadTelemetryData = async () => {
+  const loadTelemetryData = useCallback(async () => {
     if (!selectedDevice) return;
     
     try {
@@ -71,28 +94,55 @@ const SensorChartScreen = ({ navigation }) => {
       
       log.info(`Loading telemetry data for device ${selectedDevice}, hours: ${hours}`);
       
-      const response = await apiService.getTelemetryHistory(selectedDevice, hours, 2000);
+      const response = await apiService.getTelemetryHistory(selectedDevice, hours);
       
       if (response.success && response.data) {
-        let data = response.data;
+        let data = Array.isArray(response.data) ? response.data : [];
+        
+        // Limit data immediately to prevent memory issues
+        const MAX_LOAD_RECORDS = 1500;
+        if (data.length > MAX_LOAD_RECORDS) {
+          log.warn(`Limiting data from ${data.length} to ${MAX_LOAD_RECORDS} records`);
+          data = data.slice(0, MAX_LOAD_RECORDS);
+        }
         
         // Filter by custom date range if set
         if (customDateRange) {
           data = data.filter(item => {
-            const itemDate = new Date(item.createdAt || item.payload?.ts);
-            return itemDate >= customDateRange.startDate && itemDate <= customDateRange.endDate;
+            try {
+              const itemDate = new Date(item.createdAt || item.payload?.ts);
+              if (isNaN(itemDate.getTime())) return false;
+              return itemDate >= customDateRange.startDate && itemDate <= customDateRange.endDate;
+            } catch {
+              return false;
+            }
           });
         }
         
-        // Sort by timestamp ascending
-        data.sort((a, b) => {
-          const timeA = new Date(a.createdAt || a.payload?.ts || 0).getTime();
-          const timeB = new Date(b.createdAt || b.payload?.ts || 0).getTime();
-          return timeA - timeB;
-        });
+        // Sort by timestamp ascending with error handling
+        try {
+          data.sort((a, b) => {
+            try {
+              const timeA = new Date(a.createdAt || a.payload?.ts || 0).getTime();
+              const timeB = new Date(b.createdAt || b.payload?.ts || 0).getTime();
+              if (isNaN(timeA) || isNaN(timeB)) return 0;
+              return timeA - timeB;
+            } catch {
+              return 0;
+            }
+          });
+        } catch (sortErr) {
+          log.error('Error sorting data:', sortErr);
+        }
         
-        setTelemetryData(data);
-        log.info(`Loaded ${data.length} telemetry records`);
+        // Only set data if we have valid data
+        if (data.length > 0) {
+          setTelemetryData(data);
+          log.info(`Loaded ${data.length} telemetry records`);
+        } else {
+          setTelemetryData([]);
+          log.info('No valid telemetry records after processing');
+        }
       } else {
         setTelemetryData([]);
       }
@@ -103,62 +153,93 @@ const SensorChartScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDevice, selectedTimeRange, customDateRange, t]);
+
+  // Load telemetry data when device or time range changes
+  useEffect(() => {
+    let isMounted = true;
+    
+    if (selectedDevice) {
+      loadTelemetryData().catch(err => {
+        if (isMounted) {
+          log.error('Error in loadTelemetryData:', err);
+        }
+      });
+    } else {
+      setTelemetryData([]);
+    }
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [loadTelemetryData]);
 
   // Process data for chart
   const chartData = useMemo(() => {
-    if (!telemetryData.length || !selectedSensor) return { labels: [], datasets: [] };
-    
-    const sensorConfig = SENSOR_TYPES[selectedSensor];
-    if (!sensorConfig) return { labels: [], datasets: [] };
-    
-    const data = telemetryData
-      .map(item => {
-        const payload = item.payload || {};
-        const value = payload[sensorConfig.key];
-        
-        if (value === null || value === undefined) return null;
-        
-        const timestamp = new Date(item.createdAt || payload.ts || Date.now());
-        return {
-          timestamp,
-          value: Number(value),
-          label: formatTimeLabel(timestamp),
-        };
-      })
-      .filter(item => item !== null);
-    
-    // Sample data if too many points (> 100 points)
-    const maxPoints = 100;
-    let sampledData = data;
-    if (data.length > maxPoints) {
-      const step = Math.ceil(data.length / maxPoints);
-      sampledData = data.filter((_, index) => index % step === 0 || index === data.length - 1);
+    try {
+      if (!telemetryData.length || !selectedSensor) return { labels: [], values: [], timestamps: [] };
+      
+      const sensorConfig = SENSOR_TYPES[selectedSensor];
+      if (!sensorConfig) return { labels: [], values: [], timestamps: [] };
+      
+      // Limit processing to avoid crash with too much data
+      const maxProcess = 1000; // Reduced to 1000 for better performance
+      const limitedData = telemetryData.slice(0, maxProcess);
+      
+      // Process data with batch processing to avoid blocking
+      const data = [];
+      for (let i = 0; i < limitedData.length; i++) {
+        try {
+          const item = limitedData[i];
+          const payload = item?.payload || {};
+          const value = payload[sensorConfig.key];
+          
+          // Treat null/undefined as 0
+          const numValue = (value === null || value === undefined) ? 0 : Number(value);
+          if (isNaN(numValue)) continue;
+          
+          const timestamp = new Date(item?.createdAt || payload?.ts || Date.now());
+          if (isNaN(timestamp.getTime())) continue;
+          
+          const label = formatTimeLabel(timestamp);
+          if (!label) continue; // Skip if label is empty
+          
+          data.push({
+            timestamp,
+            value: numValue,
+            label,
+          });
+        } catch (err) {
+          log.warn('Error processing data item:', err);
+          continue; // Skip this item
+        }
+      }
+      
+      // Sample data if too many points (> 150 points for better performance)
+      const maxPoints = 150;
+      let sampledData = data;
+      if (data.length > maxPoints) {
+        const step = Math.ceil(data.length / maxPoints);
+        sampledData = [];
+        for (let i = 0; i < data.length; i += step) {
+          sampledData.push(data[i]);
+        }
+        // Always include last point
+        if (sampledData[sampledData.length - 1] !== data[data.length - 1]) {
+          sampledData.push(data[data.length - 1]);
+        }
+      }
+      
+      return {
+        labels: sampledData.map(item => item.label).filter(Boolean),
+        values: sampledData.map(item => item.value).filter(v => !isNaN(v)),
+        timestamps: sampledData.map(item => item.timestamp),
+      };
+    } catch (error) {
+      log.error('Error processing chart data:', error);
+      return { labels: [], values: [], timestamps: [] };
     }
-    
-    return {
-      labels: sampledData.map(item => item.label),
-      values: sampledData.map(item => item.value),
-      timestamps: sampledData.map(item => item.timestamp),
-    };
-  }, [telemetryData, selectedSensor, t]);
-
-  const formatTimeLabel = (timestamp) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffHours = diffMs / (1000 * 60 * 60);
-    
-    if (diffHours < 1) {
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      return `${diffMins}m`;
-    } else if (diffHours < 24) {
-      return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    } else {
-      return date.toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }) + ' ' +
-             date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    }
-  };
+  }, [telemetryData, selectedSensor, t, formatTimeLabel]);
 
   const handleCustomDateRange = (startDate, endDate) => {
     setCustomDateRange({ startDate, endDate });
@@ -351,12 +432,14 @@ const SensorChartScreen = ({ navigation }) => {
                     </View>
                   )}
                 </View>
-                <SensorChart
-                  data={chartData}
-                  color={sensorColor}
-                  unit={sensorConfig.unit}
-                  height={250}
-                />
+                {chartData.labels.length > 0 && chartData.values.length > 0 && (
+                  <SensorChart
+                    data={chartData}
+                    color={sensorColor}
+                    unit={sensorConfig.unit}
+                    height={250}
+                  />
+                )}
               </View>
             )}
           </>

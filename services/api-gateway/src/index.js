@@ -154,6 +154,9 @@ function secureProxy(targetBaseUrl) {
 // Devices service (preserve '/api/devices' path for downstream)
 app.use('/api/devices', ...secureProxy(DEVICES_SERVICE_URL));
 
+// Logs service (part of devices-service, preserve '/api/logs' path)
+app.use('/api/logs', ...secureProxy(DEVICES_SERVICE_URL));
+
 // Rules service (preserve '/api/rules')
 app.use('/api/rules', ...secureProxy(RULES_SERVICE_URL));
 

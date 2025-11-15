@@ -194,7 +194,7 @@ export const getTelemetryHistory = async (req, res) => {
     const { deviceId } = req.params;
     const userId = req.user?.sub;
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'service';
-    const { hours = 24, limit = 1000 } = req.query;
+    const { hours = 24 } = req.query;
     
     // Check device ownership
     if (userId) {
@@ -215,14 +215,31 @@ export const getTelemetryHistory = async (req, res) => {
       createdAt: { $gte: startDate }
     })
     .sort({ createdAt: -1 })
-    .limit(parseInt(limit))
-    .select('payload createdAt');
+    .select('payload createdAt')
+    .lean();
+    
+    const normalizedLogs = logs.map(log => ({
+      ...log,
+      payload: {
+        ...log.payload,
+        temp: log.payload?.temp ?? 0,
+        humid: log.payload?.humid ?? 0,
+        smoke: log.payload?.smoke ?? 0,
+        gas_ppm: log.payload?.gas_ppm ?? 0,
+        o: {
+          o1: log.payload?.o?.o1 ?? false,
+          o2: log.payload?.o?.o2 ?? false,
+          o3: log.payload?.o?.o3 ?? false,
+          o4: log.payload?.o?.o4 ?? false,
+        }
+      }
+    }));
     
     res.json({
       success: true,
-      data: logs,
+      data: normalizedLogs,
       period: `${hours} hours`,
-      count: logs.length
+      count: normalizedLogs.length
     });
   } catch (error) {
     logger.error('Error fetching telemetry history:', error);
