@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
-import axios from 'axios';
+import EmailService from '../services/EmailService.js';
 import logger from '../utils/logger.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-strong-secret';
@@ -271,5 +271,137 @@ export const changePassword = async (req, res) => {
       return res.status(401).json({ error: 'invalid_token' });
     }
     res.status(500).json({ error: 'password_change_failed' });
+  }
+};
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'email_required' });
+    }
+
+    // Kiểm tra email có tồn tại không
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.json({ 
+        message: 'If the email exists, a reset code has been sent' 
+      });
+    }
+
+    // Tạo mã reset và lưu vào user
+    await user.setResetCode();
+    
+    // Gửi email trực tiếp
+    try {
+      const emailService = new EmailService();
+      await emailService.sendPasswordResetEmail(
+        email.toLowerCase(), 
+        user.resetCode, 
+        user.name
+      );
+      
+      logger.info('Password reset code sent successfully', { 
+        email: email.toLowerCase(),
+        code: user.resetCode 
+      });
+    } catch (emailError) {
+      logger.error('Failed to send password reset email:', emailError);
+    }
+
+    res.json({ 
+      message: 'If the email exists, a reset code has been sent' 
+    });
+  } catch (err) {
+    logger.error('Forgot password error:', err);
+    res.status(500).json({ error: 'forgot_password_failed' });
+  }
+};
+
+export const verifyResetCode = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    
+    if (!email || !code) {
+      return res.status(400).json({ error: 'email_and_code_required' });
+    }
+
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: 'invalid_code_format' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ error: 'user_not_found' });
+    }
+
+    const result = user.verifyResetCode(code);
+    
+    if (!result.valid) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json({ 
+      message: 'Code verified successfully',
+      expiresAt: user.resetCodeExpires
+    });
+  } catch (err) {
+    logger.error('Verify reset code error:', err);
+    res.status(500).json({ error: 'verify_code_failed' });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: 'email_code_and_password_required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'password_must_be_at_least_6_characters' });
+    }
+
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: 'invalid_code_format' });
+    }
+
+    // Tìm user
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ error: 'user_not_found' });
+    }
+
+    // Xác thực mã một lần nữa
+    const result = user.verifyResetCode(code);
+    
+    if (!result.valid) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    // Hash mật khẩu mới
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    
+    // Cập nhật mật khẩu và xóa mã reset
+    await User.findByIdAndUpdate(user._id, { 
+      passwordHash: newPasswordHash,
+      resetCode: null,
+      resetCodeExpires: null,
+      resetCodeAttempts: 0
+    });
+
+    logger.info('Password reset successfully', { 
+      email: email.toLowerCase(),
+      userId: user.userId 
+    });
+
+    res.json({ 
+      message: 'Password reset successfully' 
+    });
+  } catch (err) {
+    logger.error('Reset password error:', err);
+    res.status(500).json({ error: 'reset_password_failed' });
   }
 };

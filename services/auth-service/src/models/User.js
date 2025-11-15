@@ -53,6 +53,18 @@ const userSchema = new mongoose.Schema({
     unique: true,
     sparse: true,
     trim: true
+  },
+  resetCode: {
+    type: String,
+    default: null
+  },
+  resetCodeExpires: {
+    type: Date,
+    default: null
+  },
+  resetCodeAttempts: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true
@@ -93,6 +105,47 @@ userSchema.statics.generateUserId = function() {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substr(2, 5);
   return `user_${timestamp}_${random}`;
+};
+
+// Password reset methods
+userSchema.statics.generateResetCode = function() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+userSchema.methods.setResetCode = function() {
+  this.resetCode = this.constructor.generateResetCode();
+  this.resetCodeExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  this.resetCodeAttempts = 0;
+  return this.save();
+};
+
+userSchema.methods.verifyResetCode = function(code) {
+  if (!this.resetCode || !this.resetCodeExpires) {
+    return { valid: false, error: 'no_reset_code' };
+  }
+  
+  if (new Date() > this.resetCodeExpires) {
+    return { valid: false, error: 'code_expired' };
+  }
+  
+  if (this.resetCodeAttempts >= 5) {
+    return { valid: false, error: 'too_many_attempts' };
+  }
+  
+  if (this.resetCode !== code) {
+    this.resetCodeAttempts += 1;
+    this.save();
+    return { valid: false, error: 'invalid_code' };
+  }
+  
+  return { valid: true };
+};
+
+userSchema.methods.clearResetCode = function() {
+  this.resetCode = null;
+  this.resetCodeExpires = null;
+  this.resetCodeAttempts = 0;
+  return this.save();
 };
 
 const User = mongoose.model('User', userSchema);

@@ -172,7 +172,7 @@ class NotificationService {
         break;
       case 'fcm':
         if (preferences.fcm.tokens.length > 0) {
-          if (notification.priority === 'urgent' || notification.category === 'security' || notification.type === 'security_alert' || notification.type === 'consolidated_alert') {
+          if (notification.priority === 'urgent' || notification.category === 'security' || notification.type === 'security_alert' || notification.type === 'consolidated_alert' || notification.type === 'escalation_alert') {
             result = await this.fcmService.sendEmergency(
               preferences.fcm.tokens,
               title,

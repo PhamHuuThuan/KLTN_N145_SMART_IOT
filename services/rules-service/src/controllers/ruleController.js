@@ -227,15 +227,14 @@ export const toggleRuleStatus = async (req, res) => {
 export const respondToAlert = async (req, res) => {
   try {
     const { ruleId } = req.params;
-    const { response, metadata = {}, timeoutMs } = req.body || {};
+    const { response, metadata = {} } = req.body || {};
     const userId = req.user?.userId || req.user?.sub;
 
     const result = await ruleEvaluationService.handleUserResponse({
       userId,
       ruleId,
       response,
-      metadata,
-      timeoutMs
+      metadata
     });
 
     res.json({

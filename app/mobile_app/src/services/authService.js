@@ -91,10 +91,22 @@ class AuthService {
       this.log.error('Login failed:', {
         email,
         message: error.message,
-        status: error.response?.status
+        status: error.response?.status,
+        data: error.response?.data
       });
       
-      const errorMessage = error.response?.data?.error || 'Login failed';
+      let errorMessage = 'Đăng nhập thất bại';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Email hoặc mật khẩu không đúng';
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Thông tin đăng nhập không hợp lệ';
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return { success: false, error: errorMessage };
     }
   }
@@ -154,6 +166,76 @@ class AuthService {
     } catch (error) {
       this.log.error('Failed to change password:', error.message);
       const errorMessage = error.response?.data?.error || 'Failed to change password';
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  async forgotPassword(email) {
+    try {
+      this.log.info('Requesting password reset for:', email);
+      
+      const response = await authClient.post('/auth/forgot-password', {
+        email,
+      });
+      
+      this.log.info('Password reset request sent successfully');
+      return { success: true, message: response.data.message };
+    } catch (error) {
+      this.log.error('Failed to request password reset:', error.message);
+      const errorMessage = error.response?.data?.error || 'Failed to request password reset';
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  async verifyResetCode(email, code) {
+    try {
+      this.log.info('Verifying reset code for:', email);
+      
+      const response = await authClient.post('/auth/verify-reset-code', {
+        email,
+        code,
+      });
+      
+      this.log.info('Reset code verified successfully');
+      return { success: true, message: response.data.message, expiresAt: response.data.expiresAt };
+    } catch (error) {
+      this.log.error('Failed to verify reset code:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      
+      let errorMessage = 'Mã xác nhận không hợp lệ';
+      
+      if (error.response?.status === 400) {
+        errorMessage = 'Mã xác nhận không đúng hoặc đã hết hạn';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Không tìm thấy mã xác nhận';
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  async resetPassword(email, code, newPassword) {
+    try {
+      this.log.info('Resetting password for:', email);
+      
+      const response = await authClient.post('/auth/reset-password', {
+        email,
+        code,
+        newPassword,
+      });
+      
+      this.log.info('Password reset successfully');
+      return { success: true, message: response.data.message };
+    } catch (error) {
+      this.log.error('Failed to reset password:', error.message);
+      const errorMessage = error.response?.data?.error || 'Failed to reset password';
       return { success: false, error: errorMessage };
     }
   }
