@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useDeviceData } from '../hooks/useDeviceData';
 import Header from '../components/Header';
 import SensorChart from '../components/SensorChart';
+import AnimatedNavBar from '../components/AnimatedNavBar';
 import apiService from '../services/apiService';
 import { createLogger } from '../utils/logger';
 
@@ -49,6 +50,7 @@ const SensorChartScreen = ({ navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customDateRange, setCustomDateRange] = useState(null);
   const [selectedLog, setSelectedLog] = useState(null);
+  const loadDataTimeoutRef = useRef(null);
 
   // Format time label for chart
   const formatTimeLabel = useCallback((timestamp) => {
@@ -101,7 +103,7 @@ const SensorChartScreen = ({ navigation }) => {
         let data = Array.isArray(response.data) ? response.data : [];
         
         // Limit data immediately to prevent memory issues
-        const MAX_LOAD_RECORDS = 1500;
+        const MAX_LOAD_RECORDS = 100000;
         if (data.length > MAX_LOAD_RECORDS) {
           log.warn(`Limiting data from ${data.length} to ${MAX_LOAD_RECORDS} records`);
           data = data.slice(0, MAX_LOAD_RECORDS);
@@ -156,24 +158,100 @@ const SensorChartScreen = ({ navigation }) => {
     }
   }, [selectedDevice, selectedTimeRange, customDateRange, t]);
 
-  // Load telemetry data when device or time range changes
+  // Helper function to check sensor data availability
+  const checkSensorDataAvailability = useCallback(() => {
+    if (!telemetryData.length) {
+      return {};
+    }
+    
+    const sensorDataAvailability = {};
+    Object.keys(SENSOR_TYPES).forEach(sensorKey => {
+      const sensorConfig = SENSOR_TYPES[sensorKey];
+      const hasData = telemetryData.some(item => {
+        const payload = item?.payload || {};
+        const value = payload[sensorConfig.key];
+        return value !== null && value !== undefined && !isNaN(Number(value)) && isFinite(Number(value));
+      });
+      sensorDataAvailability[sensorKey] = hasData;
+    });
+    
+    return sensorDataAvailability;
+  }, [telemetryData]);
+
+  // Auto-select sensor with available data when telemetry data is loaded
   useEffect(() => {
+    if (!telemetryData.length) {
+      return;
+    }
+    
+    const sensorDataAvailability = checkSensorDataAvailability();
+    log.info('Sensor data availability:', sensorDataAvailability);
+    
+    // Check if current selected sensor has data
+    const currentHasData = sensorDataAvailability[selectedSensor];
+    
+    // If current sensor has no data, select first available sensor
+    if (!currentHasData) {
+      const firstAvailableSensor = Object.keys(sensorDataAvailability).find(
+        key => sensorDataAvailability[key]
+      );
+      if (firstAvailableSensor && firstAvailableSensor !== selectedSensor) {
+        log.info(`Auto-selecting sensor: ${firstAvailableSensor} (current: ${selectedSensor} has no data)`);
+        setSelectedSensor(firstAvailableSensor);
+      }
+    }
+  }, [telemetryData, checkSensorDataAvailability]); // Only depend on telemetryData to avoid loops
+
+  // Also check when selectedSensor changes (user manually selects)
+  useEffect(() => {
+    if (!telemetryData.length) {
+      return;
+    }
+    
+    const sensorDataAvailability = checkSensorDataAvailability();
+    const currentHasData = sensorDataAvailability[selectedSensor];
+    
+    // If user selected a sensor with no data, auto-switch to first available
+    if (!currentHasData) {
+      const firstAvailableSensor = Object.keys(sensorDataAvailability).find(
+        key => sensorDataAvailability[key]
+      );
+      if (firstAvailableSensor && firstAvailableSensor !== selectedSensor) {
+        log.info(`Switching from ${selectedSensor} (no data) to ${firstAvailableSensor}`);
+        setSelectedSensor(firstAvailableSensor);
+      }
+    }
+  }, [selectedSensor, checkSensorDataAvailability]);
+
+  useEffect(() => {
+    // Clear any pending timeout
+    if (loadDataTimeoutRef.current) {
+      clearTimeout(loadDataTimeoutRef.current);
+    }
+    
     let isMounted = true;
     
     if (selectedDevice) {
-      loadTelemetryData().catch(err => {
+      loadDataTimeoutRef.current = setTimeout(() => {
         if (isMounted) {
-          log.error('Error in loadTelemetryData:', err);
+          loadTelemetryData().catch(err => {
+            if (isMounted) {
+              log.error('Error in loadTelemetryData:', err);
+            }
+          });
         }
-      });
+      }, 150); // Small delay to let UI update first
     } else {
       setTelemetryData([]);
     }
     
     return () => {
       isMounted = false;
+      if (loadDataTimeoutRef.current) {
+        clearTimeout(loadDataTimeoutRef.current);
+      }
     };
-  }, [loadTelemetryData]);
+  }, [loadTelemetryData, selectedDevice]); // Only reload when device or time range changes, not sensor
 
   // Process data for chart
   const chartData = useMemo(() => {
@@ -183,98 +261,219 @@ const SensorChartScreen = ({ navigation }) => {
       const sensorConfig = SENSOR_TYPES[selectedSensor];
       if (!sensorConfig) return { labels: [], values: [], timestamps: [] };
       
-      // Limit processing to avoid crash with too much data
-      const maxProcess = 1000; // Reduced to 1000 for better performance
-      const limitedData = telemetryData.slice(0, maxProcess);
+      // Special handling for smoke sensor (binary: 0 or 1)
+      const isSmokeSensor = selectedSensor === 'smoke';
       
-      // Process data with batch processing to avoid blocking
+      // First pass: find minValue and maxValue from valid values (only for non-smoke sensors)
+      // For smoke sensor, minValue is always 0 and maxValue is always 1
+      let minValue = 0;
+      let maxValue = 1;
+      
+      if (!isSmokeSensor) {
+        minValue = Infinity;
+        maxValue = -Infinity;
+        const validValues = [];
+        
+        for (let i = 0; i < telemetryData.length; i++) {
+          try {
+            const item = telemetryData[i];
+            const payload = item?.payload || {};
+            const value = payload[sensorConfig.key];
+            
+            if (value !== null && value !== undefined) {
+              const numValue = Number(value);
+              if (!isNaN(numValue) && isFinite(numValue)) {
+                validValues.push(numValue);
+                if (numValue < minValue) {
+                  minValue = numValue;
+                }
+                if (numValue > maxValue) {
+                  maxValue = numValue;
+                }
+              }
+            }
+          } catch (err) {
+            // Skip invalid items
+          }
+        }
+        
+        // If no valid values found, use default range
+        if (minValue === Infinity || validValues.length === 0) {
+          minValue = 0;
+          maxValue = 100;
+        } else if (minValue === maxValue) {
+          // If all values are the same, add some padding
+          const padding = Math.max(1, Math.abs(minValue) * 0.1);
+          minValue = minValue - padding;
+          maxValue = maxValue + padding;
+        }
+      }
+      
+      // Second pass: process all data
+      // For smoke sensor, include all points (even null/undefined as 0)
+      // For other sensors, only include points with valid values
       const data = [];
-      for (let i = 0; i < limitedData.length; i++) {
+      for (let i = 0; i < telemetryData.length; i++) {
         try {
-          const item = limitedData[i];
+          const item = telemetryData[i];
           const payload = item?.payload || {};
           const value = payload[sensorConfig.key];
-          
-          // Treat null/undefined as 0
-          const numValue = (value === null || value === undefined) ? 0 : Number(value);
-          if (isNaN(numValue)) continue;
           
           const timestamp = new Date(item?.createdAt || payload?.ts || Date.now());
           if (isNaN(timestamp.getTime())) continue;
           
-          const label = formatTimeLabel(timestamp);
-          if (!label) continue; // Skip if label is empty
-          
-          data.push({
-            timestamp,
-            value: numValue,
-            label,
-          });
+          // For smoke sensor, always include (null/undefined = 0)
+          if (isSmokeSensor) {
+            let numValue = 0;
+            if (value !== null && value !== undefined) {
+              const parsed = Number(value);
+              if (!isNaN(parsed) && isFinite(parsed)) {
+                numValue = parsed > 0 ? 1 : 0;
+              }
+            }
+            
+            const label = formatTimeLabel(timestamp);
+            if (!label) continue;
+            
+            data.push({
+              timestamp,
+              value: numValue,
+              label,
+              isGapPoint: false,
+            });
+          } else {
+            // For other sensors, only include valid values
+            if (value === null || value === undefined) {
+              continue; // Skip null/undefined values for non-smoke sensors
+            }
+            
+            const numValue = Number(value);
+            if (isNaN(numValue) || !isFinite(numValue)) {
+              continue; // Skip invalid numbers
+            }
+            
+            const label = formatTimeLabel(timestamp);
+            if (!label) continue;
+            
+            data.push({
+              timestamp,
+              value: numValue,
+              label,
+              isGapPoint: false,
+            });
+          }
         } catch (err) {
           log.warn('Error processing data item:', err);
           continue; // Skip this item
         }
       }
       
-      // Sample data if too many points (> 150 points for better performance)
-      const maxPoints = 150;
-      let sampledData = data;
-      if (data.length > maxPoints) {
-        const step = Math.ceil(data.length / maxPoints);
-        sampledData = [];
-        for (let i = 0; i < data.length; i += step) {
-          sampledData.push(data[i]);
-        }
-        // Always include last point
-        if (sampledData[sampledData.length - 1] !== data[data.length - 1]) {
-          sampledData.push(data[data.length - 1]);
+      data.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      
+      let timeThreshold = 10 * 60 * 1000;
+      if (customDateRange) {
+        const rangeMs = customDateRange.endDate.getTime() - customDateRange.startDate.getTime();
+        timeThreshold = Math.max(10 * 60 * 1000, rangeMs * 0.05);
+      } else if (selectedTimeRange) {
+        const rangeMs = selectedTimeRange * 60 * 60 * 1000;
+        timeThreshold = Math.max(10 * 60 * 1000, rangeMs * 0.05);
+      }
+      
+      const filledData = [];
+      for (let i = 0; i < data.length; i++) {
+        filledData.push(data[i]);
+        
+        if (i < data.length - 1) {
+          const currentTime = data[i].timestamp.getTime();
+          const nextTime = data[i + 1].timestamp.getTime();
+          const gap = nextTime - currentTime;
+          
+          if (gap > timeThreshold) {
+            // Insert gap point at start of gap
+            const gapStartTime = new Date(currentTime + 1000);
+            const gapStartLabel = formatTimeLabel(gapStartTime);
+            if (gapStartLabel) {
+              filledData.push({
+                timestamp: gapStartTime,
+                value: 0,
+                label: gapStartLabel,
+                isGapPoint: true,
+              });
+            }
+            // Insert gap point at end of gap
+            const gapEndTime = new Date(nextTime - 1000);
+            const gapEndLabel = formatTimeLabel(gapEndTime);
+            if (gapEndLabel) {
+              filledData.push({
+                timestamp: gapEndTime,
+                value: 0,
+                label: gapEndLabel,
+                isGapPoint: true,
+              });
+            }
+          }
         }
       }
       
+      // Sort again after inserting gap points
+      filledData.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      
+      log.info(`Chart data for ${selectedSensor}: ${filledData.length} points, range: [${minValue}, ${maxValue}]`);
+      
       return {
-        labels: sampledData.map(item => item.label).filter(Boolean),
-        values: sampledData.map(item => item.value).filter(v => !isNaN(v)),
-        timestamps: sampledData.map(item => item.timestamp),
+        labels: filledData.map(item => item.label || ''),
+        values: filledData.map(item => item.value),
+        timestamps: filledData.map(item => item.timestamp),
+        isGapPoints: filledData.map(item => item.isGapPoint || false),
       };
     } catch (error) {
       log.error('Error processing chart data:', error);
       return { labels: [], values: [], timestamps: [] };
     }
-  }, [telemetryData, selectedSensor, t, formatTimeLabel]);
-
-  const handleCustomDateRange = (startDate, endDate) => {
-    setCustomDateRange({ startDate, endDate });
-    setSelectedTimeRange(null); // Clear preset range
-    setShowDatePicker(false);
-  };
+  }, [telemetryData, selectedSensor, formatTimeLabel, customDateRange, selectedTimeRange]);
 
   const handlePresetRange = (hours) => {
+    // Update UI immediately - don't wait for data load
     setSelectedTimeRange(hours);
-    setCustomDateRange(null); // Clear custom range
-    setSelectedLog(null); // Clear selected log
+    setCustomDateRange(null);
+    setSelectedLog(null);
+    // Data will be loaded by useEffect with debounce
   };
 
-  // Handle point selection from chart
   const handlePointSelect = useCallback((point, rawData) => {
     if (!point || !point.timestamp) {
       setSelectedLog(null);
       return;
     }
 
-    // Tìm log gốc từ telemetryData dựa trên timestamp
     const timestamp = new Date(point.timestamp);
     if (isNaN(timestamp.getTime())) {
       setSelectedLog(null);
       return;
     }
 
-    // Tìm log gần nhất với timestamp (trong vòng 1 phút)
-    const tolerance = 60 * 1000; // 1 phút
+    // Check if this is a gap point (no data)
+    if (point.isGapPoint) {
+      setSelectedLog({
+        payload: {
+          temp: 0,
+          humid: 0,
+          gas_ppm: 0,
+          smoke: 0,
+          ts: point.timestamp.getTime(),
+        },
+        createdAt: point.timestamp,
+        selectedValue: 0,
+        selectedTimestamp: point.timestamp,
+        isGapPoint: true, // Mark as gap point
+      });
+      return;
+    }
+
     const matchingLog = telemetryData.find(log => {
       const logTime = new Date(log.createdAt || log.payload?.ts);
       if (isNaN(logTime.getTime())) return false;
-      const diff = Math.abs(logTime.getTime() - timestamp.getTime());
-      return diff <= tolerance;
+      return logTime.getTime() === timestamp.getTime();
     });
 
     if (matchingLog) {
@@ -282,9 +481,9 @@ const SensorChartScreen = ({ navigation }) => {
         ...matchingLog,
         selectedValue: point.value,
         selectedTimestamp: point.timestamp,
+        isGapPoint: false,
       });
     } else {
-      // Nếu không tìm thấy, tạo log từ point data
       setSelectedLog({
         payload: {
           temp: selectedSensor === 'temperature' ? point.value : 0,
@@ -296,6 +495,7 @@ const SensorChartScreen = ({ navigation }) => {
         createdAt: point.timestamp,
         selectedValue: point.value,
         selectedTimestamp: point.timestamp,
+        isGapPoint: false,
       });
     }
   }, [telemetryData, selectedSensor]);
@@ -303,15 +503,29 @@ const SensorChartScreen = ({ navigation }) => {
   const sensorConfig = SENSOR_TYPES[selectedSensor];
   const sensorColor = sensorConfig ? colors[sensorConfig.colorKey] || colors.primary : colors.primary;
 
-  // Get device name
   const deviceName = useMemo(() => {
     if (!selectedDevice) return null;
-    // Try to get from deviceData first
     if (deviceData?.name) return deviceData.name;
-    // Fallback to devicesList
     const device = devicesList.find(d => d.deviceId === selectedDevice);
     return device?.name || selectedDevice;
   }, [selectedDevice, deviceData, devicesList]);
+
+  const chartTimeRange = useMemo(() => {
+    if (customDateRange) {
+      return {
+        startTime: customDateRange.startDate,
+        endTime: customDateRange.endDate,
+      };
+    } else if (selectedTimeRange) {
+      const now = new Date();
+      const startTime = new Date(now.getTime() - selectedTimeRange * 60 * 60 * 1000);
+      return {
+        startTime,
+        endTime: now,
+      };
+    }
+    return null;
+  }, [customDateRange, selectedTimeRange]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -339,86 +553,55 @@ const SensorChartScreen = ({ navigation }) => {
           </View>
         ) : (
           <>
-            {/* Compact Controls Bar */}
-            <View style={[styles.controlsBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {/* Sensor Selector - Compact */}
+            {/* Animated Controls Bar */}
+            <View style={[styles.controlsBar, { backgroundColor: 'transparent' }]}>
+              {/* Sensor Selector - Animated NavBar */}
               <View style={styles.controlsRow}>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.compactSelector}
-                >
-                  {Object.entries(SENSOR_TYPES).map(([key, config]) => {
-                    const isSelected = selectedSensor === key;
-                    const itemColor = isSelected ? sensorColor : colors.textSecondary;
-                    return (
-                      <TouchableOpacity
-                        key={key}
-                        style={[
-                          styles.compactButton,
-                          {
-                            backgroundColor: isSelected ? itemColor : colors.backgroundSecondary,
-                            borderColor: isSelected ? itemColor : colors.border,
-                          }
-                        ]}
-                        onPress={() => setSelectedSensor(key)}
-                      >
-                        <MaterialCommunityIcons 
-                          name={config.icon} 
-                          size={18} 
-                          color={isSelected ? colors.white : itemColor} 
-                        />
-                        <Text 
-                          style={[
-                            styles.compactButtonText,
-                            { 
-                              color: isSelected ? colors.white : itemColor 
-                            }
-                          ]}
-                        >
-                          {t(config.label)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
+                <AnimatedNavBar
+                  items={Object.entries(SENSOR_TYPES).map(([sensorKey, config]) => {
+                    // sensorKey is 'temperature', 'humidity', 'gas', 'smoke'
+                    // config.key is 'temp', 'humid', 'gas_ppm', 'smoke' (field name in payload)
+                    // We need to use sensorKey as the item key, not config.key
+                    return {
+                      ...config,
+                      sensorKey, // Store sensor key separately
+                      key: sensorKey, // This is what we use for selection
+                    };
                   })}
-                </ScrollView>
+                  selectedValue={selectedSensor}
+                  onSelect={(key) => {
+                    // Update UI immediately - don't wait for data load
+                    setSelectedSensor(key);
+                    setSelectedLog(null); // Clear selected log when switching sensor
+                    // Data will be loaded by useEffect with debounce
+                  }}
+                  getItemKey={(item) => {
+                    // Ensure we get the correct key
+                    return item?.key;
+                  }}
+                  getItemLabel={(item) => t(item.label)}
+                  getItemIcon={(item) => item.icon}
+                  getItemColor={(item) => {
+                    const config = SENSOR_TYPES[item.key];
+                    return config ? colors[config.colorKey] || colors.primary : colors.primary;
+                  }}
+                  horizontal={true}
+                  style={styles.navBar}
+                />
               </View>
 
-              {/* Time Range - Compact */}
+              {/* Time Range - Animated NavBar */}
               <View style={[styles.controlsRow, styles.controlsRowSpacing]}>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.compactSelector}
-                >
-                  {TIME_RANGES.slice(0, 4).map((range) => {
-                    const isSelected = selectedTimeRange === range.hours;
-                    return (
-                      <TouchableOpacity
-                        key={range.hours}
-                        style={[
-                          styles.compactButton,
-                          {
-                            backgroundColor: isSelected ? colors.primary : colors.backgroundSecondary,
-                            borderColor: isSelected ? colors.primary : colors.border,
-                          }
-                        ]}
-                        onPress={() => handlePresetRange(range.hours)}
-                      >
-                        <Text 
-                          style={[
-                            styles.compactButtonText,
-                            { 
-                              color: isSelected ? colors.white : colors.textSecondary 
-                            }
-                          ]}
-                        >
-                          {t(range.label)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                <AnimatedNavBar
+                  items={TIME_RANGES.slice(0, 4)}
+                  selectedValue={selectedTimeRange}
+                  onSelect={(hours) => handlePresetRange(hours)}
+                  getItemKey={(item) => item.hours}
+                  getItemLabel={(item) => t(item.label)}
+                  getItemColor={() => colors.primary}
+                  horizontal={true}
+                  style={styles.navBar}
+                />
               </View>
 
               {/* Custom Range Display */}
@@ -497,7 +680,9 @@ const SensorChartScreen = ({ navigation }) => {
                         {t('charts.current')}
                       </Text>
                       <Text style={[styles.statValue, { color: sensorColor }]}>
-                        {chartData.values[chartData.values.length - 1]?.toFixed(1)}
+                        {selectedSensor === 'smoke' 
+                          ? chartData.values[chartData.values.length - 1] 
+                          : chartData.values[chartData.values.length - 1]?.toFixed(1)}
                         {sensorConfig.unit}
                       </Text>
                     </View>
@@ -511,6 +696,8 @@ const SensorChartScreen = ({ navigation }) => {
                     height={250}
                     onPointSelect={handlePointSelect}
                     rawData={telemetryData}
+                    timeRange={chartTimeRange}
+                    isBinary={selectedSensor === 'smoke'}
                   />
                 )}
               </View>
@@ -561,7 +748,11 @@ const SensorChartScreen = ({ navigation }) => {
                       {t(sensorConfig.label)}:
                     </Text>
                     <Text style={[styles.logDetailValue, { color: sensorColor, fontWeight: 'bold' }]}>
-                      {selectedLog.selectedValue?.toFixed(1) || '0'}{sensorConfig.unit}
+                      {selectedLog.isGapPoint 
+                        ? (t('charts.noData') || 'Không có thông tin')
+                        : (selectedSensor === 'smoke' 
+                            ? selectedLog.selectedValue 
+                            : selectedLog.selectedValue?.toFixed(1) || '0') + sensorConfig.unit}
                     </Text>
                   </View>
                 </View>
@@ -583,15 +774,7 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   controlsBar: {
-    borderRadius: 12,
-    padding: 12,
     marginBottom: 15,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   controlsRow: {
     flexDirection: 'row',
@@ -600,31 +783,13 @@ const styles = StyleSheet.create({
   controlsRowSpacing: {
     marginTop: 12,
   },
-  controlsLabel: {
-    width: 100,
-    marginRight: 8,
-  },
-  controlsLabelText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  compactSelector: {
+  navBar: {
     flex: 1,
-    flexDirection: 'row',
-  },
-  compactButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 6,
-    borderWidth: 1,
-  },
-  compactButtonText: {
-    marginLeft: 4,
-    fontSize: 12,
-    fontWeight: '500',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   customRangeDisplay: {
     flexDirection: 'row',

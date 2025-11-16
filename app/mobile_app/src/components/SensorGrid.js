@@ -71,9 +71,6 @@ const SensorGrid = ({ deviceData, onViewChart }) => {
             onPress={() => onViewChart(deviceData.deviceId)}
           >
             <MaterialCommunityIcons name="chart-line" size={18} color={colors.white} />
-            <Text style={[styles.chartButtonText, { color: colors.white }]}>
-              {t('sensors.viewChart')}
-            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -121,16 +118,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   chartButton: {
-    flexDirection: 'row',
+    padding: 5,
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  chartButtonText: {
-    marginLeft: 6,
-    fontSize: 12,
-    fontWeight: '600',
+    justifyContent: 'center',
+    borderRadius: 2,
   },
   grid: {
     flexDirection: 'row',
