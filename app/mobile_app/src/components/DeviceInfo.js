@@ -23,6 +23,32 @@ const DeviceInfo = ({ deviceData, compact = false }) => {
 
   const meta = deviceData.metadata || {};
   const firmwareVersion = meta.firmwareVersion || deviceData.firmware?.version;
+  const statusLabel = deviceData.isOnline ? 'Online' : 'Offline';
+  const lastActiveValue =
+    deviceData.lastSeenAt ??
+    deviceData.updatedAt;
+
+  const toDate = (value) => {
+    if (!value) return null;
+    if (typeof value === 'number') {
+      return new Date(Number(value));
+    }
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value);
+      if (!Number.isNaN(parsed)) {
+        return new Date(parsed);
+      }
+      const numeric = Number(value);
+      if (!Number.isNaN(numeric)) {
+        return new Date(numeric);
+      }
+    }
+    return null;
+  };
+
+  const lastActiveDate = toDate(lastActiveValue);
+  const lastActiveLabel = lastActiveDate ? lastActiveDate.toLocaleString() : '--';
+  const statusWithTime = lastActiveValue ? `${statusLabel} · ${lastActiveLabel}` : statusLabel;
 
   React.useEffect(() => {
     log.debug('deviceData updated');
@@ -30,12 +56,14 @@ const DeviceInfo = ({ deviceData, compact = false }) => {
 
   const rows = compact
     ? [
+        { icon: 'power', label: 'Status', value: statusWithTime },
         { icon: 'factory', label: 'Manufacturer', value: meta.manufacturer },
         { icon: 'update', label: 'Firmware', value: firmwareVersion },
         { icon: 'ip', label: 'IP Address', value: meta.ipAddress },
         { icon: 'alphabetical-variant', label: 'MAC Address', value: meta.macAddress },
       ]
     : [
+        { icon: 'power', label: 'Status', value: statusWithTime },
         { icon: 'factory', label: 'Manufacturer', value: meta.manufacturer },
         { icon: 'chip', label: 'Hardware', value: meta.hardwareVersion },
         { icon: 'update', label: 'Firmware', value: firmwareVersion },

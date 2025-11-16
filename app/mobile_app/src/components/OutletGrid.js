@@ -161,7 +161,6 @@ const OutletGrid = ({
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       <Text style={[styles.title, { color: colors.primary }]}>🔌 {t('devices.outletControl')}</Text>
-      <Text style={[styles.deviceInfo, { color: colors.textSecondary }]}>{t('devices.device')}: {selectedDevice || t('devices.notSelected')}</Text>
       
       <View style={styles.grid}>
         {outlets.length === 0 && (

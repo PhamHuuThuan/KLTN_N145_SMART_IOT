@@ -2,6 +2,7 @@ import axios from 'axios';
 import CONFIG from '../constants/config';
 import environment from '../config/environment';
 import { createLogger } from '../utils/logger';
+import { handleUnauthorized } from '../utils/authHandler';
 
 const log = createLogger('API');
 
@@ -56,10 +57,16 @@ apiClient.interceptors.response.use(
     log.info(`${response.status} ${response.config.url}`);
     return response;
   },
-  (error) => {
+  async (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url;
     log.error('Response error', status ? `${status} ${url}` : error?.message || String(error));
+    
+    // Handle 401 Unauthorized - trigger logout
+    if (status === 401) {
+      await handleUnauthorized();
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -261,9 +268,22 @@ class ApiService {
     }
   }
 
-}
+  // Get telemetry history for a device
+  async getTelemetryHistory(deviceId, hours = 24) {
+    try {
+      // Correct endpoint: /api/logs/:deviceId/history (not /api/devices/logs/:deviceId/history)
+      const url = `/api/logs/${deviceId}/history?hours=${hours}`;
+      const response = await apiClient.get(url);
+      return response.data;
+    } catch (error) {
+      log.error('getTelemetryHistory error', error?.message || error);
+      throw new Error(`Failed to fetch telemetry history: ${error.message}`);
+    }
+  }
 
+}
 // Export singleton instance
 const apiService = new ApiService();
 export { apiService };
 export default apiService;
+

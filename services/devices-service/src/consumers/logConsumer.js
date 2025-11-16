@@ -1,6 +1,7 @@
 import { Kafka } from 'kafkajs';
 import DeviceLog from '../models/DeviceLog.js';
 import Device from '../models/Device.js';
+import { DEVICE_STATUS } from '../constants/deviceStatus.js';
 import MessageCount from '../models/MessageCount.js';
 import { emitDeviceTelemetry } from '../realtime/socket.js';
 import dotenv from 'dotenv';
@@ -47,9 +48,9 @@ async function updateDeviceStatus(data) {
     }
 
     // Update device online status
-    device.lastSeenAt = new Date();
-    device.status = 'online';
-    device.lastUpdate = new Date();
+  device.lastSeenAt = new Date();
+  device.status = DEVICE_STATUS.ONLINE;
+  device.lastUpdate = new Date();
     
     // Update outlet statuses if provided
     if (payload.o && typeof payload.o === 'object') {
@@ -181,39 +182,99 @@ async function startLogConsumer() {
             logger.error(`Failed to increment message counters: ${incErr.message}`);
           }
 
+          // Check if log should be saved (skip if changes are too small)
+          const shouldSaveLog = async (logData) => {
+            if (logData.type === 'event' && logData.payload?.ack === true) {
+              return true; // Always save ACK events
+            }
+            
+            if (logData.type !== 'telemetry') {
+              return true; // Save non-telemetry logs
+            }
+            
+            // Get last log for comparison
+            const lastLog = await DeviceLog.findOne({
+              deviceId: logData.deviceId,
+              type: 'telemetry'
+            }).sort({ createdAt: -1 }).lean();
+            
+            if (!lastLog) {
+              return true; // Save first log
+            }
+            
+            const payload = logData.payload || {};
+            const lastPayload = lastLog.payload || {};
+            
+            // Thresholds: temp/humid < 0.2, gas < 4 units
+            const tempDiff = Math.abs((payload.temp || 0) - (lastPayload.temp || 0));
+            const humidDiff = Math.abs((payload.humid || 0) - (lastPayload.humid || 0));
+            const gasDiff = Math.abs((payload.gas_ppm || 0) - (lastPayload.gas_ppm || 0));
+            const smokeDiff = Math.abs((payload.smoke || 0) - (lastPayload.smoke || 0));
+            
+            // Check if outlet status changed
+            const outletChanged = payload.o && lastPayload.o && (
+              (payload.o.o1 !== lastPayload.o.o1) ||
+              (payload.o.o2 !== lastPayload.o.o2) ||
+              (payload.o.o3 !== lastPayload.o.o3) ||
+              (payload.o.o4 !== lastPayload.o.o4)
+            );
+            
+            // Save if significant change or outlet changed
+            if (tempDiff >= 0.2 || humidDiff >= 0.2 || gasDiff >= 4 || smokeDiff > 0 || outletChanged) {
+              return true;
+            }
+            
+            return false; // Skip saving - change too small
+          };
+
           // Create and save device log (including event/ack)
           let savedLog = null;
           try {
-            // Handle event/ack logs with minimal payload
-            let logToSave = logData;
-            if (logData.type === 'event' && logData.payload?.ack === true) {
-              // Extract outlet info from ACK if available
-              const ackOutlets = logData.payload.o || logData.metadata?.ackData?.o || {};
+            // Check if should save (skip small changes)
+            const save = await shouldSaveLog(logData);
+            if (!save) {
+              logger.debug(`Skipping log save for ${logData.deviceId} - changes too small`);
+              // Still update device status but don't save log
+            } else {
+              // Handle event/ack logs with minimal payload
+              let logToSave = logData;
+              if (logData.type === 'event' && logData.payload?.ack === true) {
+                // Extract outlet info from ACK if available
+                const ackOutlets = logData.payload.o || logData.metadata?.ackData?.o || {};
+                
+                logToSave = {
+                  ...logData,
+                  payload: {
+                    ts: logData.payload.ts || Date.now(),
+                    temp: 0,
+                    humid: 0,
+                    smoke: 0,
+                    gas_ppm: 0,
+                    o: {
+                          o1: ackOutlets.o1 ?? false,
+                          o2: ackOutlets.o2 ?? false,
+                          o3: ackOutlets.o3 ?? false,
+                          o4: ackOutlets.o4 ?? false
+                        }
+                  },
+                  metadata: {
+                    ...logData.metadata
+                  }
+                };
+              }
               
-              logToSave = {
-                ...logData,
-                payload: {
-                  ts: logData.payload.ts || Date.now(),
-                  temp: 0,
-                  humid: 0,
-                  smoke: 0,
-                  gas_ppm: 0,
-                  o: {
-                        o1: ackOutlets.o1 ?? false,
-                        o2: ackOutlets.o2 ?? false,
-                        o3: ackOutlets.o3 ?? false,
-                        o4: ackOutlets.o4 ?? false
-                      }
-                },
-                metadata: {
-                  ...logData.metadata
-                }
-              };
+              // Normalize null values to 0
+              if (logToSave.payload) {
+                logToSave.payload.temp = logToSave.payload.temp ?? 0;
+                logToSave.payload.humid = logToSave.payload.humid ?? 0;
+                logToSave.payload.smoke = logToSave.payload.smoke ?? 0;
+                logToSave.payload.gas_ppm = logToSave.payload.gas_ppm ?? 0;
+              }
+              
+              const deviceLog = new DeviceLog(logToSave);
+              await withTimeout(deviceLog.save(), 2000, 'saving device log');
+              savedLog = deviceLog;
             }
-            
-            const deviceLog = new DeviceLog(logToSave);
-            await withTimeout(deviceLog.save(), 2000, 'saving device log');
-            savedLog = deviceLog;
           } catch (saveError) {
             logger.error(`Error saving device log (skipped): ${saveError.message}`);
           }

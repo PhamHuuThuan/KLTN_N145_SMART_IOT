@@ -447,15 +447,43 @@
     "title": "Dữ liệu cảm biến",
     "noDeviceData": "Không tìm thấy dữ liệu thiết bị",
     "noTelemetryData": "Không có dữ liệu đo",
+    "viewChart": "Biểu đồ",
     "labels": {
       "temperature": "Nhiệt độ",
       "humidity": "Độ ẩm",
-      "gasLevel": "Mức khí gas",
+      "gasLevel": "Gas",
       "smoke": "Khói"
     },
     "values": {
       "detected": "Phát hiện",
       "clear": "Bình thường"
+    }
+  },
+  "charts": {
+    "title": "Biểu đồ cảm biến",
+    "selectDevice": "Chọn thiết bị để xem biểu đồ",
+    "selectSensor": "Chọn cảm biến",
+    "selectTimeRange": "Chọn khoảng thời gian",
+    "selectDateRange": "Chọn khoảng ngày",
+    "customRange": "Tùy chỉnh",
+    "more": "Thêm",
+    "loading": "Đang tải dữ liệu...",
+    "loadError": "Lỗi khi tải dữ liệu",
+    "noData": "Không có dữ liệu",
+    "dataPoints": "điểm dữ liệu",
+    "current": "Hiện tại",
+    "logDetail": "Chi tiết log",
+    "time": "Thời gian",
+    "allSensors": "Tất cả cảm biến",
+    "outlets": "Ổ cắm",
+    "timeRange": {
+      "1hour": "1 giờ",
+      "6hours": "6 giờ",
+      "12hours": "12 giờ",
+      "24hours": "24 giờ",
+      "48hours": "48 giờ",
+      "7days": "7 ngày",
+      "30days": "30 ngày"
     }
   },
   "emergency": {

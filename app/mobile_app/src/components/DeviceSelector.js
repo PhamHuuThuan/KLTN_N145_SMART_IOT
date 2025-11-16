@@ -9,12 +9,12 @@ import { useTheme } from '../contexts/ThemeContext';
 import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
 
-const DeviceSelector = ({ 
-  devices, 
-  selectedDevice, 
-  onSelectDevice, 
-  onPressDetails, 
-  onDeviceAdded, 
+const DeviceSelector = ({
+  devices,
+  selectedDevice,
+  onSelectDevice,
+  onPressDetails,
+  onDeviceAdded,
   onDeviceRemoved,
   hasMore,
   loadingMore,
@@ -31,13 +31,35 @@ const DeviceSelector = ({
   const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
   const { user } = useAuth();
 
+  const normalizedDevices = Array.isArray(devices)
+    ? devices.map((device) => (typeof device === 'string' ? { deviceId: device } : device))
+    : [];
+
+  const selectedDeviceData = normalizedDevices.find((device) => device.deviceId === selectedDevice) || null;
+
+  const StatusBadge = ({ status, lastSeenAt }) => {
+    const isOnline = (status || '').toLowerCase() === 'online';
+    const baseColor = isOnline ? colors.success : colors.danger;
+    return (
+      <View style={[
+        styles.statusBadge,
+        { backgroundColor: `${baseColor}22` }
+      ]}>
+        <View style={[
+          styles.statusDot,
+          { backgroundColor: baseColor }
+        ]} />
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.section, { backgroundColor: colors.surface }]}>
       <View style={styles.headerRow}>
         <MaterialCommunityIcons name="devices" size={20} color={colors.primary} />
         <Text style={[styles.sectionTitle, { color: colors.primary }]}>{t('devices.connectedDevices')}</Text>
       </View>
-      {devices.length > 0 ? (
+      {normalizedDevices.length > 0 ? (
         <View style={styles.row}>
           <TouchableOpacity
             style={[styles.selectBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
@@ -46,8 +68,14 @@ const DeviceSelector = ({
           >
             <MaterialCommunityIcons name="chevron-down" size={20} color={colors.gray} />
             <Text style={[styles.selectText, { color: colors.text }]} numberOfLines={1}>
-              {selectedDevice || t('devices.selectDevice')}
+              {selectedDeviceData?.name || selectedDeviceData?.deviceId || t('devices.selectDevice')}
             </Text>
+            {selectedDeviceData?.deviceId && (
+              <StatusBadge
+                status={selectedDeviceData?.status}
+                lastSeenAt={selectedDeviceData?.lastSeenAt || selectedDeviceData?.lastUpdate}
+              />
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -92,27 +120,41 @@ const DeviceSelector = ({
               </TouchableOpacity>
             </View>
             <FlatList
-              data={devices}
-              keyExtractor={(item) => item}
-              renderItem={({ item: deviceId }) => (
+              data={normalizedDevices}
+              keyExtractor={(item) => item.deviceId}
+              renderItem={({ item }) => {
+                const deviceId = item.deviceId;
+                const isSelected = selectedDevice === deviceId;
+                return (
                 <View style={styles.deviceItemContainer}>
                   <TouchableOpacity
                     style={[
                       styles.modalItem,
-                      selectedDevice === deviceId && [styles.modalItemActive, { backgroundColor: colors.backgroundSecondary }]
+                      isSelected && [styles.modalItemActive, { backgroundColor: colors.backgroundSecondary }]
                     ]}
                     onPress={() => {
                       setShowPicker(false);
                       onSelectDevice && onSelectDevice(deviceId);
                     }}
                   >
-                    <Text style={[
-                      styles.modalItemText, 
-                      { color: colors.text },
-                      selectedDevice === deviceId && styles.modalItemTextActive
-                    ]}>
-                      {deviceId}
-                    </Text>
+                    <View style={styles.deviceLabel}>
+                      <Text style={[
+                        styles.modalItemText,
+                        { color: colors.text },
+                        isSelected && styles.modalItemTextActive
+                      ]}>
+                        {item.name || deviceId}
+                      </Text>
+                      {item.name && (
+                        <Text style={[styles.modalItemSubText, { color: colors.textSecondary }]}>
+                          {deviceId}
+                        </Text>
+                      )}
+                    </View>
+                    <StatusBadge
+                      status={item.status}
+                      lastSeenAt={item.lastSeenAt}
+                    />
                     <TouchableOpacity
                       style={[styles.removeButton, { backgroundColor: colors.backgroundSecondary }]}
                       activeOpacity={0.7}
@@ -143,8 +185,8 @@ const DeviceSelector = ({
                                   
                                   // Call onDeviceRemoved callback and auto-select another device
                                   if (onDeviceRemoved) {
-                                    const remainingDevices = devices.filter(d => d !== deviceId);
-                                    const newSelectedDevice = remainingDevices.length > 0 ? remainingDevices[0] : null;
+                                    const remainingDevices = normalizedDevices.filter(d => d.deviceId !== deviceId);
+                                    const newSelectedDevice = remainingDevices.length > 0 ? remainingDevices[0].deviceId : null;
                                     await onDeviceRemoved(deviceId, newSelectedDevice);
                                   }
                                 } else {
@@ -174,7 +216,8 @@ const DeviceSelector = ({
                   </TouchableOpacity>
                   </TouchableOpacity>
                 </View>
-              )}
+              );
+              }}
               onEndReached={() => {
                 if (hasMore && !loadingMore && onLoadMore) {
                   onLoadMore();
@@ -391,6 +434,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -505,6 +565,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     flex: 1,
   },
+  deviceLabel: {
+    flex: 1,
+    marginRight: 10,
+  },
   modalItemActive: {
     // backgroundColor handled by theme
   },
@@ -514,6 +578,10 @@ const styles = StyleSheet.create({
   },
   modalItemTextActive: {
     fontWeight: '700',
+  },
+  modalItemSubText: {
+    fontSize: 12,
+    marginTop: 2,
   },
   deviceItemContainer: {
     flexDirection: 'row',

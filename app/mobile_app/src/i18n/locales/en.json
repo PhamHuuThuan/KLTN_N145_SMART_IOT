@@ -446,15 +446,43 @@
     "title": "Sensor Data",
     "noDeviceData": "Device data not found",
     "noTelemetryData": "No telemetry data",
+    "viewChart": "Chart",
     "labels": {
-      "temperature": "Temperature",
-      "humidity": "Humidity",
-      "gasLevel": "Gas Level",
+      "temperature": "Temp",
+      "humidity": "Humid",
+      "gasLevel": "Gas",
       "smoke": "Smoke"
     },
     "values": {
       "detected": "Detected",
       "clear": "Clear"
+    }
+  },
+  "charts": {
+    "title": "Sensor Charts",
+    "selectDevice": "Select a device to view charts",
+    "selectSensor": "Select Sensor",
+    "selectTimeRange": "Select Time Range",
+    "selectDateRange": "Select Date Range",
+    "customRange": "Custom",
+    "more": "More",
+    "loading": "Loading data...",
+    "loadError": "Failed to load data",
+    "noData": "No data available",
+    "dataPoints": "data points",
+    "current": "Current",
+    "logDetail": "Log Detail",
+    "time": "Time",
+    "allSensors": "All Sensors",
+    "outlets": "Outlets",
+    "timeRange": {
+      "1hour": "1 Hour",
+      "6hours": "6 Hours",
+      "12hours": "12 Hours",
+      "24hours": "24 Hours",
+      "48hours": "48 Hours",
+      "7days": "7 Days",
+      "30days": "30 Days"
     }
   },
   "emergency": {
