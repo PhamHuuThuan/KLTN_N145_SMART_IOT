@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -37,10 +37,20 @@ const TIME_RANGES = [
   { hours: 720, label: 'charts.timeRange.30days' },
 ];
 
-const SensorChartScreen = ({ navigation }) => {
+const SensorChartScreen = ({ navigation, route }) => {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { selectedDevice, deviceData, devicesList } = useDeviceData();
+  
+  const routeDeviceId = route?.params?.deviceId;
+  const { selectedDevice: hookSelectedDevice, deviceData, devicesList, selectDevice } = useDeviceData();
+  
+  const selectedDevice = routeDeviceId || hookSelectedDevice;
+  
+  useEffect(() => {
+    if (routeDeviceId) {
+      selectDevice(routeDeviceId);
+    }
+  }, [routeDeviceId, selectDevice]);
   
   const [selectedSensor, setSelectedSensor] = useState('temperature');
   const [selectedTimeRange, setSelectedTimeRange] = useState(24); // hours

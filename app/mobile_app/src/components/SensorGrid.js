@@ -68,7 +68,7 @@ const SensorGrid = ({ deviceData, onViewChart }) => {
         {onViewChart && deviceData?.deviceId && (
           <TouchableOpacity
             style={[styles.chartButton, { backgroundColor: colors.primary }]}
-            onPress={() => onViewChart(deviceData.deviceId)}
+            onPress={() => onViewChart(deviceData?.deviceId)}
           >
             <MaterialCommunityIcons name="chart-line" size={18} color={colors.white} />
           </TouchableOpacity>

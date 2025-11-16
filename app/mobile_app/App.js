@@ -35,6 +35,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('Home');
   const [currentScreen, setCurrentScreen] = useState('Main');
   const [nativeEmergency, setNativeEmergency] = useState(null);
+  const [navigationParams, setNavigationParams] = useState({});
 
   // Reset to Home tab when user becomes authenticated (login success)
   useEffect(() => {
@@ -117,7 +118,13 @@ function AppContent() {
       case 'Main':
         switch (activeTab) {
           case 'Home':
-            return <HomeScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
+            return <HomeScreen navigation={{ 
+              navigate: (screen, params) => {
+                if (params) setNavigationParams(params);
+                setCurrentScreen(screen);
+              }, 
+              goBack: () => setCurrentScreen('Main') 
+            }} />;
           case 'Chat':
             return <ChatScreen onNavigateToHome={() => setActiveTab('Home')} />;
           case 'Rules':
@@ -138,7 +145,16 @@ function AppContent() {
       case 'ChangePassword':
         return <ChangePasswordScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
       case 'SensorChart':
-        return <SensorChartScreen navigation={{ navigate: setCurrentScreen, goBack: () => setCurrentScreen('Main') }} />;
+        return <SensorChartScreen 
+          navigation={{ 
+            navigate: (screen, params) => {
+              if (params) setNavigationParams(params);
+              setCurrentScreen(screen);
+            }, 
+            goBack: () => setCurrentScreen('Main') 
+          }}
+          route={{ params: navigationParams }}
+        />;
       default:
         return <HomeScreen />;
     }
