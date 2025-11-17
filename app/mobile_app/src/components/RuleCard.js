@@ -79,7 +79,8 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
       'temperature': 'device-thermostat',
       'humidity': 'water-drop',
       'gas_ppm': 'air',
-      'smoke': 'smoke-free'
+      'smoke': 'smoke-free',
+      'flame': 'local-fire-department'
     };
     return iconMap[sensor] || 'sensors';
   };
@@ -89,7 +90,8 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
       'temperature': t('rules.temperature'),
       'humidity': t('rules.humidity'), 
       'gas_ppm': t('rules.gas'),
-      'smoke': t('rules.smoke')
+      'smoke': t('rules.smoke'),
+      'flame': t('rules.flame')
     };
     return labelMap[sensor] || sensor;
   };
@@ -99,7 +101,8 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
       'temperature': '°C',
       'humidity': '%',
       'gas_ppm': ' ppm',
-      'smoke': ' ppm'
+      'smoke': ' ppm',
+      'flame': ''
     };
     return unitMap[sensor] || '';
   };
@@ -155,7 +158,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
                   <View style={styles.statItem}>
                     <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
                     <Text style={styles.statText}>
-                      {t('rules.maxPerDay')} {rule.maxTriggersPerDay || '∞'}
+                      {t('rules.unlimitedAlerts')}
                     </Text>
                   </View>
                 )}

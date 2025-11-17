@@ -21,19 +21,6 @@ const CustomizeModal = ({
     }
   }, [customizeTemplate?.conditions, customFields.conditions, setCustomFields]);
 
-  // Auto-set conditionLogic based on number of conditions
-  React.useEffect(() => {
-    if (customFields.conditions) {
-      if (customFields.conditions.length === 1) {
-        // Nếu chỉ có 1 điều kiện, set conditionLogic thành null
-        setCustomFields(prev => ({ ...prev, conditionLogic: null }));
-      } else if (customFields.conditions.length > 1 && !customFields.conditionLogic) {
-        // Nếu có nhiều điều kiện nhưng chưa có conditionLogic, set mặc định là AND
-        setCustomFields(prev => ({ ...prev, conditionLogic: 'AND' }));
-      }
-    }
-  }, [customFields.conditions, customFields.conditionLogic, setCustomFields]);
-
   const getPriorityColor = (priority) => {
     const priorityMap = {
       'low': '#4CAF50',
@@ -49,7 +36,8 @@ const CustomizeModal = ({
       'temperature': 'device-thermostat',
       'humidity': 'water-drop',
       'gas_ppm': 'air',
-      'smoke': 'smoke-free'
+      'smoke': 'smoke-free',
+      'flame': 'local-fire-department'
     };
     return iconMap[sensor] || 'sensors';
   };
@@ -59,88 +47,36 @@ const CustomizeModal = ({
       'temperature': t('rules.temperature'),
       'humidity': t('rules.humidity'), 
       'gas_ppm': t('rules.gas'),
-      'smoke': t('rules.smoke')
+      'smoke': t('rules.smoke'),
+      'flame': t('rules.flame')
     };
     return labelMap[sensor] || sensor;
   };
 
+  const formatConditionThreshold = (condition, getUnit) => {
+    if (!condition) return '';
+
+    const operator = condition.operator || '';
+    const value = condition.value !== undefined && condition.value !== null
+      ? `${condition.value}`
+      : '';
+    const unit = condition.unit || getUnit(condition.sensor) || '';
+    const normalizedUnit = unit.trim();
+
+    const operatorPart = operator.trim();
+    const valuePart = value.trim();
+
+    const threshold = [operatorPart, valuePart]
+      .filter(Boolean)
+      .join(operatorPart && valuePart ? ' ' : '');
+
+    return `${threshold}${normalizedUnit ? ` ${normalizedUnit}` : ''}`.trim();
+  };
+
   // Validate conditions for logical consistency (value range is now optional/warning only)
   const validateConditions = (conditions) => {
-    if (!conditions || conditions.length === 0) return { valid: false, message: 'Cần ít nhất 1 điều kiện' };
-
-    // Check each condition for required fields
-    for (const condition of conditions) {
-      if (!condition.sensor || !condition.operator || condition.value === undefined || condition.value === '') {
-        return { valid: false, message: 'Tất cả điều kiện phải có đầy đủ thông tin (sensor, operator, value)' };
-      }
-
-      // Only validate if value is a valid number (not blocking on range)
-      if (!validateSensorValue(condition.sensor, condition.value, customFields.priority)) {
-        return { 
-          valid: false, 
-          message: `Giá trị ${condition.sensor} phải là số hợp lệ` 
-        };
-      }
-    }
-
-    // If only one condition, it's valid
-    if (conditions.length < 2) return { valid: true, message: '' };
-
-    // Group conditions by sensor
-    const sensorGroups = {};
-    conditions.forEach(condition => {
-      if (condition.sensor) {
-        if (!sensorGroups[condition.sensor]) {
-          sensorGroups[condition.sensor] = [];
-        }
-        sensorGroups[condition.sensor].push(condition);
-      }
-    });
-
-    // Check each sensor group for conflicts
-    for (const [sensor, sensorConditions] of Object.entries(sensorGroups)) {
-      if (sensorConditions.length < 2) continue;
-
-      const values = sensorConditions.map(c => parseFloat(c.value)).filter(v => !isNaN(v));
-      if (values.length < 2) continue;
-
-      // Check for redundant conditions (same operator, overlapping ranges)
-      const operators = sensorConditions.map(c => c.operator);
-      const hasGreater = operators.some(op => ['>', '>='].includes(op));
-      const hasLess = operators.some(op => ['<', '<='].includes(op));
-
-      if (hasGreater && hasLess) {
-        const maxGreater = Math.max(...values.filter((v, i) => ['>', '>='].includes(operators[i])));
-        const minLess = Math.min(...values.filter((v, i) => ['<', '<='].includes(operators[i])));
-        
-        if (maxGreater >= minLess) {
-          return {
-            valid: false,
-            message: `Mâu thuẫn: ${sensor} > ${maxGreater} và ${sensor} < ${minLess} không thể xảy ra cùng lúc`
-          };
-        }
-      }
-
-      // Check for redundant conditions (same direction)
-      if (hasGreater && !hasLess) {
-        const sortedValues = values.sort((a, b) => a - b);
-        if (sortedValues.length > 1) {
-          return {
-            valid: false,
-            message: `Dư thừa: ${sensor} > ${sortedValues[0]} đã bao gồm ${sensor} > ${sortedValues[sortedValues.length - 1]}`
-          };
-        }
-      }
-
-      if (hasLess && !hasGreater) {
-        const sortedValues = values.sort((a, b) => b - a);
-        if (sortedValues.length > 1) {
-          return {
-            valid: false,
-            message: `Dư thừa: ${sensor} < ${sortedValues[0]} đã bao gồm ${sensor} < ${sortedValues[sortedValues.length - 1]}`
-          };
-        }
-      }
+    if (!conditions || conditions.length === 0) {
+      return { valid: false, message: 'Cần ít nhất 1 điều kiện' };
     }
 
     return { valid: true, message: '' };
@@ -151,68 +87,21 @@ const CustomizeModal = ({
       'temperature': '°C',
       'humidity': '%',
       'gas_ppm': ' ppm',
-      'smoke': ' ppm'
+      'smoke': ' ppm',
+      'flame': ''
     };
     return unitMap[sensor] || '';
   };
 
-  // Validation constraints for sensor values based on priority
-  const getSensorConstraints = (sensor, priority = 'medium') => {
-    const constraints = {
-      'temperature': {
-        'urgent': { min: 40, max: 100, step: 1, defaultValue: 50 },
-        'high': { min: 31, max: 40, step: 1, defaultValue: 35 },
-        'medium': { min: 15, max: 30, step: 1, defaultValue: 25 },
-        'low': { min: 0, max: 15, step: 1, defaultValue: 10 }
-      },
-      'humidity': {
-        'urgent': { min: 80, max: 100, step: 1, defaultValue: 80 },
-        'high': { min: 61, max: 80, step: 1, defaultValue: 70 },
-        'medium': { min: 30, max: 60, step: 1, defaultValue: 45 },
-        'low': { min: 0, max: 30, step: 1, defaultValue: 15 }
-      },
-      'gas_ppm': {
-        'urgent': { min: 1000, max: 2000, step: 10, defaultValue: 1500 },
-        'high': { min: 401, max: 1000, step: 10, defaultValue: 500 },
-        'medium': { min: 200, max: 400, step: 10, defaultValue: 300 },
-        'low': { min: 0, max: 200, step: 10, defaultValue: 100 }
-      },
-      'smoke': {
-        'urgent': { min: 700, max: 1000, step: 1, defaultValue: 850 },
-        'high': { min: 301, max: 700, step: 1, defaultValue: 500 },
-        'medium': { min: 100, max: 300, step: 1, defaultValue: 200 },
-        'low': { min: 0, max: 100, step: 1, defaultValue: 50 }
-      }
+  // Get default cooldown period based on priority
+  const getDefaultCooldownPeriod = (priority) => {
+    const defaults = {
+      'urgent': 30000,   // 30 giây
+      'high': 300000,    // 5 phút
+      'medium': 600000,  // 10 phút
+      'low': 900000      // 15 phút
     };
-    return constraints[sensor]?.[priority] || { min: 0, max: 1000, step: 1, defaultValue: 100 };
-  };
-
-  // Get default value for sensor + priority (for auto-setup)
-  const getDefaultValue = (sensor, priority = 'medium') => {
-    const constraints = getSensorConstraints(sensor, priority);
-    return constraints.defaultValue || 0;
-  };
-
-  // Check if value is in recommended range (warning only, not blocking)
-  const isValueInRecommendedRange = (sensor, value, priority = 'medium') => {
-    const constraints = getSensorConstraints(sensor, priority);
-    const numValue = parseFloat(value);
-    
-    if (isNaN(numValue)) return false;
-    if (numValue < constraints.min || numValue > constraints.max) return false;
-    
-    return true;
-  };
-
-  // Validate sensor value (only check if valid number, not range)
-  const validateSensorValue = (sensor, value, priority = 'medium') => {
-    const numValue = parseFloat(value);
-    return !isNaN(numValue) && numValue >= 0;
-  };
-
-  const getValueHint = (sensor, priority = 'medium') => {
-    const constraints = getSensorConstraints(sensor, priority);
-    return ` (Khuyến nghị: ${constraints.min}-${constraints.max}, Mặc định: ${constraints.defaultValue})`;
+    return defaults[priority] || 300000;
   };
 
   return (
@@ -239,52 +128,13 @@ const CustomizeModal = ({
           style={[styles.input, styles.multilineInput]}
           value={customFields.description}
           onChangeText={(t) => setCustomFields(prev => ({ ...prev, description: t }))}
-          placeholder={t('rules.descriptionPlaceholder')}
           multiline
           textAlignVertical="top"
         />
         {/* Editable Conditions */}
         {customizeTemplate.conditions && customizeTemplate.conditions.length > 0 && (
           <View style={styles.conditionsSection}>
-            <View style={styles.conditionsHeader}>
-              <Text style={styles.sectionTitle}>{t('rules.conditionsEditable')}</Text>
-              <View style={styles.conditionButtons}>
-                <TouchableOpacity
-                  style={[styles.addConditionButton, { backgroundColor: '#4CAF50' }]}
-                  onPress={() => {
-                    const currentPriority = customFields.priority || 'medium';
-                    const newCondition = {
-                      type: 'sensor',
-                      sensor: 'temperature',
-                      operator: '>',
-                      value: getDefaultValue('temperature', currentPriority),
-                      unit: '°C'
-                    };
-                    setCustomFields(prev => ({
-                      ...prev,
-                      conditions: [...(prev.conditions || []), newCondition]
-                    }));
-                  }}
-                >
-                  <MaterialIcons name="add" size={16} color="white" />
-                  <Text style={styles.addConditionText}>{t('rules.add')}</Text>
-                </TouchableOpacity>
-                {customFields.conditions && customFields.conditions.length > 1 && (
-                  <TouchableOpacity
-                    style={[styles.addConditionButton, { backgroundColor: '#F44336' }]}
-                    onPress={() => {
-                      setCustomFields(prev => ({
-                        ...prev,
-                        conditions: prev.conditions.slice(0, -1)
-                      }));
-                    }}
-                  >
-                    <MaterialIcons name="remove" size={16} color="white" />
-                    <Text style={styles.addConditionText}>{t('rules.remove')}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
+            <Text style={styles.sectionTitle}>{t('rules.conditionsPreset', 'Điều kiện cảnh báo cố định')}</Text>
             {customFields.conditions && customFields.conditions.map((condition, index) => (
               <View key={index} style={styles.conditionEditItem}>
                 <View style={styles.conditionHeader}>
@@ -297,112 +147,19 @@ const CustomizeModal = ({
                 </View>
                 
                 <View style={styles.conditionInputs}>
-                  {/* Sensor Type Selector */}
-                  <View style={styles.operatorSelector}>
-                    <Text style={styles.inputLabel}>{t('rules.sensorType')}</Text>
-                    <View style={styles.sensorButtons}>
-                      {[
-                        { key: 'temperature', label: '🌡️', fullLabel: t('rules.temperature') },
-                        { key: 'humidity', label: '💧', fullLabel: t('rules.humidity') },
-                        { key: 'gas_ppm', label: '🚨', fullLabel: t('rules.gas') },
-                        { key: 'smoke', label: '🔥', fullLabel: t('rules.smoke') }
-                      ].map((sensor) => (
-                        <TouchableOpacity
-                          key={sensor.key}
-                          style={[
-                            styles.sensorButton,
-                            customFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonSelected
-                          ]}
-                          onPress={() => {
-                            const newConditions = [...customFields.conditions];
-                            const currentPriority = customFields.priority || 'medium';
-                            newConditions[index] = { 
-                              ...newConditions[index], 
-                              sensor: sensor.key,
-                              unit: getSensorUnit(sensor.key),
-                              value: getDefaultValue(sensor.key, currentPriority)
-                            };
-                            setCustomFields(prev => ({ ...prev, conditions: newConditions }));
-                          }}
-                        >
-                          <Text style={[
-                            styles.sensorButtonText,
-                            customFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonTextSelected
-                          ]}>{sensor.label}</Text>
-                          <Text 
-                            style={[
-                              styles.sensorButtonLabel,
-                              customFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonLabelSelected
-                            ]}
-                            numberOfLines={2}
-                          >{sensor.fullLabel}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-
-                  {/* Operator Selector */}
-                  <View style={styles.operatorSelector}>
-                    <Text style={styles.inputLabel}>{t('rules.operator')}</Text>
-                    <View style={styles.operatorButtons}>
-                      {['>', '<', '>=', '<=', '==', '!='].map((op) => (
-                        <TouchableOpacity
-                          key={op}
-                          style={[
-                            styles.operatorButton,
-                            customFields.conditions?.[index]?.operator === op && styles.operatorButtonSelected
-                          ]}
-                          onPress={() => {
-                            const newConditions = [...customFields.conditions];
-                            newConditions[index] = { ...newConditions[index], operator: op };
-                            setCustomFields(prev => ({ ...prev, conditions: newConditions }));
-                          }}
-                        >
-                          <Text style={[
-                            styles.operatorText,
-                            customFields.conditions?.[index]?.operator === op && styles.operatorTextSelected
-                          ]}>{op}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-
-                  {/* Value Input */}
-                  <View style={styles.valueInput}>
+                  <View style={styles.thresholdContainer}>
                     <Text style={styles.inputLabel}>
-                      {t('rules.value')} {getSensorUnit(condition.sensor)}
-                      {getValueHint(condition.sensor, customFields.priority)}
+                      {t('rules.thresholdValue', 'Ngưỡng cảnh báo')}
                     </Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        customFields.conditions?.[index]?.value !== undefined && 
-                        !validateSensorValue(condition.sensor, customFields.conditions[index].value, customFields.priority) && 
-                        styles.inputError
-                      ]}
-                      value={customFields.conditions?.[index]?.value !== undefined ? String(customFields.conditions[index].value) : ''}
-                      onChangeText={(text) => {
-                        const newConditions = [...customFields.conditions];
-                        const numValue = text === '' ? '' : parseFloat(text);
-                        newConditions[index] = { ...newConditions[index], value: numValue };
-                        setCustomFields(prev => ({ ...prev, conditions: newConditions }));
-                      }}
-                      placeholder={String(getDefaultValue(condition.sensor, customFields.priority))}
-                      keyboardType="numeric"
-                    />
-                    {customFields.conditions?.[index]?.value !== undefined && 
-                     !validateSensorValue(condition.sensor, customFields.conditions[index].value, customFields.priority) && (
-                      <Text style={styles.errorText}>
-                        Giá trị phải là số hợp lệ
+                    <View style={styles.thresholdBadge}>
+                      <MaterialIcons name="tune" size={16} color={CONFIG.COLORS.primary} />
+                      <Text style={styles.thresholdText}>
+                        {formatConditionThreshold(condition, getSensorUnit)}
                       </Text>
-                    )}
-                    {customFields.conditions?.[index]?.value !== undefined && 
-                     validateSensorValue(condition.sensor, customFields.conditions[index].value, customFields.priority) &&
-                     !isValueInRecommendedRange(condition.sensor, customFields.conditions[index].value, customFields.priority) && (
-                      <Text style={styles.warningText}>
-                        ⚠️ Giá trị ngoài khoảng khuyến nghị {getSensorConstraints(condition.sensor, customFields.priority).min}-{getSensorConstraints(condition.sensor, customFields.priority).max} cho mức {customFields.priority}. Bạn vẫn có thể sử dụng giá trị này.
+                    </View>
+                    <Text style={styles.thresholdHint}>
+                      {t('rules.thresholdFixedHint', 'Giá trị do hệ thống thiết lập, liên hệ Admin để thay đổi')}
                       </Text>
-                    )}
                   </View>
                 </View>
               </View>
@@ -422,17 +179,12 @@ const CustomizeModal = ({
                 { borderColor: getPriorityColor(priority) }
               ]}
               onPress={() => {
-                const newPriority = priority;
-                // Auto-update condition values when priority changes
-                if (customFields.conditions && customFields.conditions.length > 0) {
-                  const updatedConditions = customFields.conditions.map(condition => ({
-                    ...condition,
-                    value: getDefaultValue(condition.sensor, newPriority)
-                  }));
-                  setCustomFields(prev => ({ ...prev, priority: newPriority, conditions: updatedConditions }));
-                } else {
-                  setCustomFields(prev => ({ ...prev, priority: newPriority }));
-                }
+                const defaultCooldown = getDefaultCooldownPeriod(priority);
+                setCustomFields(prev => ({ 
+                  ...prev, 
+                  priority,
+                  cooldownPeriod: defaultCooldown
+                }));
               }}
             >
               <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(priority) }]} />
@@ -443,78 +195,40 @@ const CustomizeModal = ({
           ))}
         </View>
 
-        {/* Condition Logic (only show if multiple conditions) */}
-        {customFields.conditions && customFields.conditions.length > 1 && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>{t('rules.conditionLogic')}</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {['AND', 'OR'].map((logic) => (
-                <TouchableOpacity
-                  key={logic}
-                  activeOpacity={0.85}
-                  style={[
-                    styles.priorityChip,
-                    customFields.conditionLogic === logic && [styles.priorityChipSelected, { borderColor: '#2196F3', backgroundColor: '#2196F322' }],
-                    { borderColor: '#2196F3' }
-                  ]}
-                  onPress={() => setCustomFields(prev => ({ ...prev, conditionLogic: logic }))}
-                >
-                  <Text style={[styles.priorityLabel, customFields.conditionLogic === logic && { color: '#2196F3', fontWeight: '700' }]}>
-                    {logic === 'AND' ? t('rules.andAll') : t('rules.orOne')}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Cooldown Period - Hidden for urgent priority */}
-        {customFields.priority !== 'urgent' && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>{t('rules.cooldownPeriod')}</Text>
-            <TextInput
-              style={styles.input}
-              value={customFields.cooldownPeriod ? String(Math.floor(customFields.cooldownPeriod / 60000)) : ''}
-              onChangeText={(text) => {
+        {/* Cooldown Period */}
+        <View style={{ marginTop: 16 }}>
+        <Text style={styles.inputLabel}>
+          {customFields.priority === 'urgent'
+            ? t('rules.cooldownSecondsLabel', 'Thời gian chờ (giây)')
+            : t('rules.cooldownMinutesLabel', 'Thời gian chờ (phút)')
+          }
+        </Text>
+          <TextInput
+            style={styles.input}
+            value={customFields.cooldownPeriod ? (customFields.priority === 'urgent' 
+              ? String(Math.floor(customFields.cooldownPeriod / 1000)) 
+              : String(Math.floor(customFields.cooldownPeriod / 60000))) : ''}
+            onChangeText={(text) => {
+              if (customFields.priority === 'urgent') {
+                const seconds = parseInt(text) || 0;
+                setCustomFields(prev => ({ ...prev, cooldownPeriod: seconds * 1000 }));
+              } else {
                 const minutes = parseInt(text) || 0;
                 setCustomFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
-              }}
-              placeholder="5"
-              keyboardType="numeric"
-            />
-          </View>
-        )}
-
-        {/* Max Triggers Per Day - Hidden for urgent priority */}
-        {customFields.priority !== 'urgent' && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>{t('rules.maxTriggersPerDay')}</Text>
-            <TextInput
-              style={styles.input}
-              value={customFields.maxTriggersPerDay ? String(customFields.maxTriggersPerDay) : ''}
-              onChangeText={(text) => {
-                const max = parseInt(text) || 0;
-                setCustomFields(prev => ({ ...prev, maxTriggersPerDay: max }));
-              }}
-              placeholder="10"
-              keyboardType="numeric"
-            />
-          </View>
-        )}
+              }
+            }}
+            placeholder={customFields.priority === 'urgent' ? "30" : "5"}
+            keyboardType="numeric"
+          />
+        </View>
 
 
-        {/* Emergency Mode Notice for Urgent Priority */}
-        {customFields.priority === 'urgent' && (
-          <View style={{ marginTop: 16, padding: 12, backgroundColor: '#F4433622', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F44336' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              <MaterialIcons name="priority-high" size={16} color="#F44336" />
-              <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>{t('rules.emergencyMode')}</Text>
-            </View>
-            <Text style={{ color: '#F44336', fontSize: 12 }}>
-              {t('rules.emergencyModeDescription')}
-            </Text>
-          </View>
-        )}
+        <View style={styles.infoBanner}>
+          <MaterialIcons name="notifications-active" size={16} color={CONFIG.COLORS.primary} />
+          <Text style={styles.infoBannerText}>
+            {t('rules.unlimitedAlertsHint')}
+          </Text>
+        </View>
 
         {/* Validation Error */}
         {(() => {
@@ -529,7 +243,7 @@ const CustomizeModal = ({
                 {validation.message}
               </Text>
               <Text style={{ color: '#F44336', fontSize: 11, fontStyle: 'italic' }}>
-                💡 Hãy sửa lại điều kiện hoặc chọn logic OR để kích hoạt khi một trong các điều kiện đúng
+                💡 Hãy kiểm tra lại các điều kiện và giá trị cảnh báo trước khi lưu
               </Text>
             </View>
           );
@@ -816,6 +530,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     fontWeight: '500',
+    fontStyle: 'italic',
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: `${CONFIG.COLORS.primary}11`,
+    borderWidth: 1,
+    borderColor: `${CONFIG.COLORS.primary}33`,
+  },
+  infoBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: CONFIG.COLORS.gray,
+    lineHeight: 16,
+  },
+  thresholdContainer: {
+    gap: 6,
+  },
+  thresholdBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: `${CONFIG.COLORS.primary}11`,
+    borderWidth: 1,
+    borderColor: CONFIG.COLORS.primary,
+    gap: 8,
+  },
+  thresholdText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: CONFIG.COLORS.primary,
+  },
+  thresholdHint: {
+    fontSize: 11,
+    color: CONFIG.COLORS.gray,
     fontStyle: 'italic',
   },
 });

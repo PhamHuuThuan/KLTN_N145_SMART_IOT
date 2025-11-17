@@ -53,7 +53,7 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
             <View style={styles.statItem}>
               <MaterialIcons name="repeat" size={12} color={CONFIG.THEME.gray} />
               <Text style={styles.statText}>
-                {t('rules.maxPerDay')} {template.maxTriggersPerDay || '∞'}
+                {t('rules.unlimitedAlerts')}
               </Text>
             </View>
           )}
