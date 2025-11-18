@@ -516,170 +516,52 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       return [];
     }
   
-    const { minValue, maxValue } = points;
-    const displayMin = minValue;
-    const displayMax = maxValue;
-    const displayRange = (displayMax - displayMin) || 1;  // <--- FIX CHÍNH
+    const { low, normal, high } = THRESHOLDS[sensorType];
   
-    const regions = [];
+    let { minValue, maxValue } = points;
+  
+    const displayMin = Math.min(minValue, low, 0);
+    const displayMax = Math.max(maxValue, high);
+  
     const chartBottom = PADDING_Y + chartAreaHeight;
-    const chartTop = PADDING_Y;
+    const chartTop = PADDING_Y;                      
+    const displayRange = (displayMax - displayMin) || 1;
   
     const getYForValue = (value) => {
-      if (displayRange === 0) return chartBottom;
       const ratio = (value - displayMin) / displayRange;
-      const clampedRatio = Math.max(0, Math.min(1, ratio));
-      const y = chartBottom - (chartAreaHeight * clampedRatio);
+      const clamped = Math.max(0, Math.min(1, ratio));
+      const y = chartBottom - chartAreaHeight * clamped;
       return Math.max(chartTop, Math.min(chartBottom, y));
     };
   
-    const { low: lowThreshold, normal: normalThreshold, high: highThreshold } = THRESHOLDS[sensorType];
-  
-    const lowY = getYForValue(lowThreshold);
-    const normalY = getYForValue(normalThreshold);
-    const highY = getYForValue(highThreshold);
-  
-    const clampedLowY = Math.max(chartTop, Math.min(chartBottom, lowY));
-    const clampedNormalY = Math.max(chartTop, Math.min(chartBottom, normalY));
-    const clampedHighY = Math.max(chartTop, Math.min(chartBottom, highY));
 
-    let currentY = chartBottom;
-    
-    if (clampedLowY < currentY && clampedLowY >= chartTop) {
-      regions.push({
-        level: 'low',
-        y: clampedLowY,
-        height: currentY - clampedLowY,
-        color: LEVEL_COLORS.low,
-      });
-      currentY = clampedLowY;
-    } else if (clampedLowY >= chartBottom) {
-      regions.push({
-        level: 'low',
-        y: chartTop,
-        height: chartAreaHeight,
-        color: LEVEL_COLORS.low,
-      });
-      currentY = chartTop;
-    }
-    
-    if (clampedNormalY < currentY && clampedNormalY >= chartTop) {
-      regions.push({
-        level: 'normal',
-        y: clampedNormalY,
-        height: currentY - clampedNormalY,
-        color: LEVEL_COLORS.normal,
-      });
-      currentY = clampedNormalY;
-    }
-    
-    if (clampedHighY < currentY && clampedHighY >= chartTop) {
-      regions.push({
-        level: 'high',
-        y: clampedHighY,
-        height: currentY - clampedHighY,
-        color: LEVEL_COLORS.high,
-      });
-      currentY = clampedHighY;
-    }
-    
-    if (currentY > chartTop) {
-      regions.push({
-        level: 'veryHigh',
-        y: chartTop,
-        height: currentY - chartTop,
-        color: LEVEL_COLORS.veryHigh,
-      });
-    }
-    
-    if (regions.length !== 4) {
-      regions.length = 0;
-      
-      const sortedYs = [clampedLowY, clampedNormalY, clampedHighY]
-        .filter((y, idx, arr) => arr.indexOf(y) === idx)
-        .sort((a, b) => b.y - a.y);
-      
-      let prevY = chartBottom;
-      
-      if (sortedYs.length > 0 && prevY > sortedYs[0]) {
-        regions.push({
-          level: 'low',
-          y: sortedYs[0],
-          height: prevY - sortedYs[0],
-          color: LEVEL_COLORS.low,
-        });
-        prevY = sortedYs[0];
-      } else if (sortedYs.length === 0 || sortedYs[0] >= chartBottom) {
-        regions.push({
-          level: 'low',
-          y: chartTop,
-          height: chartAreaHeight,
-          color: LEVEL_COLORS.low,
-        });
-        prevY = chartTop;
-      }
-      
-      if (sortedYs.length > 1 && prevY > sortedYs[1] && sortedYs[1] >= chartTop) {
-        regions.push({
-          level: 'normal',
-          y: sortedYs[1],
-          height: prevY - sortedYs[1],
-          color: LEVEL_COLORS.normal,
-        });
-        prevY = sortedYs[1];
-      }
-      
-      if (sortedYs.length > 2 && prevY > sortedYs[2] && sortedYs[2] >= chartTop) {
-        regions.push({
-          level: 'high',
-          y: sortedYs[2],
-          height: prevY - sortedYs[2],
-          color: LEVEL_COLORS.high,
-        });
-        prevY = sortedYs[2];
-      }
-      
-      if (prevY > chartTop) {
-        regions.push({
-          level: 'veryHigh',
-          y: chartTop,
-          height: prevY - chartTop,
-          color: LEVEL_COLORS.veryHigh,
-        });
-      }
-      
-      if (regions.length < 4) {
-        // Rebuild with proper order: low, normal, high, veryHigh
-        regions.length = 0;
-        const quarterHeight = chartAreaHeight / 4;
-        regions.push(
-          { level: 'low', y: chartBottom - quarterHeight, height: quarterHeight, color: LEVEL_COLORS.low },
-          { level: 'normal', y: chartBottom - 2 * quarterHeight, height: quarterHeight, color: LEVEL_COLORS.normal },
-          { level: 'high', y: chartBottom - 3 * quarterHeight, height: quarterHeight, color: LEVEL_COLORS.high },
-          { level: 'veryHigh', y: chartTop, height: quarterHeight, color: LEVEL_COLORS.veryHigh }
-        );
-      }
-    }
-    
-    console.log('[SensorChart] Total regions generated:', regions.length);
+    const yMin    = getYForValue(displayMin);
+    const yLow    = getYForValue(low);
+    const yNormal = getYForValue(normal);
+    const yHigh   = getYForValue(high);
+    const yMax    = getYForValue(displayMax);
+
+    const makeRegion = (level, topY, bottomY, color) => {
+      const height = bottomY - topY;
+      if (height <= 0) return null;
+      return { level, y: topY, height, color };
+    };
+  
+    const regionsRaw = [
+      makeRegion('low',      yLow,    yMin,    LEVEL_COLORS.low),
+      makeRegion('normal',   yNormal, yLow,    LEVEL_COLORS.normal),
+      makeRegion('high',     yHigh,   yNormal, LEVEL_COLORS.high),
+      makeRegion('veryHigh', yMax,    yHigh,   LEVEL_COLORS.veryHigh),
+    ];
+  
+    const regions = regionsRaw.filter(Boolean);
+  
     regions.forEach((r, idx) => {
-      console.log(`[SensorChart] Region ${idx + 1}: ${r.level} - y: ${r.y.toFixed(1)}, height: ${r.height.toFixed(1)}, color: ${r.color}`);
+      console.log(
+        `  #${idx + 1} ${r.level} -> y=${r.y.toFixed(1)}, h=${r.height.toFixed(1)}`
+      );
     });
-    
-    if (sensorType === 'temperature') {
-      const testValue = 30.5;
-      const testY = getYForValue(testValue);
-      const testRegion = regions.find(r => {
-        const regionTop = r.y;
-        const regionBottom = r.y + r.height;
-
-        return testY >= regionTop && testY <= regionBottom;
-      });
-      if (testRegion && testRegion.level !== 'normal') {
-        console.warn(`[SensorChart] ERROR: Value ${testValue} should be normal but is in ${testRegion.level} region!`);
-      }
-    }
-    
+  
     return regions;
   }, [sensorType, points, chartAreaHeight, isBinary, LEVEL_COLORS]);
 
