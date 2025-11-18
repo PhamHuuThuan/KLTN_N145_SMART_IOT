@@ -457,6 +457,12 @@
     "values": {
       "detected": "Phát hiện",
       "clear": "Bình thường"
+    },
+    "legend": {
+      "low": "Thấp",
+      "normal": "Bình thường",
+      "high": "Cao",
+      "veryHigh": "Rất cao"
     }
   },
   "charts": {

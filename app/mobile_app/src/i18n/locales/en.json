@@ -456,6 +456,12 @@
     "values": {
       "detected": "Detected",
       "clear": "Clear"
+    },
+    "legend": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High",
+      "veryHigh": "Very High"
     }
   },
   "charts": {
