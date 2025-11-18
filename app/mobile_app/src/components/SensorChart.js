@@ -21,12 +21,12 @@ const THRESHOLDS = {
   smoke: { low: 1.0, normal: 1.4, high: 1.6 },
 };
 
-// Color mapping for levels - Light mode (darker for better visibility on chart)
+// Light mode
 const LEVEL_COLORS_LIGHT = {
-  low: '#90CAF9',      // Darker blue (was #E3F2FD)
-  normal: '#E0E0E0',   // Darker gray (was #F5F5F5)
-  high: '#FFB74D',     // Darker orange (was #FFF3E0)
-  veryHigh: '#EF5350', // Darker red (was #FFEBEE)
+  low: '#90CAF9',
+  normal: '#E0E0E0',
+  high: '#FFB74D', 
+  veryHigh: '#EF5350', 
 };
 
 // Color mapping for levels - Dark mode
@@ -40,6 +40,7 @@ const LEVEL_COLORS_DARK = {
 const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = [], timeRange = null, isBinary = false, sensorType = null }) => {
   const { colors, isDarkMode } = useTheme();
   const [selectedIndex, setSelectedIndex] = useState(null);
+  const [selectedVirtualPoint, setSelectedVirtualPoint] = useState(null);
   
   // Select colors based on theme
   const LEVEL_COLORS = isDarkMode ? LEVEL_COLORS_DARK : LEVEL_COLORS_LIGHT;
@@ -269,25 +270,84 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
           }
         });
       } else {
-        // Normal line chart
+        // Normal line chart - connect continuously using default value for missing data
+        const { minValue, maxValue, minTime, maxTime } = points;
+        const valueRange = maxValue - minValue || 1;
+        const defaultValue = 0;
+        const defaultRatio = (defaultValue - minValue) / valueRange;
+        const defaultY = PADDING_Y + chartAreaHeight - (chartAreaHeight * Math.max(0, Math.min(1, defaultRatio)));
+        
+        const chartStartX = PADDING_X;
+        const chartEndX = PADDING_X + chartAreaWidth;
+        
+        // Check if first point starts from chart start (X=0 position)
+        let needsStartConnection = false;
+        if (points.points.length > 0) {
+          const firstPoint = points.points[0];
+          if (firstPoint.x > chartStartX + 5) { // Small tolerance for rounding
+            needsStartConnection = true;
+          }
+        }
+        
+        // Check if last point ends at chart end
+        let needsEndConnection = false;
+        if (points.points.length > 0) {
+          const lastPoint = points.points[points.points.length - 1];
+          if (lastPoint.x < chartEndX - 5) { // Small tolerance for rounding
+            needsEndConnection = true;
+          }
+        }
+        
+        // Draw line from chart start to first point if needed
+        if (needsStartConnection && points.points.length > 0) {
+          const firstPoint = points.points[0];
+          d = `M ${chartStartX.toFixed(precision)} ${defaultY.toFixed(precision)}`;
+          d += ` L ${firstPoint.x.toFixed(precision)} ${defaultY.toFixed(precision)}`;
+          d += ` L ${firstPoint.x.toFixed(precision)} ${firstPoint.y.toFixed(precision)}`;
+        } else if (points.points.length > 0) {
+          // Start from first point
+          d = `M ${points.points[0].x.toFixed(precision)} ${points.points[0].y.toFixed(precision)}`;
+        }
+        
+        // Draw connections between points
         points.points.forEach((point, idx) => {
-          if (idx === 0) {
-            d = `M ${point.x.toFixed(precision)} ${point.y.toFixed(precision)}`;
-          } else {
+          if (idx === 0 && !needsStartConnection) {
+            // Already handled above
+            return;
+          }
+          
+          if (idx > 0) {
             const prevPoint = points.points[idx - 1];
             if (prevPoint && prevPoint.timestamp && point.timestamp) {
               const timeGap = Math.abs(point.timestamp.getTime() - prevPoint.timestamp.getTime());
               
               if (timeGap > timeThreshold) {
-                d += ` M ${point.x.toFixed(precision)} ${point.y.toFixed(precision)}`;
+                // Missing data gap - draw line down to default, across, then up
+                // Step 1: Line down from previous point to default value
+                d += ` L ${prevPoint.x.toFixed(precision)} ${defaultY.toFixed(precision)}`;
+                // Step 2: Line across at default value to next point X
+                d += ` L ${point.x.toFixed(precision)} ${defaultY.toFixed(precision)}`;
+                // Step 3: Line up from default value to current point
+                d += ` L ${point.x.toFixed(precision)} ${point.y.toFixed(precision)}`;
               } else {
+                // Normal connection
                 d += ` L ${point.x.toFixed(precision)} ${point.y.toFixed(precision)}`;
               }
             } else {
+              // No timestamp - normal connection
               d += ` L ${point.x.toFixed(precision)} ${point.y.toFixed(precision)}`;
             }
           }
         });
+        
+        // Draw line from last point to chart end if needed
+        if (needsEndConnection && points.points.length > 0) {
+          const lastPoint = points.points[points.points.length - 1];
+          // Step 1: Line down from last point to default value
+          d += ` L ${lastPoint.x.toFixed(precision)} ${defaultY.toFixed(precision)}`;
+          // Step 2: Line across at default value to chart end
+          d += ` L ${chartEndX.toFixed(precision)} ${defaultY.toFixed(precision)}`;
+        }
       }
 
       return d;
@@ -350,6 +410,7 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     let minDistance = Infinity;
     let nearestPoint = null;
 
+    // First, try to find an existing point
     points.points.forEach((point) => {
       const xDistance = Math.abs(touchX - point.x);
       // For gap points, use larger tolerance and check both X and Y
@@ -372,8 +433,46 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       }
     });
 
+    // If no point found within tolerance, create a virtual point for missing data
+    // Allow clicking anywhere on the X axis to show default value
+    if (!nearestPoint && touchX >= PADDING_X && touchX <= PADDING_X + chartAreaWidth) {
+      const { minValue, maxValue, minTime, maxTime } = points;
+      const valueRange = maxValue - minValue || 1;
+      
+      // Calculate timestamp from X position
+      let timestamp = null;
+      if (timeRange && timeRange.startTime && timeRange.endTime) {
+        const timeRangeMs = timeRange.endTime.getTime() - timeRange.startTime.getTime();
+        const xRatio = (touchX - PADDING_X) / chartAreaWidth;
+        const timeOffset = timeRangeMs * xRatio;
+        timestamp = new Date(timeRange.startTime.getTime() + timeOffset);
+      } else if (points.points.length > 0 && minTime && maxTime) {
+        const timeRangeMs = maxTime - minTime || 1;
+        const xRatio = (touchX - PADDING_X) / chartAreaWidth;
+        const timeOffset = timeRangeMs * xRatio;
+        timestamp = new Date(minTime + timeOffset);
+      } else {
+        // Fallback: use current time
+        timestamp = new Date();
+      }
+      
+      const defaultValue = 0;
+      const defaultRatio = (defaultValue - minValue) / valueRange;
+      const defaultY = PADDING_Y + chartAreaHeight - (chartAreaHeight * Math.max(0, Math.min(1, defaultRatio)));
+      
+      // Create virtual point for missing data
+      nearestPoint = {
+        x: touchX,
+        y: defaultY,
+        value: defaultValue,
+        timestamp: timestamp,
+        index: -1, // Virtual point has no index
+        isGapPoint: true, // Mark as gap/missing point
+      };
+    }
+
     return nearestPoint;
-  }, [points]);
+  }, [points, timeRange, chartAreaWidth, chartAreaHeight]);
 
   const panResponder = useMemo(
     () =>
@@ -384,24 +483,40 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
           const { locationX, locationY } = evt.nativeEvent;
           const point = findNearestPoint(locationX, locationY);
           if (point) {
-            setSelectedIndex(point.index);
+            //missing data
+            if (point.index === -1) {
+              setSelectedIndex(null);
+              setSelectedVirtualPoint(point);
+            } else {
+              setSelectedIndex(point.index);
+              setSelectedVirtualPoint(null);
+            }
             if (onPointSelect) {
               onPointSelect(point, rawData);
             }
           } else {
             setSelectedIndex(null);
+            setSelectedVirtualPoint(null);
           }
         },
         onPanResponderMove: (evt) => {
           const { locationX, locationY } = evt.nativeEvent;
           const point = findNearestPoint(locationX, locationY);
           if (point) {
-            setSelectedIndex(point.index);
+            // Check if it's a virtual point (missing data)
+            if (point.index === -1) {
+              setSelectedIndex(null);
+              setSelectedVirtualPoint(point);
+            } else {
+              setSelectedIndex(point.index);
+              setSelectedVirtualPoint(null);
+            }
             if (onPointSelect) {
               onPointSelect(point, rawData);
             }
           } else {
             setSelectedIndex(null);
+            setSelectedVirtualPoint(null);
           }
         },
         onPanResponderRelease: () => {
@@ -413,9 +528,8 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
 
   if (!pathD || !points.points || !points.points.length) return null;
 
-  const selectedPoint = selectedIndex !== null ? points.points[selectedIndex] : null;
+  const selectedPoint = selectedVirtualPoint || (selectedIndex !== null && selectedIndex >= 0 ? points.points[selectedIndex] : null);
 
-  // Calculate zero line position - always show if 0 is within or at boundary
   const zeroLineInfo = useMemo(() => {
     const { minValue, maxValue } = points;
     const valueRange = maxValue - minValue || 1;
