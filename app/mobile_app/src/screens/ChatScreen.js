@@ -35,6 +35,9 @@ const ChatScreen = ({ onNavigateToHome }) => {
   // Outlet detail modal state
   const [showOutletDetail, setShowOutletDetail] = useState(false);
   const [selectedOutlet, setSelectedOutlet] = useState(null);
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  const [voiceDraft, setVoiceDraft] = useState('');
+  const [skipVoiceSend, setSkipVoiceSend] = useState(false);
 
   const { parseVoiceCommand, executeVoiceCommand, processTranscript } = useVoiceControl();
   const { controlOutlet: controlOutletHook } = useOutletControl();
@@ -399,21 +402,49 @@ const ChatScreen = ({ onNavigateToHome }) => {
     }
   };
 
-  const { listening, transcript, toggle } = useSpeechToText({
+  const { listening, transcript, toggle, stop } = useSpeechToText({
     locale: 'vi-VN',
-    onResult: undefined,
   });
 
   const [compose, setCompose] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   
   useEffect(() => {
-    // bind transcript to input when listening
-    if (transcript && transcript !== compose) {
-      setCompose(transcript);
+    if (transcript && transcript !== voiceDraft) {
+      setVoiceDraft(transcript);
     }
-    log.info("Listening.transcript", transcript);
-  }, [transcript]);
+  }, [transcript, voiceDraft]);
+
+  useEffect(() => {
+    if (listening) {
+      setVoiceModalVisible(true);
+    } else if (voiceModalVisible) {
+      if (voiceDraft.trim() && !skipVoiceSend) {
+        handleSend(voiceDraft.trim());
+      }
+      setVoiceDraft('');
+      setVoiceModalVisible(false);
+      setSkipVoiceSend(false);
+    }
+  }, [listening, voiceDraft, voiceModalVisible, skipVoiceSend]);
+
+  const handleVoiceToggle = async () => {
+    if (!listening) {
+      setVoiceDraft('');
+    setSkipVoiceSend(false);
+      setVoiceModalVisible(true);
+      await toggle(true);
+    } else {
+      await toggle(false);
+    }
+  };
+
+  const handleVoiceCancel = async () => {
+    setVoiceDraft('');
+    setVoiceModalVisible(false);
+  setSkipVoiceSend(true);
+    await stop();
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -457,7 +488,7 @@ const ChatScreen = ({ onNavigateToHome }) => {
           </View>
           <ChatInput
             onSend={(t) => { handleSend(t); setCompose(''); }}
-            onVoiceToggle={toggle}
+            onVoiceToggle={handleVoiceToggle}
             listening={listening}
             value={compose}
             onChangeText={setCompose}
@@ -487,6 +518,61 @@ const ChatScreen = ({ onNavigateToHome }) => {
           loadDevices();
         }}
       />
+
+      <Modal
+        visible={voiceModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleVoiceCancel}
+      >
+        <View style={styles.voiceModalBackdrop}>
+          <View style={[styles.voiceModal, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity style={styles.voiceClose} onPress={handleVoiceCancel}>
+              <Ionicons name="close" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={[
+              styles.voiceMicCircle,
+              { backgroundColor: listening ? colors.primary : colors.border }
+            ]}>
+              <Ionicons
+                name={listening ? 'mic' : 'mic-outline'}
+                size={28}
+                color={listening ? colors.white : colors.textSecondary}
+              />
+            </View>
+            <Text style={[styles.voiceHint, { color: colors.textSecondary }]}>
+              {listening
+                ? t('chat.voiceListening', 'Đang ghi âm...')
+                : t('chat.voicePreview', 'Đang gửi...')}
+            </Text>
+            <View style={styles.voiceTranscriptBox}>
+              <Text style={[styles.voiceTranscript, { color: colors.text }]}>
+                {voiceDraft || t('chat.voiceListeningPlaceholder', 'Nói nội dung bạn muốn gửi...')}
+              </Text>
+            </View>
+            {listening && (
+              <View style={styles.voiceActions}>
+                <TouchableOpacity
+                  style={[styles.voiceButton, styles.voiceSecondaryButton, { borderColor: colors.border }]}
+                  onPress={handleVoiceCancel}
+                >
+                  <Text style={[styles.voiceButtonText, { color: colors.text }]}>
+                    {t('common.cancel', 'Huỷ')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.voiceButton, { backgroundColor: colors.primary }]}
+                  onPress={() => toggle(false)}
+                >
+                  <Text style={[styles.voiceButtonText, { color: colors.white }]}>
+                    {t('chat.voiceStop', 'Dừng')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -543,6 +629,69 @@ const styles = StyleSheet.create({
   },
   messagesArea: {
     flex: 1,
+  },
+  voiceModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  voiceModal: {
+    width: '100%',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  voiceMicCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  voiceHint: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  voiceTranscriptBox: {
+    width: '100%',
+    minHeight: 80,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    padding: 12,
+    marginBottom: 16,
+  },
+  voiceTranscript: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  voiceClose: {
+    alignSelf: 'flex-end',
+    padding: 6,
+  },
+  voiceActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  voiceButton: {
+    minWidth: 90,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: 'center',
+  },
+  voiceSecondaryButton: {
+    borderWidth: 1,
+  },
+  voiceButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 
