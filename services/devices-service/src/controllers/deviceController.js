@@ -602,29 +602,6 @@ export const updateOutletSettings = async (req, res) => {
     
     await device.save();
     
-    producer.send({
-      topic: 'user-actions',
-      messages: [{
-        key: deviceId,
-        value: JSON.stringify({
-          userId: device.ownerId,
-          deviceId,
-          deviceName: device.name,
-          outletId,
-          outletName: outlet.name,
-          action: 'outlet_settings_updated',
-          result: 'success',
-          metadata: {
-            name: outlet.name,
-            type: outlet.type
-          },
-          timestamp: new Date()
-        })
-      }]
-    }).catch((kafkaError) => {
-      logger.error('Failed to publish outlet settings update event to Kafka:', kafkaError);
-    });
-    
     res.json({
       success: true,
       data: outlet,
