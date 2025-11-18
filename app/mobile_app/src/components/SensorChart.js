@@ -2,6 +2,7 @@ import React, { useMemo, memo, useState, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Platform, PanResponder, Text } from 'react-native';
 import Svg, { Path, Circle, Line, G, Text as SvgText, Rect } from 'react-native-svg';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const PADDING_X = 50;
 const PADDING_Y = 40; 
@@ -39,6 +40,7 @@ const LEVEL_COLORS_DARK = {
 
 const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = [], timeRange = null, isBinary = false, sensorType = null }) => {
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation();
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [selectedVirtualPoint, setSelectedVirtualPoint] = useState(null);
   
@@ -686,15 +688,33 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     >
       <Svg width={chartWidth} height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
         {levelRegions.map((region, idx) => (
-          <Rect
-            key={`region-${idx}-${region.level}`}
-            x={PADDING_X}
-            y={region.y}
-            width={chartAreaWidth}
-            height={region.height}
-            fill={region.color}
-            opacity={0.35}
-          />
+          <G key={`region-${idx}-${region.level}`}>
+            <Rect
+              x={PADDING_X}
+              y={region.y}
+              width={chartAreaWidth}
+              height={region.height}
+              fill={region.color}
+              opacity={0.35}
+            />
+            {/* Region label - centered in the region */}
+            {region.height > 20 && (
+              <SvgText
+                x={PADDING_X + chartAreaWidth / 2}
+                y={region.y + region.height / 2}
+                fontSize="11"
+                fill={colors.text || '#000000'}
+                textAnchor="middle"
+                fontWeight="600"
+                opacity={0.8}
+              >
+                {region.level === 'low' ? t('sensors.legend.low', 'Thấp') :
+                 region.level === 'normal' ? t('sensors.legend.normal', 'Bình thường') :
+                 region.level === 'high' ? t('sensors.legend.high', 'Cao') :
+                 t('sensors.legend.veryHigh', 'Rất cao')}
+              </SvgText>
+            )}
+          </G>
         ))}
 
         {/* X axis line (horizontal line at y=0) */}
