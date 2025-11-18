@@ -59,14 +59,21 @@ export const createDeviceLog = async (req, res) => {
       metadata
     });
     
-    await deviceLog.save();
+    let savedSuccessfully = true;
+    try {
+      await deviceLog.save();
+      logger.info(`Device log created for device ${deviceId}`, { type, severity });
+    } catch (saveErr) {
+      savedSuccessfully = false;
+      logger.error('Device log save failed (accepted but not persisted):', saveErr);
+    }
     
-    logger.info(`Device log created for device ${deviceId}`, { type, severity });
-    
-    res.status(201).json({
+    res.status(savedSuccessfully ? 201 : 202).json({
       success: true,
-      data: deviceLog,
-      message: 'Device log created successfully'
+      data: savedSuccessfully ? deviceLog : null,
+      message: savedSuccessfully
+        ? 'Device log created successfully'
+        : 'Log accepted but not persisted'
     });
   } catch (error) {
     logger.error('Error creating device log:', error);
@@ -87,7 +94,6 @@ export const getDeviceLogs = async (req, res) => {
     
     let query = {};
     if (deviceId) {
-      // Check device ownership if deviceId is provided
       if (userId) {
         const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
         if (!ownershipCheck.success) {
@@ -99,7 +105,6 @@ export const getDeviceLogs = async (req, res) => {
       }
       query.deviceId = deviceId;
     } else if (userId && !isAdmin) {
-      // If no deviceId specified, only show logs for user's devices
       const userDevices = await Device.find({ ownerId: userId }).select('deviceId');
       const deviceIds = userDevices.map(d => d.deviceId);
       query.deviceId = { $in: deviceIds };
