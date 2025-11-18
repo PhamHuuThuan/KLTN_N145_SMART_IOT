@@ -6,7 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
 const SensorGrid = ({ deviceData, onViewChart }) => {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { t } = useTranslation();
   
   if (!deviceData) {
@@ -34,13 +34,24 @@ const SensorGrid = ({ deviceData, onViewChart }) => {
     smoke: { low: 1.0, normal: 1.4, high: 1.6 },
   };
 
-  // Color mapping for levels
-  const LEVEL_COLORS = {
-    low: '#E3F2FD',      // Light blue
-    normal: '#F5F5F5',   // Light gray
-    high: '#FFF3E0',     // Light orange
-    veryHigh: '#FFEBEE', // Light red
+  //levels - Light mode
+  const LEVEL_COLORS_LIGHT = {
+    low: '#E3F2FD', 
+    normal: '#F5F5F5',
+    high: '#FFF3E0',
+    veryHigh: '#FFEBEE',
   };
+
+  //levels - Dark mode
+  const LEVEL_COLORS_DARK = {
+    low:      '#1E3A8A',
+    normal:   '#4B5563',
+    high:     '#DC6A00',
+    veryHigh: '#DC2626',
+  };
+
+  // Select colors based on theme
+  const LEVEL_COLORS = isDarkMode ? LEVEL_COLORS_DARK : LEVEL_COLORS_LIGHT;
 
   // Determine sensor level
   const getSensorLevel = (value, thresholds) => {
@@ -145,22 +156,22 @@ const SensorGrid = ({ deviceData, onViewChart }) => {
       <View style={styles.legendContainer}>
         <View style={styles.legendBar}>
           <View style={[styles.legendSegment, { backgroundColor: LEVEL_COLORS.low }]}>
-            <Text style={styles.legendLabel}>
+            <Text style={[styles.legendLabel, { color: colors.text }]}>
               {t('sensors.legend.low', 'Thấp')}
             </Text>
           </View>
           <View style={[styles.legendSegment, { backgroundColor: LEVEL_COLORS.normal }]}>
-            <Text style={styles.legendLabel}>
+            <Text style={[styles.legendLabel, { color: colors.text }]}>
               {t('sensors.legend.normal', 'Bình thường')}
             </Text>
           </View>
           <View style={[styles.legendSegment, { backgroundColor: LEVEL_COLORS.high }]}>
-            <Text style={styles.legendLabel}>
+            <Text style={[styles.legendLabel, { color: colors.text }]}>
               {t('sensors.legend.high', 'Cao')}
             </Text>
           </View>
           <View style={[styles.legendSegment, { backgroundColor: LEVEL_COLORS.veryHigh }]}>
-            <Text style={styles.legendLabel}>
+            <Text style={[styles.legendLabel, { color: colors.text }]}>
               {t('sensors.legend.veryHigh', 'Rất cao')}
             </Text>
           </View>
@@ -249,7 +260,6 @@ const styles = StyleSheet.create({
   legendLabel: {
     fontSize: 10,
     fontWeight: '400',
-    color: '#333',
     textAlign: 'center',
   },
 });
