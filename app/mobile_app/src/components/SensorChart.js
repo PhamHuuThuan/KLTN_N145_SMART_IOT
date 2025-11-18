@@ -1,6 +1,6 @@
 import React, { useMemo, memo, useState, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Platform, PanResponder, Text } from 'react-native';
-import Svg, { Path, Circle, Line, G, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Circle, Line, G, Text as SvgText, Rect } from 'react-native-svg';
 import { useTheme } from '../contexts/ThemeContext';
 
 const PADDING_X = 50;
@@ -13,9 +13,36 @@ const TOUCH_TOLERANCE = 30;
 const Y_AXIS_LABELS = 5;
 const X_AXIS_LABELS = 5;
 
-const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = [], timeRange = null, isBinary = false }) => {
-  const { colors } = useTheme();
+// Thresholds for sensor levels
+const THRESHOLDS = {
+  temperature: { low: 15, normal: 40, high: 50 },
+  humidity: { low: 30, normal: 80, high: 90 },
+  gas: { low: 200, normal: 500, high: 1000 },
+  smoke: { low: 1.0, normal: 1.4, high: 1.6 },
+};
+
+// Color mapping for levels - Light mode (darker for better visibility on chart)
+const LEVEL_COLORS_LIGHT = {
+  low: '#90CAF9',      // Darker blue (was #E3F2FD)
+  normal: '#E0E0E0',   // Darker gray (was #F5F5F5)
+  high: '#FFB74D',     // Darker orange (was #FFF3E0)
+  veryHigh: '#EF5350', // Darker red (was #FFEBEE)
+};
+
+// Color mapping for levels - Dark mode
+const LEVEL_COLORS_DARK = {
+  low:      '#1E3A8A',
+  normal:   '#4B5563',
+  high:     '#DC6A00',
+  veryHigh: '#DC2626',
+};
+
+const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = [], timeRange = null, isBinary = false, sensorType = null }) => {
+  const { colors, isDarkMode } = useTheme();
   const [selectedIndex, setSelectedIndex] = useState(null);
+  
+  // Select colors based on theme
+  const LEVEL_COLORS = isDarkMode ? LEVEL_COLORS_DARK : LEVEL_COLORS_LIGHT;
 
   const chartWidth = useMemo(() => {
     try {
@@ -82,22 +109,33 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       if (isBinary) {
         minValue = 0;
         maxValue = 1;
-      } else if (minValue < 0) {
-        if (maxValue < 0) {
+      } else {
+        // Always start from 0 or below, extend to include thresholds if sensorType is provided
+        if (sensorType && THRESHOLDS[sensorType]) {
+          const thresholds = THRESHOLDS[sensorType];
+          minValue = Math.min(0, minValue, thresholds.low || minValue);
+          maxValue = Math.max(maxValue, thresholds.high || maxValue);
+        } else {
+          // For other cases, ensure we show from 0 if values are positive
+          if (minValue >= 0) {
+            minValue = 0;
+          }
+        }
+        if (minValue < 0 && maxValue < 0) {
           maxValue = 0;
         }
       }
       
       const valueRange = maxValue - minValue || 1;
 
-      console.log('[SensorChart] prepared values:', values.length);
+      console.log('[SensorChart] prepared values:', values.length, 'min:', minValue, 'max:', maxValue);
 
       return { values, timestamps: ts, isGapPoints: gapPoints, minValue, maxValue, valueRange };
     } catch (e) {
       console.log('[SensorChart] prepare error:', e);
       return null;
     }
-  }, [data]);
+  }, [data, sensorType]);
 
   if (!prepared) return null;
 
@@ -377,15 +415,21 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
 
   const selectedPoint = selectedIndex !== null ? points.points[selectedIndex] : null;
 
-  // Calculate zero line position if there are negative values
+  // Calculate zero line position - always show if 0 is within or at boundary
   const zeroLineInfo = useMemo(() => {
     const { minValue, maxValue } = points;
     const valueRange = maxValue - minValue || 1;
     const hasNegativeValues = minValue < 0;
+    const hasPositiveValues = maxValue >= 0;
     
-    if (hasNegativeValues) {
+    // Always show zero line if it's within or at the boundary of the chart
+    if (hasNegativeValues || (minValue === 0 && hasPositiveValues)) {
       const zeroRatio = (0 - minValue) / valueRange;
       const zeroY = PADDING_Y + chartAreaHeight * (1 - zeroRatio);
+      return { hasZeroLine: true, zeroY, zeroValue: 0 };
+    } else if (minValue >= 0 && minValue === 0) {
+      // Zero is at the bottom
+      const zeroY = PADDING_Y + chartAreaHeight;
       return { hasZeroLine: true, zeroY, zeroValue: 0 };
     }
     return { hasZeroLine: false, zeroY: null, zeroValue: null };
@@ -467,13 +511,197 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     return labels;
   }, [points, chartAreaWidth]);
 
+  const levelRegions = useMemo(() => {
+    if (!sensorType || !THRESHOLDS[sensorType] || (isBinary && sensorType !== 'smoke')) {
+      return [];
+    }
+  
+    const { minValue, maxValue } = points;
+    const displayMin = minValue;
+    const displayMax = maxValue;
+    const displayRange = (displayMax - displayMin) || 1;  // <--- FIX CHÍNH
+  
+    const regions = [];
+    const chartBottom = PADDING_Y + chartAreaHeight;
+    const chartTop = PADDING_Y;
+  
+    const getYForValue = (value) => {
+      if (displayRange === 0) return chartBottom;
+      const ratio = (value - displayMin) / displayRange;
+      const clampedRatio = Math.max(0, Math.min(1, ratio));
+      const y = chartBottom - (chartAreaHeight * clampedRatio);
+      return Math.max(chartTop, Math.min(chartBottom, y));
+    };
+  
+    const { low: lowThreshold, normal: normalThreshold, high: highThreshold } = THRESHOLDS[sensorType];
+  
+    const lowY = getYForValue(lowThreshold);
+    const normalY = getYForValue(normalThreshold);
+    const highY = getYForValue(highThreshold);
+  
+    const clampedLowY = Math.max(chartTop, Math.min(chartBottom, lowY));
+    const clampedNormalY = Math.max(chartTop, Math.min(chartBottom, normalY));
+    const clampedHighY = Math.max(chartTop, Math.min(chartBottom, highY));
+
+    let currentY = chartBottom;
+    
+    if (clampedLowY < currentY && clampedLowY >= chartTop) {
+      regions.push({
+        level: 'low',
+        y: clampedLowY,
+        height: currentY - clampedLowY,
+        color: LEVEL_COLORS.low,
+      });
+      currentY = clampedLowY;
+    } else if (clampedLowY >= chartBottom) {
+      regions.push({
+        level: 'low',
+        y: chartTop,
+        height: chartAreaHeight,
+        color: LEVEL_COLORS.low,
+      });
+      currentY = chartTop;
+    }
+    
+    if (clampedNormalY < currentY && clampedNormalY >= chartTop) {
+      regions.push({
+        level: 'normal',
+        y: clampedNormalY,
+        height: currentY - clampedNormalY,
+        color: LEVEL_COLORS.normal,
+      });
+      currentY = clampedNormalY;
+    }
+    
+    if (clampedHighY < currentY && clampedHighY >= chartTop) {
+      regions.push({
+        level: 'high',
+        y: clampedHighY,
+        height: currentY - clampedHighY,
+        color: LEVEL_COLORS.high,
+      });
+      currentY = clampedHighY;
+    }
+    
+    if (currentY > chartTop) {
+      regions.push({
+        level: 'veryHigh',
+        y: chartTop,
+        height: currentY - chartTop,
+        color: LEVEL_COLORS.veryHigh,
+      });
+    }
+    
+    if (regions.length !== 4) {
+      regions.length = 0;
+      
+      const sortedYs = [clampedLowY, clampedNormalY, clampedHighY]
+        .filter((y, idx, arr) => arr.indexOf(y) === idx)
+        .sort((a, b) => b.y - a.y);
+      
+      let prevY = chartBottom;
+      
+      if (sortedYs.length > 0 && prevY > sortedYs[0]) {
+        regions.push({
+          level: 'low',
+          y: sortedYs[0],
+          height: prevY - sortedYs[0],
+          color: LEVEL_COLORS.low,
+        });
+        prevY = sortedYs[0];
+      } else if (sortedYs.length === 0 || sortedYs[0] >= chartBottom) {
+        regions.push({
+          level: 'low',
+          y: chartTop,
+          height: chartAreaHeight,
+          color: LEVEL_COLORS.low,
+        });
+        prevY = chartTop;
+      }
+      
+      if (sortedYs.length > 1 && prevY > sortedYs[1] && sortedYs[1] >= chartTop) {
+        regions.push({
+          level: 'normal',
+          y: sortedYs[1],
+          height: prevY - sortedYs[1],
+          color: LEVEL_COLORS.normal,
+        });
+        prevY = sortedYs[1];
+      }
+      
+      if (sortedYs.length > 2 && prevY > sortedYs[2] && sortedYs[2] >= chartTop) {
+        regions.push({
+          level: 'high',
+          y: sortedYs[2],
+          height: prevY - sortedYs[2],
+          color: LEVEL_COLORS.high,
+        });
+        prevY = sortedYs[2];
+      }
+      
+      if (prevY > chartTop) {
+        regions.push({
+          level: 'veryHigh',
+          y: chartTop,
+          height: prevY - chartTop,
+          color: LEVEL_COLORS.veryHigh,
+        });
+      }
+      
+      if (regions.length < 4) {
+        // Rebuild with proper order: low, normal, high, veryHigh
+        regions.length = 0;
+        const quarterHeight = chartAreaHeight / 4;
+        regions.push(
+          { level: 'low', y: chartBottom - quarterHeight, height: quarterHeight, color: LEVEL_COLORS.low },
+          { level: 'normal', y: chartBottom - 2 * quarterHeight, height: quarterHeight, color: LEVEL_COLORS.normal },
+          { level: 'high', y: chartBottom - 3 * quarterHeight, height: quarterHeight, color: LEVEL_COLORS.high },
+          { level: 'veryHigh', y: chartTop, height: quarterHeight, color: LEVEL_COLORS.veryHigh }
+        );
+      }
+    }
+    
+    console.log('[SensorChart] Total regions generated:', regions.length);
+    regions.forEach((r, idx) => {
+      console.log(`[SensorChart] Region ${idx + 1}: ${r.level} - y: ${r.y.toFixed(1)}, height: ${r.height.toFixed(1)}, color: ${r.color}`);
+    });
+    
+    if (sensorType === 'temperature') {
+      const testValue = 30.5;
+      const testY = getYForValue(testValue);
+      const testRegion = regions.find(r => {
+        const regionTop = r.y;
+        const regionBottom = r.y + r.height;
+
+        return testY >= regionTop && testY <= regionBottom;
+      });
+      if (testRegion && testRegion.level !== 'normal') {
+        console.warn(`[SensorChart] ERROR: Value ${testValue} should be normal but is in ${testRegion.level} region!`);
+      }
+    }
+    
+    return regions;
+  }, [sensorType, points, chartAreaHeight, isBinary, LEVEL_COLORS]);
+
   return (
     <View
       style={[styles.container, { width: chartWidth, height: chartHeight }]}
       {...panResponder.panHandlers}
     >
       <Svg width={chartWidth} height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
-        {/* Zero line (X axis at y=0) if there are negative values */}
+        {levelRegions.map((region, idx) => (
+          <Rect
+            key={`region-${idx}-${region.level}`}
+            x={PADDING_X}
+            y={region.y}
+            width={chartAreaWidth}
+            height={region.height}
+            fill={region.color}
+            opacity={0.35}
+          />
+        ))}
+
+        {/* X axis line (horizontal line at y=0) */}
         {zeroLineInfo.hasZeroLine && (
           <Line
             x1={PADDING_X}
@@ -481,23 +709,21 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
             x2={PADDING_X + chartAreaWidth}
             y2={zeroLineInfo.zeroY}
             stroke={colors.text || '#000000'}
-            strokeWidth={1.5}
-            opacity={0.8}
+            strokeWidth={2}
+            opacity={0.9}
           />
         )}
 
-        {/* Y axis line (vertical line at x=0) if there are negative values */}
-        {zeroLineInfo.hasZeroLine && (
-          <Line
-            x1={PADDING_X}
-            y1={PADDING_Y}
-            x2={PADDING_X}
-            y2={PADDING_Y + chartAreaHeight}
-            stroke={colors.text || '#000000'}
-            strokeWidth={1.5}
-            opacity={0.8}
-          />
-        )}
+        {/* Y axis line (vertical line at x=PADDING_X) - always show */}
+        <Line
+          x1={PADDING_X}
+          y1={PADDING_Y}
+          x2={PADDING_X}
+          y2={PADDING_Y + chartAreaHeight}
+          stroke={colors.text || '#000000'}
+          strokeWidth={2}
+          opacity={0.9}
+        />
 
         {yAxisLabels.map((item, idx) => (
           <G key={`y-${idx}`}>

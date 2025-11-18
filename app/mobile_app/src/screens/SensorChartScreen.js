@@ -270,14 +270,12 @@ const SensorChartScreen = ({ navigation, route }) => {
       
       const sensorConfig = SENSOR_TYPES[selectedSensor];
       if (!sensorConfig) return { labels: [], values: [], timestamps: [] };
-      
-      // Special handling for smoke sensor (binary: 0 or 1)
+
       const isSmokeSensor = selectedSensor === 'smoke';
       
-      // First pass: find minValue and maxValue from valid values (only for non-smoke sensors)
-      // For smoke sensor, minValue is always 0 and maxValue is always 1
-      let minValue = 0;
-      let maxValue = 1;
+
+      let minValue = isSmokeSensor ? 0 : Infinity;
+      let maxValue = isSmokeSensor ? 2 : -Infinity;
       
       if (!isSmokeSensor) {
         minValue = Infinity;
@@ -307,21 +305,16 @@ const SensorChartScreen = ({ navigation, route }) => {
           }
         }
         
-        // If no valid values found, use default range
         if (minValue === Infinity || validValues.length === 0) {
           minValue = 0;
           maxValue = 100;
         } else if (minValue === maxValue) {
-          // If all values are the same, add some padding
           const padding = Math.max(1, Math.abs(minValue) * 0.1);
           minValue = minValue - padding;
           maxValue = maxValue + padding;
         }
       }
       
-      // Second pass: process all data
-      // For smoke sensor, include all points (even null/undefined as 0)
-      // For other sensors, only include points with valid values
       const data = [];
       for (let i = 0; i < telemetryData.length; i++) {
         try {
@@ -352,14 +345,13 @@ const SensorChartScreen = ({ navigation, route }) => {
               isGapPoint: false,
             });
           } else {
-            // For other sensors, only include valid values
             if (value === null || value === undefined) {
-              continue; // Skip null/undefined values for non-smoke sensors
+              continue;
             }
             
             const numValue = Number(value);
             if (isNaN(numValue) || !isFinite(numValue)) {
-              continue; // Skip invalid numbers
+              continue;
             }
             
             const label = formatTimeLabel(timestamp);
@@ -707,7 +699,8 @@ const SensorChartScreen = ({ navigation, route }) => {
                     onPointSelect={handlePointSelect}
                     rawData={telemetryData}
                     timeRange={chartTimeRange}
-                    isBinary={selectedSensor === 'smoke'}
+                    isBinary={false}
+                    sensorType={selectedSensor}
                   />
                 )}
               </View>
