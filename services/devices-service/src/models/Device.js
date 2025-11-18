@@ -70,6 +70,7 @@ const deviceSchema = new mongoose.Schema({
     humid: { type: Number },
     smoke: { type: Number },
     gas_ppm: { type: Number },
+    flame: { type: Boolean, default: false },
     o: { type: Object, default: {} }
   }
 }, {

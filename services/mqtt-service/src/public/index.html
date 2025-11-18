@@ -369,7 +369,8 @@
                 humidValue.textContent = data.humidity.toFixed(1);
             }
             
-            smokeValue.textContent = data.smoke ? '🚬' : '✅';
+            const smokeReading = typeof data.smoke === 'number' ? data.smoke : null;
+            smokeValue.textContent = smokeReading !== null ? smokeReading.toFixed(2) : '--';
             gasValue.textContent = data.gasPpm ? data.gasPpm.toFixed(1) : '--';
             mq2Value.textContent = data.mq2Voltage ? data.mq2Voltage.toFixed(3) : '--';
             flameValue.textContent = data.flame ? '🔥' : '✅';
@@ -380,7 +381,7 @@
 
             // Update smoke sensor styling
             const smokeSensor = document.getElementById('smokeSensor');
-            if (data.smoke) {
+            if (smokeReading !== null && smokeReading >= 1.6) {
                 smokeSensor.classList.add('flame-alert');
             } else {
                 smokeSensor.classList.remove('flame-alert');
@@ -531,7 +532,7 @@
                 }
             }
             
-            addLog(`Sensor data from ${data.deviceId}: T=${data.temperature}°C, H=${data.humidity}%, Smoke=${data.smoke}, Gas=${data.gasPpm}ppm, MQ2=${data.mq2Voltage}V, Flame=${data.flame}, o1=${data.outlets.o1}`, 'info');
+            addLog(`Sensor data from ${data.deviceId}: T=${data.temperature}°C, H=${data.humidity}%, Smoke=${typeof data.smoke === 'number' ? data.smoke.toFixed(2) + 'V' : '--'}, Gas=${data.gasPpm}ppm, MQ2=${data.mq2Voltage}V, Flame=${data.flame}, o1=${data.outlets.o1}`, 'info');
         });
 
         socket.on('ack', (data) => {

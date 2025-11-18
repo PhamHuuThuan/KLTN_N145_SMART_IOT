@@ -93,18 +93,20 @@ function startMqtt() {
       }
       
       const data = JSON.parse(message.toString());
+      const toNumber = (value) => (value ?? null) !== null ? Number(value) : null;
+      const toBoolean = (value) => (value ?? null) !== null ? Boolean(Number(value)) : null;
 
       if (messageType === 'telemetry') {
         
         // Store data for this specific device
         const deviceData = {
           deviceId: deviceId,
-          temperature: (data.temp ?? null),
-          humidity: (data.humid ?? null),
-          smoke: (data.smoke ?? null),
-          gasPpm: (data.gas_ppm ?? null),
-          mq2Voltage: (data.mq2_v ?? null),
-          flame: (data.flame ?? null),
+          temperature: toNumber(data.temp),
+          humidity: toNumber(data.humid),
+          smoke: toNumber(data.smoke),
+          gasPpm: toNumber(data.gas_ppm),
+          mq2Voltage: toNumber(data.mq2_v),
+          flame: toBoolean(data.flame),
           outlets: {
             o1: (data.o?.o1 ?? null),
             o2: (data.o?.o2 ?? null),
@@ -136,10 +138,11 @@ function startMqtt() {
           topic,
           payload: {
             ts: Date.now(),
-            temp: (data.temp ?? null) !== null ? Number(data.temp) : null,
-            humid: (data.humid ?? null) !== null ? Number(data.humid) : null,
-            smoke: (data.smoke ?? null) !== null ? Number(data.smoke) : null,
-            gas_ppm: (data.gas_ppm ?? null) !== null ? Number(data.gas_ppm) : null,
+            temp: toNumber(data.temp),
+            humid: toNumber(data.humid),
+            smoke: toNumber(data.smoke),
+            gas_ppm: toNumber(data.gas_ppm),
+            flame: toBoolean(data.flame),
             o: {
               o1: (data.o?.o1 ?? null),
               o2: (data.o?.o2 ?? null),

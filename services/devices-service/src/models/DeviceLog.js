@@ -27,6 +27,11 @@ const telemetrySchema = new mongoose.Schema({
     required: true,
     default: 0
   },
+  flame: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
   o: {
     o1: { type: Boolean, default: false },
     o2: { type: Boolean, default: false },
@@ -103,11 +108,14 @@ deviceLogSchema.methods.checkEmergencyConditions = function() {
   // Check temperature threshold
   if (payload.temp > 60) return { emergency: true, reason: 'high_temperature' };
   
-  // Check smoke threshold
-  if (payload.smoke > 100) return { emergency: true, reason: 'smoke_detected' };
+  // Check smoke threshold (voltage or PPM equivalent)
+  if (payload.smoke > 1.6) return { emergency: true, reason: 'smoke_detected' };
   
   // Check gas threshold
   if (payload.gas_ppm > 1000) return { emergency: true, reason: 'gas_leak' };
+
+  // Check flame sensor
+  if (payload.flame) return { emergency: true, reason: 'flame_detected' };
   
   return { emergency: false, reason: null };
 };

@@ -25,6 +25,8 @@ const consumer = kafka.consumer({
   heartbeatInterval: 3000
 });
 
+const hasValue = (value) => value !== undefined && value !== null;
+
 // Update device status from telemetry or event data
 async function updateDeviceStatus(data) {
   try {
@@ -75,14 +77,15 @@ async function updateDeviceStatus(data) {
     let shouldPersist = true;
 
     // Update latest telemetry (only set provided fields; do not default to 0)
-    if (payload.temp !== undefined || payload.humid !== undefined || payload.smoke !== undefined || payload.gas_ppm !== undefined || payload.o) {
-      const prev = device.latestTelemetry || { ts: Date.now(), o: {} };
+    if (hasValue(payload.temp) || hasValue(payload.humid) || hasValue(payload.smoke) || hasValue(payload.gas_ppm) || hasValue(payload.flame) || payload.o) {
+      const prev = device.latestTelemetry || { ts: Date.now(), o: {}, flame: false };
       device.latestTelemetry = {
         ts: payload.ts || prev.ts || Date.now(),
-        temp: payload.temp !== undefined ? payload.temp : prev.temp,
-        humid: payload.humid !== undefined ? payload.humid : prev.humid,
-        smoke: payload.smoke !== undefined ? payload.smoke : prev.smoke,
-        gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : prev.gas_ppm,
+        temp: hasValue(payload.temp) ? payload.temp : prev.temp,
+        humid: hasValue(payload.humid) ? payload.humid : prev.humid,
+        smoke: hasValue(payload.smoke) ? payload.smoke : prev.smoke,
+        gas_ppm: hasValue(payload.gas_ppm) ? payload.gas_ppm : prev.gas_ppm,
+        flame: hasValue(payload.flame) ? payload.flame : prev.flame,
         o: (payload.o || payload.outlets || prev.o || {})
       };
       // Emit to socket clients
@@ -209,7 +212,11 @@ async function startLogConsumer() {
             const tempDiff = Math.abs((payload.temp || 0) - (lastPayload.temp || 0));
             const humidDiff = Math.abs((payload.humid || 0) - (lastPayload.humid || 0));
             const gasDiff = Math.abs((payload.gas_ppm || 0) - (lastPayload.gas_ppm || 0));
-            const smokeDiff = Math.abs((payload.smoke || 0) - (lastPayload.smoke || 0));
+            const lastSmoke = lastPayload.smoke !== undefined && lastPayload.smoke !== null ? lastPayload.smoke : 0;
+            const currentSmoke = hasValue(payload.smoke) ? payload.smoke : lastSmoke;
+            const smokeDiff = Math.abs(currentSmoke - lastSmoke);
+            const prevFlame = lastPayload.flame !== undefined ? lastPayload.flame : false;
+            const flameChanged = hasValue(payload.flame) ? payload.flame !== prevFlame : false;
             
             // Check if outlet status changed
             const outletChanged = payload.o && lastPayload.o && (
@@ -220,7 +227,7 @@ async function startLogConsumer() {
             );
             
             // Save if significant change or outlet changed
-            if (tempDiff >= 0.2 || humidDiff >= 0.2 || gasDiff >= 4 || smokeDiff > 0 || outletChanged) {
+            if (tempDiff >= 0.2 || humidDiff >= 0.2 || gasDiff >= 4 || smokeDiff >= 0.05 || flameChanged || outletChanged) {
               return true;
             }
             
@@ -250,6 +257,7 @@ async function startLogConsumer() {
                     humid: 0,
                     smoke: 0,
                     gas_ppm: 0,
+                    flame: false,
                     o: {
                           o1: ackOutlets.o1 ?? false,
                           o2: ackOutlets.o2 ?? false,
@@ -269,6 +277,7 @@ async function startLogConsumer() {
                 logToSave.payload.humid = logToSave.payload.humid ?? 0;
                 logToSave.payload.smoke = logToSave.payload.smoke ?? 0;
                 logToSave.payload.gas_ppm = logToSave.payload.gas_ppm ?? 0;
+                logToSave.payload.flame = logToSave.payload.flame ?? false;
               }
               
               const deviceLog = new DeviceLog(logToSave);

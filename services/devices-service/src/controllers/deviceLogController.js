@@ -41,6 +41,7 @@ export const createDeviceLog = async (req, res) => {
       humid: payload.humid !== null && payload.humid !== undefined ? Number(payload.humid) : 0,
       smoke: payload.smoke !== null && payload.smoke !== undefined ? Number(payload.smoke) : 0,
       gas_ppm: payload.gas_ppm !== null && payload.gas_ppm !== undefined ? Number(payload.gas_ppm) : 0,
+      flame: payload.flame !== null && payload.flame !== undefined ? Boolean(Number(payload.flame)) : false,
       o: {
         o1: Boolean(payload.o?.o1) || false,
         o2: Boolean(payload.o?.o2) || false,
@@ -226,6 +227,7 @@ export const getTelemetryHistory = async (req, res) => {
         humid: log.payload?.humid ?? 0,
         smoke: log.payload?.smoke ?? 0,
         gas_ppm: log.payload?.gas_ppm ?? 0,
+        flame: log.payload?.flame ?? false,
         o: {
           o1: log.payload?.o?.o1 ?? false,
           o2: log.payload?.o?.o2 ?? false,

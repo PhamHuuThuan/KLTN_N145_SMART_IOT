@@ -26,13 +26,10 @@ export const SENSOR_CONFIG = {
   },
   [SENSOR_TYPES.SMOKE]: {
     label: 'Smoke',
-    unit: '',
+    unit: 'V',
     icon: '🚬',
     color: '#E74C3C',
-    precision: 0,
-    isBoolean: true,
-    trueValue: 'Detected',
-    falseValue: 'Normal',
+    precision: 2,
   },
   [SENSOR_TYPES.GAS_PPM]: {
     label: 'Gas PPM',
