@@ -160,7 +160,10 @@ const OutletGrid = ({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      <Text style={[styles.title, { color: colors.primary }]}>🔌 {t('devices.outletControl')}</Text>
+      <View style={styles.titleRow}>
+        <MaterialCommunityIcons name="power-plug" size={32} color={colors.primary} />
+        <Text style={[styles.title, { color: colors.primary }]}>{t('devices.outletControl')}</Text>
+      </View>
       
       <View style={styles.grid}>
         {outlets.length === 0 && (
@@ -286,7 +289,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
-    textAlign: 'center',
+    marginLeft: 6,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
   deviceInfo: {
     fontSize: 14,

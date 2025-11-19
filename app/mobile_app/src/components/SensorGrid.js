@@ -124,7 +124,13 @@ const SensorGrid = ({ deviceData, onViewChart }) => {
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: colors.primary }]}>📊 {t('sensors.title')}</Text>
+        <View>
+          <Text style={[styles.title, { color: colors.primary }]}></Text>
+        </View>
+        <View style={styles.titleRow}>
+          <MaterialCommunityIcons name="chart-line-variant" size={32} color={colors.primary} />
+          <Text style={[styles.title, { color: colors.primary }]}>{t('sensors.title')}</Text>
+        </View>
         {onViewChart && deviceData?.deviceId && (
           <TouchableOpacity
             style={[styles.chartButton, { backgroundColor: colors.primary }]}
@@ -201,7 +207,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    flex: 1,
+    marginLeft: 6,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   chartButton: {
     padding: 5,
