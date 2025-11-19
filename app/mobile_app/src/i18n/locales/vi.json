@@ -537,8 +537,13 @@
     "outletTurnedOn": "✅ Đã bật ổ cắm",
     "outletTurnedOff": "✅ Đã tắt ổ cắm",
     "outletControlFailed": "❌ Không thể điều khiển ổ cắm",
+    "voiceListening": "Đang ghi âm...",
+    "voiceStopped": "Đã dừng ghi âm",
+    "voiceListeningPlaceholder": "Nói nội dung bạn muốn gửi...",
+    "voiceStoppedPlaceholder": "Đã dừng ghi âm, đang gửi...",
+    "voiceStop": "Dừng",
     "guidance": {
-      "selectDevice": "💡 Mẹo: Nhấn nút thiết bị ở header để chọn thiết bị trước.",
+      "selectDevice": "💡 Mẹo: Chọn thiết bị ở trên để điều khiển ổ cắm.",
       "tryCommands": "💡 Thử nói: 'Bật ổ cắm 1' hoặc 'Tắt tất cả ổ cắm'",
       "checkDevice": "💡 Kiểm tra xem thiết bị có online không và thử lại.",
       "general": "💡 Cần trợ giúp? Nhấn nút trợ giúp để xem hướng dẫn lệnh giọng nói."
@@ -562,6 +567,11 @@
     "alternativeForOn": "Từ thay thế cho 'bật'",
     "alternativeForOff": "Từ thay thế cho 'tắt'",
     "englishCommands": "Lệnh tiếng Anh cũng hoạt động",
-    "tip": "Nói rõ ràng và tạm dừng ngắn giữa các từ để nhận diện tốt hơn"
+    "tip": "Nói rõ ràng và tạm dừng ngắn giữa các từ để nhận diện tốt hơn",
+    "permissionTitle": "Quyền truy cập microphone",
+    "permissionMessage": "Ứng dụng cần quyền truy cập microphone để sử dụng lệnh giọng nói",
+    "permissionDenied": "Quyền truy cập microphone bị từ chối",
+    "permissionDeniedMessage": "Vui lòng cho phép quyền truy cập microphone trong Cài đặt > Ứng dụng > Smart IoT Kitchen > Quyền.",
+    "openSettings": "Mở Cài đặt"
   }
 }

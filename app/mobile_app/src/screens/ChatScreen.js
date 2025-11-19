@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next';
 import ChatMessageList from '../components/ChatMessageList';
 import ChatInput from '../components/ChatInput';
 import VoiceCommandsHelp from '../components/VoiceCommandsHelp';
-import ChatDeviceSelector from '../components/ChatDeviceSelector';
+import DeviceSelector from '../components/DeviceSelector';
+import { useDeviceData } from '../hooks/useDeviceData';
 import OutletDetail from '../components/OutletDetail';
 import useSpeechToText from '../hooks/useSpeechToText';
 import useVoiceControl from '../hooks/useVoiceControl';
@@ -26,11 +27,18 @@ const ChatScreen = ({ onNavigateToHome }) => {
   const myId = 'me';
   const [messages, setMessages] = useState([]);
   
-  // Device and outlet control state
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [devices, setDevices] = useState([]);
-  const [showDeviceSelector, setShowDeviceSelector] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // Use useDeviceData hook like HomeScreen
+  const {
+    devicesList,
+    selectedDevice: hookSelectedDevice,
+    selectDevice,
+    fetchDevices,
+    hasMore,
+    loadingMore,
+    loadMoreDevices,
+  } = useDeviceData();
+  
+  const selectedDevice = hookSelectedDevice ? devicesList.find(d => d.deviceId === hookSelectedDevice) : null;
   
   // Outlet detail modal state
   const [showOutletDetail, setShowOutletDetail] = useState(false);
@@ -44,11 +52,11 @@ const ChatScreen = ({ onNavigateToHome }) => {
 
   // Load devices and messages on component mount
   useEffect(() => {
-    loadDevices();
     if (user?.id) {
+      fetchDevices(1, 20);
       loadChatSession();
     }
-  }, [user?.id]);
+  }, [user?.id, fetchDevices]);
 
   // Load chat session
   const loadChatSession = async () => {
@@ -110,27 +118,14 @@ const ChatScreen = ({ onNavigateToHome }) => {
     });
   };
 
-  const loadDevices = async () => {
-    try {
-      setLoading(true);
-      const response = await apiService.getDevices();
-      if (response.success) {
-        setDevices(response.data || []);
-        // Auto-select first device if available
-        if (response.data && response.data.length > 0) {
-          const firstDevice = response.data[0];
-          log.info('Auto-selecting first device:', firstDevice);
-          setSelectedDevice(firstDevice);
-        }
-      } else {
-        log.error('Failed to load devices:', response.message);
-      }
-    } catch (error) {
-      log.error('Error loading devices:', error);
-    } finally {
-      setLoading(false);
+  // Auto-select first device if available
+  useEffect(() => {
+    if (devicesList && devicesList.length > 0 && !hookSelectedDevice) {
+      const firstDevice = devicesList[0];
+      log.info('Auto-selecting first device:', firstDevice);
+      selectDevice(firstDevice.deviceId);
     }
-  };
+  }, [devicesList, hookSelectedDevice, selectDevice]);
 
   const handleSend = (text) => {
     const msg = { id: `m_${Date.now()}`, userId: myId, text, time: Date.now() };
@@ -201,9 +196,9 @@ const ChatScreen = ({ onNavigateToHome }) => {
 
   // Silent version for voice command (doesn't add messages)
   const handleOutletControlSilent = async (action, outletId) => {
-    const deviceId = selectedDevice?.deviceId;
+    const deviceId = hookSelectedDevice;
     
-    if (!selectedDevice || !deviceId) {
+    if (!hookSelectedDevice || !deviceId) {
       return false;
     }
 
@@ -234,9 +229,9 @@ const ChatScreen = ({ onNavigateToHome }) => {
 
   // Version that adds messages (for direct calls)
   const handleOutletControl = async (action, outletId) => {
-    const deviceId = selectedDevice?.deviceId;
+    const deviceId = hookSelectedDevice;
     
-    if (!selectedDevice || !deviceId) {
+    if (!hookSelectedDevice || !deviceId) {
       const errorMsg = { 
         id: `bot_${Date.now()}`, 
         userId: 'bot', 
@@ -279,7 +274,7 @@ const ChatScreen = ({ onNavigateToHome }) => {
 
   const controlOutlet = async (outletId, action) => {
     try {
-      const deviceId = selectedDevice?.deviceId;
+      const deviceId = hookSelectedDevice;
       
       // Get device details first to find outlet info
       const deviceResponse = await apiService.getDeviceDetail(deviceId);
@@ -371,8 +366,7 @@ const ChatScreen = ({ onNavigateToHome }) => {
 
   const controlAllOutlets = async (action) => {
     try {
-      // Use device.id (not _id) for API calls
-      const deviceId = selectedDevice?.deviceId;
+      const deviceId = hookSelectedDevice;
       // Get device outlets first
       const deviceResponse = await apiService.getDeviceDetail(deviceId);
       if (!deviceResponse.success || !deviceResponse.data?.outlets) {
@@ -455,17 +449,8 @@ const ChatScreen = ({ onNavigateToHome }) => {
       >
         <View style={[styles.frame, { backgroundColor: colors.surface }]}>
           <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}> 
-            <Text style={[styles.headerTitle, { color: colors.primary }]}>Chat</Text>
+            <Text style={[styles.headerTitle, { color: colors.primary }]}>{t('navigation.chat', 'Chat')}</Text>
             <View style={styles.headerActions}>
-              <TouchableOpacity 
-                style={[styles.deviceButton, { backgroundColor: colors.backgroundSecondary }]}
-                onPress={() => setShowDeviceSelector(true)}
-              >
-                <Ionicons name="hardware-chip-outline" size={20} color={colors.primary} />
-                <Text style={[styles.deviceButtonText, { color: colors.text }]} numberOfLines={1}>
-                  {selectedDevice ? selectedDevice.name || selectedDevice.id : t('chat.selectDevice')}
-                </Text>
-              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.helpButton}
                 onPress={() => setShowHelp(true)}
@@ -473,6 +458,20 @@ const ChatScreen = ({ onNavigateToHome }) => {
                 <Ionicons name="help-circle-outline" size={24} color={colors.primary} />
               </TouchableOpacity>
             </View>
+          </View>
+          {/* Device Selector - same as HomeScreen */}
+          <View style={styles.deviceSelectorContainer}>
+            <DeviceSelector
+              devices={devicesList}
+              selectedDevice={hookSelectedDevice}
+              onSelectDevice={async (deviceId) => {
+                await selectDevice(deviceId);
+              }}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={loadMoreDevices}
+              showAddButton={false}
+            />
           </View>
           <View style={styles.messagesArea}>
             <ChatMessageList 
@@ -501,12 +500,6 @@ const ChatScreen = ({ onNavigateToHome }) => {
         onClose={() => setShowHelp(false)} 
       />
       
-      <ChatDeviceSelector
-        visible={showDeviceSelector}
-        onClose={() => setShowDeviceSelector(false)}
-        onDeviceSelect={setSelectedDevice}
-        selectedDevice={selectedDevice}
-      />
       
       <OutletDetail
         visible={showOutletDetail}
@@ -547,7 +540,9 @@ const ChatScreen = ({ onNavigateToHome }) => {
             </Text>
             <View style={styles.voiceTranscriptBox}>
               <Text style={[styles.voiceTranscript, { color: colors.text }]}>
-                {voiceDraft || t('chat.voiceListeningPlaceholder', 'Nói nội dung bạn muốn gửi...')}
+                {voiceDraft || (listening 
+                  ? t('chat.voiceListeningPlaceholder', 'Nói nội dung bạn muốn gửi...')
+                  : t('chat.voiceStoppedPlaceholder', 'Đã dừng ghi âm, đang gửi...'))}
               </Text>
             </View>
             {listening && (

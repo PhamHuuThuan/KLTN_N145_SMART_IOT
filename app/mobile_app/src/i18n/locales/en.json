@@ -535,8 +535,13 @@
     "outletTurnedOn": "✅ Outlet turned on",
     "outletTurnedOff": "✅ Outlet turned off",
     "outletControlFailed": "❌ Failed to control outlet",
+    "voiceListening": "Recording...",
+    "voiceStopped": "Recording stopped",
+    "voiceListeningPlaceholder": "Speak your message...",
+    "voiceStoppedPlaceholder": "Recording stopped, sending...",
+    "voiceStop": "Stop",
     "guidance": {
-      "selectDevice": "💡 Tip: Tap the device button in the header to select a device first.",
+      "selectDevice": "💡 Tip: Select a device above to control outlets.",
       "tryCommands": "💡 Try saying: 'Bật ổ cắm 1' or 'Tắt tất cả ổ cắm'",
       "checkDevice": "💡 Check if your device is online and try again.",
       "general": "💡 Need help? Tap the help button for voice commands guide."
@@ -560,6 +565,11 @@
     "alternativeForOn": "Alternative words for 'turn on'",
     "alternativeForOff": "Alternative words for 'turn off'",
     "englishCommands": "English commands also work",
-    "tip": "Speak clearly and pause briefly between words for better recognition"
+    "tip": "Speak clearly and pause briefly between words for better recognition",
+    "permissionTitle": "Microphone Permission",
+    "permissionMessage": "App needs access to your microphone for voice commands",
+    "permissionDenied": "Microphone permission denied",
+    "permissionDeniedMessage": "Please allow microphone access in Settings > Apps > Smart IoT Kitchen > Permissions.",
+    "openSettings": "Open Settings"
   }
 }

@@ -175,6 +175,7 @@ const RulesScreen = () => {
           onSelectDevice={(id) => {
             setSelectedDevice(id);
           }}
+          showAddButton={false}
         />
       </View>
 
