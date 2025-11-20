@@ -22,9 +22,7 @@ const RulesScreen = () => {
     name: '',
     description: '',
     priority: 'medium',
-    maxTriggersPerDay: 10,
     cooldownPeriod: 300000,
-    conditionLogic: 'AND',
   });
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedRule, setSelectedRule] = useState(null);
@@ -34,9 +32,7 @@ const RulesScreen = () => {
     description: '',
     priority: 'medium',
     isActive: true,
-    maxTriggersPerDay: 10,
     cooldownPeriod: 300000,
-    conditionLogic: 'AND',
   });
   const { rules, templates, devices, loading, refreshing, loadRules, onRefresh } = useRulesData();
   const { creatingRule, creatingTemplateId, toggleRuleStatus, deleteRule, createRuleFromTemplate, updateRule } = useRuleActions(loadRules);
@@ -49,13 +45,22 @@ const RulesScreen = () => {
 
   useEffect(() => {
     if (devices.length > 0 && !selectedDevice) {
-      setSelectedDevice(devices[0]);
+      // Set first device's deviceId as selected
+      const firstDevice = devices[0];
+      const deviceId = typeof firstDevice === 'string' ? firstDevice : firstDevice?.deviceId;
+      if (deviceId) {
+        setSelectedDevice(deviceId);
+      }
     }
   }, [devices]);
 
   useEffect(() => {
     if (selectedDevice) {
-      loadRules(selectedDevice);
+      // Ensure we pass deviceId string to loadRules
+      const deviceId = typeof selectedDevice === 'string' ? selectedDevice : selectedDevice?.deviceId;
+      if (deviceId) {
+        loadRules(deviceId);
+      }
     }
   }, [selectedDevice]);
 
@@ -76,9 +81,7 @@ const RulesScreen = () => {
       name: translatedTemplate.name || '',
       description: translatedTemplate.description || '',
       priority: template.priority || 'medium',
-      maxTriggersPerDay: template.maxTriggersPerDay || 10,
       cooldownPeriod: template.cooldownPeriod || 300000,
-      conditionLogic: template.conditionLogic || 'AND',
       conditions: template.conditions || [],
     });
     setCustomizeVisible(true);
@@ -107,9 +110,7 @@ const RulesScreen = () => {
       description: rule.description || '',
       priority: rule.priority || 'medium',
       isActive: !!rule.isActive,
-      maxTriggersPerDay: rule.maxTriggersPerDay || 10,
       cooldownPeriod: rule.cooldownPeriod || 300000,
-      conditionLogic: rule.conditionLogic || 'AND',
       conditions: rule.conditions || [],
     });
     setDetailVisible(true);
@@ -124,9 +125,7 @@ const RulesScreen = () => {
       description: fields.description,
       priority: fields.priority,
       isActive: fields.isActive,
-      maxTriggersPerDay: fields.maxTriggersPerDay,
       cooldownPeriod: fields.cooldownPeriod,
-      conditionLogic: fields.conditionLogic || 'AND',
     };
     
     // Use the updated conditions from editFields
@@ -172,8 +171,14 @@ const RulesScreen = () => {
         <DeviceSelector
           devices={devices}
           selectedDevice={selectedDevice}
-          onSelectDevice={(id) => {
-            setSelectedDevice(id);
+          onSelectDevice={(deviceIdOrDevice) => {
+            // Handle both deviceId string and device object
+            const deviceId = typeof deviceIdOrDevice === 'string' 
+              ? deviceIdOrDevice 
+              : deviceIdOrDevice?.deviceId || deviceIdOrDevice?._id;
+            if (deviceId) {
+              setSelectedDevice(deviceId);
+            }
           }}
         />
       </View>
@@ -320,9 +325,7 @@ const RulesScreen = () => {
               name: fields.name, 
               description: fields.description,
               priority: fields.priority,
-              maxTriggersPerDay: fields.maxTriggersPerDay,
               cooldownPeriod: fields.cooldownPeriod,
-              conditionLogic: fields.conditionLogic || 'AND',
             };
             
             // Use the updated conditions from customFields

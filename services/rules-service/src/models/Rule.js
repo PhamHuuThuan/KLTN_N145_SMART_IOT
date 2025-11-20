@@ -45,7 +45,7 @@ const ruleSchema = new mongoose.Schema({
     },
     sensor: {
       type: String,
-      enum: ['temperature', 'humidity', 'gas_ppm', 'smoke']
+      enum: ['temperature', 'humidity', 'gas_ppm', 'smoke', 'flame']
     },
     operator: {
       type: String,
@@ -53,11 +53,6 @@ const ruleSchema = new mongoose.Schema({
     },
     value: mongoose.Schema.Types.Mixed
   }],
-  conditionLogic: {
-    type: String,
-    enum: ['AND', 'OR'],
-    default: 'AND'
-  },
   actions: [{
     type: {
       type: String,
@@ -66,33 +61,15 @@ const ruleSchema = new mongoose.Schema({
     },
     message: String
   }],
-  pausedUntil: {
-    type: Date,
-    default: null
-  },
   cooldownPeriod: {
     type: Number,
     default: 300000,
     min: 0,
     max: 86400000  // Max 24 hours
   },
-  maxTriggersPerDay: {
-    type: Number,
-    default: 10,
-    min: 1,
-    max: 1000  // Max 1000 triggers per day
-  },
   triggerCount: {
     type: Number,
     default: 0
-  },
-  lastTriggered: {
-    type: Date,
-    default: null
-  },
-  dailyResetDate: {
-    type: Date,
-    default: null
   },
   deletedAt: {
     type: Date,
@@ -105,27 +82,31 @@ const ruleSchema = new mongoose.Schema({
       high: {
         temperature: { type: Number, default: 1.2 },    // +20%
         smoke: { type: Number, default: 1.5 },          // +50%
-        gas_ppm: { type: Number, default: 2.0 },       // +100%
-        humidity: { type: Number, default: 1.3 }         // +30%
+        gas_ppm: { type: Number, default: 2.0 },        // +100%
+        humidity: { type: Number, default: 1.3 },       // +30%
+        flame: { type: Number, default: 1.0 }           // Bật ngay khi phát hiện
       },
       medium: {
         temperature: { type: Number, default: 1.3 },    // +30%
         smoke: { type: Number, default: 1.8 },          // +80%
-        gas_ppm: { type: Number, default: 2.5 },       // +150%
-        humidity: { type: Number, default: 1.5 }        // +50%
+        gas_ppm: { type: Number, default: 2.5 },        // +150%
+        humidity: { type: Number, default: 1.5 },       // +50%
+        flame: { type: Number, default: 1.0 }
       },
       low: {
         temperature: { type: Number, default: 1.5 },    // +50%
-        smoke: { type: Number, default: 2.0 },         // +100%
-        gas_ppm: { type: Number, default: 3.0 },       // +200%
-        humidity: { type: Number, default: 2.0 }        // +100%
+        smoke: { type: Number, default: 2.0 },          // +100%
+        gas_ppm: { type: Number, default: 3.0 },        // +200%
+        humidity: { type: Number, default: 2.0 },       // +100%
+        flame: { type: Number, default: 1.0 }
       }
     },
     criticalThresholds: {
       temperature: { type: Number, default: 90 },
       smoke: { type: Number, default: 1.5 },
       gas_ppm: { type: Number, default: 100 },
-      humidity: { type: Number, default: 20 }
+      humidity: { type: Number, default: 20 },
+      flame: { type: Number, default: 1 }
     }
   }
 });
@@ -137,10 +118,6 @@ ruleSchema.index({ ruleId: 1 });
 ruleSchema.index({ deviceId: 1 });
 ruleSchema.index({ createdBy: 1 });
 ruleSchema.index({ isActive: 1 });
-ruleSchema.index({ pausedUntil: 1 });
-ruleSchema.index({ lastTriggered: 1 });
-ruleSchema.index({ dailyResetDate: 1 });
-
 // sort by priority
 const sortByPriority = (a, b) =>
   PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
@@ -166,19 +143,8 @@ ruleSchema.statics.findByCreator = async function (createdBy, options = {}) {
 };
 
 // Methods
-ruleSchema.methods.isInCooldown = function(currentSensorValue = null, sensorType = null) {
-  if (!this.lastTriggered || !this.cooldownPeriod) return false;
-  const now = new Date();
-  const cooldownEnd = new Date(this.lastTriggered.getTime() + this.cooldownPeriod);
-  const isInBasicCooldown = now < cooldownEnd;
-  
-  if (!isInBasicCooldown) return false;
-  
-  if (currentSensorValue && sensorType && this.escalationConfig.enabled) {
-    return !this.shouldEscalate(currentSensorValue, sensorType);
-  }
-  
-  return true;
+ruleSchema.methods.isInCooldown = function() {
+  return false;
 };
 
 // Check if rule should escalate
@@ -210,27 +176,9 @@ ruleSchema.methods.shouldEscalate = function(currentValue, sensorType) {
   return currentValue >= escalationThreshold;
 };
 
-// Check if rule has reached daily limit
-ruleSchema.methods.hasReachedDailyLimit = async function() {
-  if (!this.maxTriggersPerDay) return false;
-  
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
-  if (!this.dailyResetDate || this.dailyResetDate < today) {
-    this.triggerCount = 0;
-    this.dailyResetDate = today;
-    await this.save();
-    return false;
-  }
-  
-  return this.triggerCount >= this.maxTriggersPerDay;
-};
-
 // Increment trigger count
 ruleSchema.methods.incrementTriggerCount = function() {
   this.triggerCount++;
-  this.lastTriggered = new Date();
   return this.save();
 };
 
@@ -240,11 +188,7 @@ ruleSchema.methods.canTrigger = async function(currentSensorValue = null, sensor
   
   if (this.deletedAt) return false;
   
-  if (this.pausedUntil && new Date() < this.pausedUntil) return false;
-  
-  if (this.isInCooldown(currentSensorValue, sensorType)) return false;
-  
-  if (await this.hasReachedDailyLimit()) return false;
+  if (this.isInCooldown()) return false;
   
   return true;
 };

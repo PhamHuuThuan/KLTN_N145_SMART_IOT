@@ -137,6 +137,12 @@ class RulePriorityService {
         case 'smoke':
           sensorValue = sensorData.smoke;
           break;
+        case 'flame':
+          sensorValue = sensorData.flame;
+          if (sensorValue !== undefined && sensorValue !== null) {
+            sensorValue = Number(sensorValue);
+          }
+          break;
         default:
           sensorValue = 'N/A';
       }
@@ -151,6 +157,10 @@ class RulePriorityService {
           return `🚨 ${rule.name}: Current ${sensorValue} ppm (Threshold: ${threshold} ppm)`;
         case 'smoke':
           return `⚠️ ${rule.name}: Level ${sensorValue} (Threshold: ${threshold})`;
+        case 'flame': {
+          const flameStatus = Number(sensorValue) >= 1 ? '🔥 phát hiện lửa' : '✅ an toàn';
+          return `🔥 ${rule.name}: ${flameStatus}`;
+        }
         default:
           return `📊 ${rule.name}: ${sensorType} ${operator} ${threshold}`;
       }

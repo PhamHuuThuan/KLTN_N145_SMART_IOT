@@ -7,11 +7,13 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useNotificationContext } from '../contexts/NotificationContext';
 import { useTheme } from '../contexts/ThemeContext';
 
 const NotificationItem = ({ notification, onPress }) => {
   const { markAsRead, deleteNotification } = useNotificationContext();
+  const { t } = useTranslation();
   const { colors } = useTheme();
 
   const getPriorityColor = (priority) => {
@@ -191,14 +193,9 @@ const NotificationItem = ({ notification, onPress }) => {
                 ⚠️ Cooldown đã được bỏ qua
               </Text>
             )}
-            {notification.metadata.dailyLimitExceeded && (
-              <Text style={[styles.metadataText, { color: '#FF0000', fontWeight: 'bold' }]}>
-                🚨 Đã vượt giới hạn daily limit
-              </Text>
-            )}
-            {notification.metadata.triggerCount && notification.metadata.maxTriggersPerDay && (
+            {typeof notification.metadata.triggerCount === 'number' && (
               <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
-                📊 Triggers: {notification.metadata.triggerCount}/{notification.metadata.maxTriggersPerDay}
+                📊 {t('rules.triggered')} {notification.metadata.triggerCount} · {t('rules.unlimitedAlerts')}
               </Text>
             )}
           </View>

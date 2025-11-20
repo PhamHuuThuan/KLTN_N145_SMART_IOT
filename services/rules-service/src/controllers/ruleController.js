@@ -1,9 +1,5 @@
 import Rule from '../models/Rule.js';
-import RuleEvaluationService from '../services/RuleEvaluationService.js';
 import logger from '../utils/logger.js';
-
-// Delegate messaging to RuleEvaluationService to reuse its Kafka producer
-const ruleEvaluationService = new RuleEvaluationService();
 
 // Get all rules for a user
 export const getAllRules = async (req, res) => {
@@ -53,9 +49,7 @@ export const createRule = async (req, res) => {
       conditions, 
       actions,
       cooldownPeriod,
-      maxTriggersPerDay,
-      isActive,
-      conditionLogic
+      isActive
     } = req.body;
     
     const createdBy = (req.user && (req.user.userId || req.user.sub || req.user.id)) || null;
@@ -88,9 +82,8 @@ export const createRule = async (req, res) => {
       conditions,
       actions,
       cooldownPeriod: cooldownPeriod || 300000,
-      maxTriggersPerDay: maxTriggersPerDay || 10,
       isActive: isActive !== undefined ? isActive : true,
-      conditionLogic: conditionLogic || 'AND'
+      triggerCount: 0
     });
 
     await rule.save();
@@ -218,38 +211,6 @@ export const toggleRuleStatus = async (req, res) => {
       success: false,
       message: 'Error updating rule status',
       error: error.message,
-    });
-  }
-};
-
-
-// User responds to an alert (acknowledge, dismiss, false alarm)
-export const respondToAlert = async (req, res) => {
-  try {
-    const { ruleId } = req.params;
-    const { response, metadata = {} } = req.body || {};
-    const userId = req.user?.userId || req.user?.sub;
-
-    const result = await ruleEvaluationService.handleUserResponse({
-      userId,
-      ruleId,
-      response,
-      metadata
-    });
-
-    res.json({
-      success: true,
-      message: `Response '${response}' recorded successfully`,
-      data: result
-    });
-
-  } catch (error) {
-    logger.error('Error handling user response:', error);
-    const status = error.statusCode || (error.message?.includes('Unauthorized') ? 401 : 500);
-    res.status(status).json({
-      success: false,
-      message: 'Failed to process user response',
-      error: error.message
     });
   }
 };

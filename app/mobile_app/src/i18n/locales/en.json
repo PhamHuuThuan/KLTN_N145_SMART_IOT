@@ -84,6 +84,7 @@
     "temperature": "Temperature",
     "humidity": "Humidity",
     "smoke": "Smoke",
+    "flame": "Flame",
     "gas": "Gas",
     "outlets": "Outlets",
     "outlet": "Outlet",
@@ -176,10 +177,6 @@
     "ruleDetails": "Rule Details",
     "customizeRule": "Customize Rule",
     "ruleNamePlaceholder": "Rule name",
-    "descriptionPlaceholder": "Description",
-    "conditionsEditable": "Conditions (Editable):",
-    "operator": "Operator",
-    "value": "Value",
     "priorityLabel": "Priority",
     "priority": {
       "low": "Low",
@@ -188,22 +185,18 @@
       "urgent": "Urgent"
     },
     "cooldownPeriod": "Cooldown Period (minutes)",
-    "maxTriggersPerDay": "Max Triggers/Day",
+    "cooldownPeriodSeconds": "Cooldown Period (seconds)",
     "emergencyMode": "Emergency Mode",
     "emergencyModeDescription": "Urgent rules trigger immediately without cooldown or daily limits",
+    "unlimitedAlertsHint": "Alerts fire every time thresholds are exceeded—no daily cap.",
     "saveChanges": "Save changes",
     "createWithCustomization": "Create with customization",
     "acknowledged": "Acknowledged",
-    "pause1h": "Pause 1h",
-    "pause24h": "Pause 24h",
-    "unpauseNow": "Unpause now",
-    "unpausing": "Unpausing...",
-    "pausedUntil": "Paused until",
     "edit": "Edit",
     "delete": "Delete",
     "conditions": "Conditions:",
     "cooldown": "Cooldown:",
-    "maxPerDay": "Max/day:",
+    "unlimitedAlerts": "No daily limit",
     "triggered": "Triggered:",
     "emergencyModeLabel": "Emergency Mode",
     "none": "None",
@@ -215,6 +208,7 @@
     "humidity": "Humidity",
     "gas": "Gas",
     "smoke": "Smoke",
+    "flame": "Flame",
     "sensors": "Sensors",
     "customizeAndCreate": "Customize & Create",
     "creatingLabel": "Creating...",
@@ -224,91 +218,71 @@
     "add": "Add",
     "remove": "Remove",
     "sensorType": "Sensor Type",
-    "conditionLogic": "Condition Logic",
-    "multipleConditions": "multiple conditions",
-    "singleCondition": "1 condition",
-    "andAll": "AND (all)",
-    "orOne": "OR (one of)",
     "templates": {
-      "gasLeakDetection": {
-        "name": "Gas Leak Detection",
-        "description": "Emergency response for gas leak",
-        "message": "🚨 Warning: High gas concentration detected! Please turn off the gas supply immediately and ventilate the area!"
+      "gasEmergency": {
+        "name": "🚨 Gas Emergency",
+        "description": "Emergency alert when gas concentration > 1000 ppm",
+        "message": "🚨 EMERGENCY ALERT: Dangerous gas concentration! Risk of poisoning or explosion!"
       },
-      "smokeDetection": {
-        "name": "Smoke Detection",
-        "description": "Emergency response for smoke detection",
-        "message": "🔥 Warning: Smoke detected! Check immediately and contact fire department if needed!"
+      "gasHigh": {
+        "name": "💨 High Gas Level",
+        "description": "Alert when gas concentration is between 401–1000 ppm",
+        "message": "💨 Warning: High gas concentration detected! Check for leaks immediately."
       },
-      "highTemperature": {
-        "name": "High Temperature",
-        "description": "Alert when temperature exceeds safe threshold",
-        "message": "🌡️ Warning: High temperature! Check heat sources and turn on fans/AC."
+      "gasMedium": {
+        "name": "💨 Medium Gas Level",
+        "description": "Alert when gas concentration is between 200–400 ppm",
+        "message": "💨 Notice: Mild gas detected. Monitor and inspect regularly."
       },
-      "lowHumidity": {
-        "name": "Low Humidity",
-        "description": "Alert when humidity is too low",
-        "message": "💧 Warning: Low humidity! Consider using a humidifier."
+      "smokeEmergency": {
+        "name": "🚨 Smoke Emergency",
+        "description": "Emergency alert when smoke concentration > 700 ppm",
+        "message": "🚨 EMERGENCY ALERT: Dense smoke detected! High risk of fire or CO exposure!"
+      },
+      "smokeHigh": {
+        "name": "🔥 High Smoke Level",
+        "description": "Alert when smoke concentration is between 301–700 ppm",
+        "message": "🔥 Warning: Heavy smoke detected! Possible fire, check immediately."
+      },
+      "smokeMedium": {
+        "name": "💨 Medium Smoke Level",
+        "description": "Alert when smoke concentration is between 100–300 ppm",
+        "message": "💨 Notice: Light smoke detected. Could be dust or mild vapor."
       },
       "tempEmergency": {
-        "name": "🔥 Emergency Temperature",
+        "name": "🚨 Temperature Emergency",
         "description": "Emergency alert when temperature > 40°C",
-        "message": "🚨 EMERGENCY ALERT: Extreme temperature! Risk of fire or explosion!"
+        "message": "🚨 EMERGENCY ALERT: Extremely high temperature! Risk of fire or explosion!"
       },
       "tempHigh": {
         "name": "🌡️ High Temperature",
-        "description": "Alert when temperature 31-40°C",
-        "message": "🌡️ Warning: High temperature! Check ventilation and heat load."
+        "description": "Alert when temperature is between 31–40°C",
+        "message": "🌡️ Warning: High temperature detected! Check cooling or ventilation systems."
       },
       "tempLow": {
         "name": "❄️ Low Temperature",
         "description": "Alert when temperature < 15°C",
-        "message": "❄️ Warning: Low temperature! Check heating system."
+        "message": "❄️ Notice: Low temperature detected! Check heating or storage conditions."
       },
       "humidityEmergency": {
-        "name": "💧 Emergency Humidity",
+        "name": "🚨 Humidity Emergency",
         "description": "Emergency alert when humidity > 80%",
-        "message": "🚨 EMERGENCY ALERT: Extreme humidity! Risk of electrical short circuit!"
+        "message": "🚨 EMERGENCY ALERT: Excessive humidity! Risk of short circuit or equipment damage!"
       },
       "humidityHigh": {
         "name": "💧 High Humidity",
-        "description": "Alert when humidity 61-80%",
-        "message": "💧 Warning: High humidity! May cause mold, damage components."
+        "description": "Alert when humidity is between 61–80%",
+        "message": "💧 Warning: High humidity level! May cause mold or component corrosion."
       },
       "humidityLow": {
         "name": "💧 Low Humidity",
         "description": "Alert when humidity < 30%",
-        "message": "💧 Warning: Low humidity! Dry air, prone to static electricity."
+        "message": "💧 Notice: Low humidity! Dry air may cause static electricity."
       },
-      "gasEmergency": {
-        "name": "🚨 Emergency Gas",
-        "description": "Emergency alert when gas > 1000 ppm",
-        "message": "🚨 EMERGENCY ALERT: Dangerous gas! Risk of poisoning or explosion!"
-      },
-      "gasHigh": {
-        "name": "⚠️ High Gas",
-        "description": "Alert when gas 401-1000 ppm",
-        "message": "⚠️ Warning: High gas concentration! Check for leaks immediately."
-      },
-      "gasMedium": {
-        "name": "🔍 Medium Gas",
-        "description": "Alert when gas 200-400 ppm",
-        "message": "🔍 Warning: Light gas detected. Monitor and check."
-      },
-      "smokeEmergency": {
-        "name": "🔥 Emergency Smoke",
-        "description": "Emergency alert when smoke > 700 ppm",
-        "message": "🚨 EMERGENCY ALERT: Dense smoke! Risk of fire or high CO!"
-      },
-      "smokeHigh": {
-        "name": "🔥 High Smoke",
-        "description": "Alert when smoke 301-700 ppm",
-        "message": "🔥 Warning: Dense smoke! Early fire warning, check immediately."
-      },
-      "smokeMedium": {
-        "name": "💨 Medium Smoke",
-        "description": "Alert when smoke 100-300 ppm",
-        "message": "💨 Warning: Light smoke detected. May be dust or smoke."
+      "flameDetected": {
+        "name": "🔥 Flame Detected",
+        "description": "Emergency alert when flame sensor is triggered",
+        "message": "🔥 EMERGENCY ALERT: Flame detected! Shut down nearby equipment and act immediately!"
       }
     },
     "valueOutOfRange": "Value is out of allowed range"
@@ -451,7 +425,8 @@
       "temperature": "Temp",
       "humidity": "Humid",
       "gasLevel": "Gas",
-      "smoke": "Smoke"
+      "smoke": "Smoke",
+      "flame": "Flame"
     },
     "values": {
       "detected": "Detected",

@@ -1,21 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
 import CONFIG from '../constants/config';
 
 const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onSave }) => {
   if (!selectedRule) return null;
   const { t } = useTranslation();
-  const { token } = useAuth();
-  const [pausing, setPausing] = useState(false);
-  const [unpausing, setUnpausing] = useState(false);
-  const [pausedUntilLocal, setPausedUntilLocal] = useState(selectedRule?.pausedUntil || null);
-
-  useEffect(() => {
-    setPausedUntilLocal(selectedRule?.pausedUntil || null);
-  }, [selectedRule?.pausedUntil, selectedRule?._id]);
 
   // Initialize editFields.conditions if not exists
   useEffect(() => {
@@ -23,9 +14,6 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
       setEditFields(prev => ({ ...prev, conditions: selectedRule.conditions }));
     }
   }, [selectedRule?.conditions, editFields.conditions, setEditFields]);
-
-  const isPaused = !!(pausedUntilLocal && new Date(pausedUntilLocal) > new Date());
-  const pausedUntilText = isPaused ? new Date(pausedUntilLocal).toLocaleString() : '';
 
   const getPriorityColor = (priority) => {
     const priorityMap = {
@@ -42,7 +30,8 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
       'temperature': 'device-thermostat',
       'humidity': 'water-drop',
       'gas_ppm': 'air',
-      'smoke': 'smoke-free'
+      'smoke': 'smoke-free',
+      'flame': 'local-fire-department'
     };
     return iconMap[sensor] || 'sensors';
   };
@@ -52,90 +41,35 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
       'temperature': t('rules.temperature'),
       'humidity': t('rules.humidity'), 
       'gas_ppm': t('rules.gas'),
-      'smoke': t('rules.smoke')
+      'smoke': t('rules.smoke'),
+      'flame': t('rules.flame')
     };
     return labelMap[sensor] || sensor;
+  };
+
+  const formatConditionThreshold = (condition, getUnit) => {
+    if (!condition) return '';
+
+    const operator = condition.operator || '';
+    const value = condition.value !== undefined && condition.value !== null
+      ? `${condition.value}`
+      : '';
+    const unit = condition.unit || getUnit(condition.sensor) || '';
+    const normalizedUnit = unit.trim();
+
+    const operatorPart = operator.trim();
+    const valuePart = value.trim();
+
+    const threshold = [operatorPart, valuePart]
+      .filter(Boolean)
+      .join(operatorPart && valuePart ? ' ' : '');
+
+    return `${threshold}${normalizedUnit ? ` ${normalizedUnit}` : ''}`.trim();
   };
 
   // Validate conditions for logical consistency and value ranges
   const validateConditions = (conditions) => {
     if (!conditions || conditions.length === 0) return { valid: false, message: 'Cần ít nhất 1 điều kiện' };
-
-    // Check each condition for value validation
-    for (const condition of conditions) {
-      if (!condition.sensor || !condition.operator || condition.value === undefined || condition.value === '') {
-        return { valid: false, message: 'Tất cả điều kiện phải có đầy đủ thông tin' };
-      }
-
-      // Only validate if value is a valid number (not blocking on range)
-      if (!validateSensorValue(condition.sensor, condition.value, editFields.priority)) {
-        return { 
-          valid: false, 
-          message: `Giá trị ${condition.sensor} phải là số hợp lệ` 
-        };
-      }
-    }
-
-    // If only one condition, it's valid
-    if (conditions.length < 2) return { valid: true, message: '' };
-
-    // Group conditions by sensor
-    const sensorGroups = {};
-    conditions.forEach(condition => {
-      if (condition.sensor) {
-        if (!sensorGroups[condition.sensor]) {
-          sensorGroups[condition.sensor] = [];
-        }
-        sensorGroups[condition.sensor].push(condition);
-      }
-    });
-
-    // Check each sensor group for conflicts
-    for (const [sensor, sensorConditions] of Object.entries(sensorGroups)) {
-      if (sensorConditions.length < 2) continue;
-
-      const values = sensorConditions.map(c => parseFloat(c.value)).filter(v => !isNaN(v));
-      if (values.length < 2) continue;
-
-      // Check for redundant conditions (same operator, overlapping ranges)
-      const operators = sensorConditions.map(c => c.operator);
-      const hasGreater = operators.some(op => ['>', '>='].includes(op));
-      const hasLess = operators.some(op => ['<', '<='].includes(op));
-
-      if (hasGreater && hasLess) {
-        const maxGreater = Math.max(...values.filter((v, i) => ['>', '>='].includes(operators[i])));
-        const minLess = Math.min(...values.filter((v, i) => ['<', '<='].includes(operators[i])));
-        
-        if (maxGreater >= minLess) {
-          return {
-            valid: false,
-            message: `Mâu thuẫn: ${sensor} > ${maxGreater} và ${sensor} < ${minLess} không thể xảy ra cùng lúc`
-          };
-        }
-      }
-
-      // Check for redundant conditions (same direction)
-      if (hasGreater && !hasLess) {
-        const sortedValues = values.sort((a, b) => a - b);
-        if (sortedValues.length > 1) {
-          return {
-            valid: false,
-            message: `Dư thừa: ${sensor} > ${sortedValues[0]} đã bao gồm ${sensor} > ${sortedValues[sortedValues.length - 1]}`
-          };
-        }
-      }
-
-      if (hasLess && !hasGreater) {
-        const sortedValues = values.sort((a, b) => b - a);
-        if (sortedValues.length > 1) {
-          return {
-            valid: false,
-            message: `Dư thừa: ${sensor} < ${sortedValues[0]} đã bao gồm ${sensor} < ${sortedValues[sortedValues.length - 1]}`
-          };
-        }
-      }
-    }
-
     return { valid: true, message: '' };
   };
 
@@ -144,69 +78,24 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
       'temperature': '°C',
       'humidity': '%',
       'gas_ppm': ' ppm',
-      'smoke': ' ppm'
+      'smoke': ' ppm',
+      'flame': ''
     };
     return unitMap[sensor] || '';
   };
 
-  // Validation constraints for sensor values based on priority
-  const getSensorConstraints = (sensor, priority = 'medium') => {
-    const constraints = {
-      'temperature': {
-        'urgent': { min: 40, max: 100, step: 1, defaultValue: 50 },
-        'high': { min: 31, max: 40, step: 1, defaultValue: 35 },
-        'medium': { min: 15, max: 30, step: 1, defaultValue: 25 },
-        'low': { min: 0, max: 15, step: 1, defaultValue: 10 }
-      },
-      'humidity': {
-        'urgent': { min: 80, max: 100, step: 1, defaultValue: 80 },
-        'high': { min: 61, max: 80, step: 1, defaultValue: 70 },
-        'medium': { min: 30, max: 60, step: 1, defaultValue: 45 },
-        'low': { min: 0, max: 30, step: 1, defaultValue: 15 }
-      },
-      'gas_ppm': {
-        'urgent': { min: 1000, max: 2000, step: 10, defaultValue: 1500 },
-        'high': { min: 401, max: 1000, step: 10, defaultValue: 500 },
-        'medium': { min: 200, max: 400, step: 10, defaultValue: 300 },
-        'low': { min: 0, max: 200, step: 10, defaultValue: 100 }
-      },
-      'smoke': {
-        'urgent': { min: 700, max: 1000, step: 1, defaultValue: 850 },
-        'high': { min: 301, max: 700, step: 1, defaultValue: 500 },
-        'medium': { min: 100, max: 300, step: 1, defaultValue: 200 },
-        'low': { min: 0, max: 100, step: 1, defaultValue: 50 }
-      }
+  // Get default cooldown period based on priority
+  const getDefaultCooldownPeriod = (priority) => {
+    const defaults = {
+      'urgent': 30000,   // 30 giây
+      'high': 300000,    // 5 phút
+      'medium': 600000,  // 10 phút
+      'low': 900000      // 15 phút
     };
-    return constraints[sensor]?.[priority] || { min: 0, max: 1000, step: 1, defaultValue: 100 };
+    return defaults[priority] || 300000;
   };
 
-  // Get default value for sensor + priority (for auto-setup)
-  const getDefaultValue = (sensor, priority = 'medium') => {
-    const constraints = getSensorConstraints(sensor, priority);
-    return constraints.defaultValue || 0;
-  };
 
-  // Check if value is in recommended range (warning only, not blocking)
-  const isValueInRecommendedRange = (sensor, value, priority = 'medium') => {
-    const constraints = getSensorConstraints(sensor, priority);
-    const numValue = parseFloat(value);
-    
-    if (isNaN(numValue)) return false;
-    if (numValue < constraints.min || numValue > constraints.max) return false;
-    
-    return true;
-  };
-
-  // Validate sensor value (only check if valid number, not range)
-  const validateSensorValue = (sensor, value, priority = 'medium') => {
-    const numValue = parseFloat(value);
-    return !isNaN(numValue) && numValue >= 0;
-  };
-
-  const getValueHint = (sensor, priority = 'medium') => {
-    const constraints = getSensorConstraints(sensor, priority);
-    return ` (Khuyến nghị: ${constraints.min}-${constraints.max}, Mặc định: ${constraints.defaultValue})`;
-  };
 
   return (
     <View style={styles.modalContainer}>
@@ -220,28 +109,6 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {isPaused && (
-          <View style={styles.pausedBanner}>
-            <MaterialIcons name="pause-circle" size={20} color={CONFIG.COLORS.white} />
-            <Text style={styles.pausedBannerText}>{t('rules.pausedUntil')} {pausedUntilText}</Text>
-            <TouchableOpacity
-              disabled={unpausing}
-              onPress={async () => {
-                try {
-                  setUnpausing(true);
-                  const rulesService = (await import('../services/rulesService')).default;
-                  await rulesService.updateRule(selectedRule._id, { pausedUntil: null }, token);
-                  setPausedUntilLocal(null);
-                } finally {
-                  setUnpausing(false);
-                }
-              }}
-              style={styles.unpauseButton}
-            >
-              <Text style={styles.unpauseButtonText}>{unpausing ? t('rules.unpausing') : t('rules.unpauseNow')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
         <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.ruleName')}</Text>
         <TextInput
           style={styles.input}
@@ -254,7 +121,6 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           style={[styles.input, styles.multilineInput]}
           value={editFields.description}
           onChangeText={(t) => setEditFields(prev => ({ ...prev, description: t }))}
-          placeholder={t('rules.descriptionPlaceholder')}
           multiline
           textAlignVertical="top"
         />
@@ -262,44 +128,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
         {/* Editable Conditions */}
         {editFields.conditions && editFields.conditions.length > 0 && (
           <View style={styles.conditionsSection}>
-            <View style={styles.conditionsHeader}>
-              <Text style={styles.sectionTitle}>{t('rules.conditionsEditable')}</Text>
-              <View style={styles.conditionButtons}>
-                <TouchableOpacity
-                  style={[styles.addConditionButton, { backgroundColor: '#4CAF50' }]}
-                  onPress={() => {
-                    const newCondition = {
-                      type: 'sensor',
-                      sensor: 'temperature',
-                      operator: '>',
-                      value: 0,
-                      unit: '°C'
-                    };
-                    setEditFields(prev => ({
-                      ...prev,
-                      conditions: [...(prev.conditions || []), newCondition]
-                    }));
-                  }}
-                >
-                  <MaterialIcons name="add" size={16} color="white" />
-                  <Text style={styles.addConditionText}>Thêm</Text>
-                </TouchableOpacity>
-                {editFields.conditions && editFields.conditions.length > 1 && (
-                  <TouchableOpacity
-                    style={[styles.addConditionButton, { backgroundColor: '#F44336' }]}
-                    onPress={() => {
-                      setEditFields(prev => ({
-                        ...prev,
-                        conditions: prev.conditions.slice(0, -1)
-                      }));
-                    }}
-                  >
-                    <MaterialIcons name="remove" size={16} color="white" />
-                    <Text style={styles.addConditionText}>Bớt</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
+            <Text style={styles.sectionTitle}>{t('rules.conditionsPreset', 'Điều kiện cảnh báo cố định')}</Text>
             {editFields.conditions.map((condition, index) => (
               <View key={index} style={styles.conditionEditItem}>
                 <View style={styles.conditionHeader}>
@@ -312,109 +141,19 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                 </View>
                 
                 <View style={styles.conditionInputs}>
-                  {/* Sensor Type Selector */}
-                  <View style={styles.operatorSelector}>
-                    <Text style={styles.inputLabel}>Loại cảm biến</Text>
-                    <View style={styles.sensorButtons}>
-                      {[
-                        { key: 'temperature', label: '🌡️', fullLabel: 'Nhiệt độ' },
-                        { key: 'humidity', label: '💧', fullLabel: 'Độ ẩm' },
-                        { key: 'gas_ppm', label: '🚨', fullLabel: 'Khí gas' },
-                        { key: 'smoke', label: '🔥', fullLabel: 'Khói' }
-                      ].map((sensor) => (
-                        <TouchableOpacity
-                          key={sensor.key}
-                          style={[
-                            styles.sensorButton,
-                            editFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonSelected
-                          ]}
-                          onPress={() => {
-                            const newConditions = [...editFields.conditions];
-                            const currentPriority = editFields.priority || 'medium';
-                            newConditions[index] = { 
-                              ...newConditions[index], 
-                              sensor: sensor.key,
-                              unit: getSensorUnit(sensor.key),
-                              value: getDefaultValue(sensor.key, currentPriority)
-                            };
-                            setEditFields(prev => ({ ...prev, conditions: newConditions }));
-                          }}
-                        >
-                          <Text style={[
-                            styles.sensorButtonText,
-                            editFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonTextSelected
-                          ]}>{sensor.label}</Text>
-                          <Text style={[
-                            styles.sensorButtonLabel,
-                            editFields.conditions?.[index]?.sensor === sensor.key && styles.sensorButtonLabelSelected
-                          ]}>{sensor.fullLabel}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-
-                  {/* Operator Selector */}
-                  <View style={styles.operatorSelector}>
-                    <Text style={styles.inputLabel}>{t('rules.operator')}</Text>
-                    <View style={styles.operatorButtons}>
-                      {['>', '<', '>=', '<=', '==', '!='].map((op) => (
-                        <TouchableOpacity
-                          key={op}
-                          style={[
-                            styles.operatorButton,
-                            editFields.conditions?.[index]?.operator === op && styles.operatorButtonSelected
-                          ]}
-                          onPress={() => {
-                            const newConditions = [...editFields.conditions];
-                            newConditions[index] = { ...newConditions[index], operator: op };
-                            setEditFields(prev => ({ ...prev, conditions: newConditions }));
-                          }}
-                        >
-                          <Text style={[
-                            styles.operatorText,
-                            editFields.conditions?.[index]?.operator === op && styles.operatorTextSelected
-                          ]}>{op}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-
-                  {/* Value Input */}
-                  <View style={styles.valueInput}>
+                  <View style={styles.thresholdContainer}>
                     <Text style={styles.inputLabel}>
-                      {t('rules.value')} {getSensorUnit(condition.sensor)}
-                      {getValueHint(condition.sensor, editFields.priority)}
+                      {t('rules.thresholdValue', 'Ngưỡng cảnh báo')}
                     </Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        editFields.conditions?.[index]?.value !== undefined && 
-                        !validateSensorValue(condition.sensor, editFields.conditions[index].value, editFields.priority) && 
-                        styles.inputError
-                      ]}
-                      value={editFields.conditions?.[index]?.value !== undefined ? String(editFields.conditions[index].value) : ''}
-                      onChangeText={(text) => {
-                        const newConditions = [...editFields.conditions];
-                        const numValue = text === '' ? '' : parseFloat(text);
-                        newConditions[index] = { ...newConditions[index], value: numValue };
-                        setEditFields(prev => ({ ...prev, conditions: newConditions }));
-                      }}
-                      placeholder={String(getDefaultValue(condition.sensor, editFields.priority))}
-                      keyboardType="numeric"
-                    />
-                    {editFields.conditions?.[index]?.value !== undefined && 
-                     !validateSensorValue(condition.sensor, editFields.conditions[index].value, editFields.priority) && (
-                      <Text style={styles.errorText}>
-                        Giá trị phải là số hợp lệ
+                    <View style={styles.thresholdBadge}>
+                      <MaterialIcons name="tune" size={16} color={CONFIG.COLORS.primary} />
+                      <Text style={styles.thresholdText}>
+                        {formatConditionThreshold(condition, getSensorUnit)}
                       </Text>
-                    )}
-                    {editFields.conditions?.[index]?.value !== undefined && 
-                     validateSensorValue(condition.sensor, editFields.conditions[index].value, editFields.priority) &&
-                     !isValueInRecommendedRange(condition.sensor, editFields.conditions[index].value, editFields.priority) && (
-                      <Text style={styles.warningText}>
-                        ⚠️ Giá trị ngoài khoảng khuyến nghị {getSensorConstraints(condition.sensor, editFields.priority).min}-{getSensorConstraints(condition.sensor, editFields.priority).max} cho mức {editFields.priority}. Bạn vẫn có thể sử dụng giá trị này.
+                    </View>
+                    <Text style={styles.thresholdHint}>
+                      {t('rules.thresholdFixedHint', 'Giá trị do hệ thống thiết lập, liên hệ Admin để thay đổi')}
                       </Text>
-                    )}
                   </View>
                 </View>
               </View>
@@ -434,17 +173,12 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
                     { borderColor: getPriorityColor(priority) }
                   ]}
                   onPress={() => {
-                    const newPriority = priority;
-                    // Auto-update condition values when priority changes
-                    if (editFields.conditions && editFields.conditions.length > 0) {
-                      const updatedConditions = editFields.conditions.map(condition => ({
-                        ...condition,
-                        value: getDefaultValue(condition.sensor, newPriority)
-                      }));
-                      setEditFields(prev => ({ ...prev, priority: newPriority, conditions: updatedConditions }));
-                    } else {
-                      setEditFields(prev => ({ ...prev, priority: newPriority }));
-                    }
+                    const defaultCooldown = getDefaultCooldownPeriod(priority);
+                    setEditFields(prev => ({ 
+                      ...prev, 
+                      priority,
+                      cooldownPeriod: defaultCooldown
+                    }));
                   }}
                 >
                   <Text style={[
@@ -459,65 +193,39 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           </View>
         </View>
 
-        {/* Condition Logic (only show if multiple conditions) */}
-        {editFields.conditions && editFields.conditions.length > 1 && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>Logic điều kiện</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {['AND', 'OR'].map((logic) => (
-                <TouchableOpacity
-                  key={logic}
-                  activeOpacity={0.85}
-                  style={[
-                    styles.priorityChip,
-                    editFields.conditionLogic === logic && [styles.priorityChipSelected, { borderColor: '#2196F3', backgroundColor: '#2196F322' }],
-                    { borderColor: '#2196F3' }
-                  ]}
-                  onPress={() => setEditFields(prev => ({ ...prev, conditionLogic: logic }))}
-                >
-                  <Text style={[styles.priorityLabel, editFields.conditionLogic === logic && { color: '#2196F3', fontWeight: '700' }]}>
-                    {logic === 'AND' ? 'VÀ (tất cả)' : 'HOẶC (một trong)'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Cooldown Period - Hidden for urgent priority */}
-        {editFields.priority !== 'urgent' && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>{t('rules.cooldownPeriod')}</Text>
-            <TextInput
-              style={styles.input}
-              value={editFields.cooldownPeriod ? String(Math.floor(editFields.cooldownPeriod / 60000)) : ''}
-              onChangeText={(text) => {
+        {/* Cooldown Period */}
+        <View style={{ marginTop: 16 }}>
+          <Text style={styles.inputLabel}>{t('rules.cooldownPeriod')}</Text>
+          <TextInput
+            style={styles.input}
+            value={editFields.cooldownPeriod ? (editFields.priority === 'urgent' 
+              ? String(Math.floor(editFields.cooldownPeriod / 1000)) 
+              : String(Math.floor(editFields.cooldownPeriod / 60000))) : ''}
+            onChangeText={(text) => {
+              if (editFields.priority === 'urgent') {
+                const seconds = parseInt(text) || 0;
+                setEditFields(prev => ({ ...prev, cooldownPeriod: seconds * 1000 }));
+              } else {
                 const minutes = parseInt(text) || 0;
                 setEditFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
-              }}
-              placeholder="5"
-              keyboardType="numeric"
-            />
-          </View>
-        )}
+              }
+            }}
+            placeholder={editFields.priority === 'urgent' ? "30" : "5"}
+            keyboardType="numeric"
+          />
+          {editFields.priority === 'urgent' && (
+            <Text style={{ fontSize: 12, color: CONFIG.COLORS.gray, marginTop: 4 }}>
+              {t('rules.cooldownPeriodSeconds', 'Thời gian chờ (giây)')}
+            </Text>
+          )}
+        </View>
 
-        {/* Max Triggers Per Day - Hidden for urgent priority */}
-        {editFields.priority !== 'urgent' && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>{t('rules.maxTriggersPerDay')}</Text>
-            <TextInput
-              style={styles.input}
-              value={editFields.maxTriggersPerDay ? String(editFields.maxTriggersPerDay) : ''}
-              onChangeText={(text) => {
-                const max = parseInt(text) || 0;
-                setEditFields(prev => ({ ...prev, maxTriggersPerDay: max }));
-              }}
-              placeholder="10"
-              keyboardType="numeric"
-            />
+        <View style={styles.infoBanner}>
+          <MaterialIcons name="notifications-active" size={16} color={CONFIG.COLORS.primary} />
+          <Text style={styles.infoBannerText}>
+            {t('rules.unlimitedAlertsHint')}
+          </Text>
           </View>
-        )}
-
 
         {/* Emergency Mode Notice for Urgent Priority */}
         {editFields.priority === 'urgent' && (
@@ -534,21 +242,18 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
 
         {/* Validation Error */}
         {(() => {
-          const validation = validateConditions(editFields.conditions);
-          return !validation.valid && (
-            <View style={{ marginTop: 16, padding: 12, backgroundColor: '#F4433622', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F44336' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                <MaterialIcons name="error" size={16} color="#F44336" />
-                <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>Không thể lưu rule</Text>
-              </View>
-              <Text style={{ color: '#F44336', fontSize: 12, marginBottom: 4 }}>
-                {validation.message}
-              </Text>
-              <Text style={{ color: '#F44336', fontSize: 11, fontStyle: 'italic' }}>
-                💡 Hãy sửa lại điều kiện hoặc chọn logic OR để kích hoạt khi một trong các điều kiện đúng
-              </Text>
-            </View>
-          );
+    const validation = validateConditions(editFields.conditions);
+    return !validation.valid && (
+      <View style={{ marginTop: 16, padding: 12, backgroundColor: '#F4433622', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F44336' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+          <MaterialIcons name="error" size={16} color="#F44336" />
+          <Text style={{ marginLeft: 6, color: '#F44336', fontWeight: 'bold', fontSize: 14 }}>Không thể lưu rule</Text>
+        </View>
+        <Text style={{ color: '#F44336', fontSize: 12, marginBottom: 4 }}>
+          {validation.message}
+        </Text>
+      </View>
+    );
         })()}
         
         <TouchableOpacity
@@ -585,60 +290,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           </Text>
         </TouchableOpacity>
 
-        {/* Quick actions: acknowledge, pause rule without toggling off */}
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-          <TouchableOpacity
-            disabled={pausing}
-            onPress={async () => {
-              try {
-                setPausing(true);
-                const rulesService = (await import('../services/rulesService')).default;
-                await rulesService.respondToAlert(selectedRule._id, 'acknowledged', { ruleName: selectedRule.name }, undefined, token);
-                onClose && onClose();
-              } finally {
-                setPausing(false);
-              }
-            }}
-            style={[styles.pauseButton, { backgroundColor: '#4CAF50' }]}
-          >
-            <MaterialIcons name="check-circle" size={16} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>Xác nhận</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            disabled={pausing}
-            onPress={async () => {
-              try {
-                setPausing(true);
-                const rulesService = (await import('../services/rulesService')).default;
-                await rulesService.respondToAlert(selectedRule._id, 'dismissed', { ruleName: selectedRule.name }, undefined, token);
-                onClose && onClose();
-              } finally {
-                setPausing(false);
-              }
-            }}
-            style={[styles.pauseButton, { backgroundColor: '#FFB020' }]}
-          >
-            <MaterialIcons name="pause-circle" size={16} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>Tạm dừng 1h</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            disabled={pausing}
-            onPress={async () => {
-              try {
-                setPausing(true);
-                const rulesService = (await import('../services/rulesService')).default;
-                await rulesService.respondToAlert(selectedRule._id, 'false_alarm', { ruleName: selectedRule.name }, undefined, token);
-                onClose && onClose();
-              } finally {
-                setPausing(false);
-              }
-            }}
-            style={[styles.pauseButton, { backgroundColor: '#E53935' }]}
-          >
-            <MaterialIcons name="block" size={16} color={CONFIG.COLORS.white} />
-            <Text style={styles.pauseButtonText}>Tạm dừng 24h</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Quick actions removed */}
       </ScrollView>
     </View>
   );
@@ -693,47 +345,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 8,
-  },
-  pauseButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  pauseButtonText: {
-    color: CONFIG.COLORS.white,
-    fontSize: 11,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  pausedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#6D6E71',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  pausedBannerText: {
-    color: CONFIG.COLORS.white,
-    fontSize: 13,
-    flex: 1,
-  },
-  unpauseButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: '#2E7D32',
-    borderRadius: 6,
-  },
-  unpauseButtonText: {
-    color: CONFIG.COLORS.white,
-    fontSize: 12,
-    fontWeight: '700',
   },
   conditionsSection: {
     marginTop: 16,
@@ -915,6 +526,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     fontWeight: '500',
+    fontStyle: 'italic',
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: `${CONFIG.COLORS.primary}11`,
+    borderWidth: 1,
+    borderColor: `${CONFIG.COLORS.primary}33`,
+  },
+  infoBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: CONFIG.COLORS.gray,
+    lineHeight: 16,
+  },
+  thresholdContainer: {
+    gap: 6,
+  },
+  thresholdBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: `${CONFIG.COLORS.primary}11`,
+    borderWidth: 1,
+    borderColor: CONFIG.COLORS.primary,
+    gap: 8,
+  },
+  thresholdText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: CONFIG.COLORS.primary,
+  },
+  thresholdHint: {
+    fontSize: 11,
+    color: CONFIG.COLORS.gray,
     fontStyle: 'italic',
   },
 });
