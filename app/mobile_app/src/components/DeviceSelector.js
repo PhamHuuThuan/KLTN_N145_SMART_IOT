@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
+import QRScannerModal from './QRScannerModal';
 
 const DeviceSelector = ({
   devices,
@@ -30,6 +31,8 @@ const DeviceSelector = ({
   const [submitting, setSubmitting] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
   const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [processingScan, setProcessingScan] = useState(false);
   const { user } = useAuth();
 
   const normalizedDevices = Array.isArray(devices)
@@ -38,6 +41,75 @@ const DeviceSelector = ({
 
   const selectedDeviceData = normalizedDevices.find((device) => device.deviceId === selectedDevice) || null;
   const canAddDevice = showAddButton !== false;
+
+  const extractDeviceIdFromPayload = (payload) => {
+    if (!payload) return null;
+    const trimmed = String(payload).trim();
+    if (!trimmed) return null;
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed?.deviceId) return String(parsed.deviceId);
+      if (parsed?.id) return String(parsed.id);
+      if (parsed?.device?.id) return String(parsed.device.id);
+    } catch (error) {
+      // Not JSON
+    }
+
+    if (typeof URL !== 'undefined') {
+      try {
+        const possibleUrl = new URL(trimmed);
+        const params = possibleUrl.searchParams;
+        const fromQuery =
+          params.get('deviceId') ||
+          params.get('device_id') ||
+          params.get('id');
+        if (fromQuery) return String(fromQuery);
+      } catch (error) {
+        // Not URL
+      }
+    }
+
+    if (/^[A-Za-z0-9\-_]+$/i.test(trimmed)) {
+      return trimmed;
+    }
+
+    return null;
+  };
+
+  const handleQrScanResult = async (rawValue) => {
+    if (!rawValue) return;
+    setProcessingScan(true);
+    try {
+      const deviceId = extractDeviceIdFromPayload(rawValue);
+      if (!deviceId) {
+        throw new Error(t('devices.invalidQrCode', 'Invalid QR code'));
+      }
+
+      setNewDeviceId(deviceId);
+      if (!newDeviceName) {
+        setNewDeviceName(deviceId);
+      }
+
+      setFeedback({
+        visible: true,
+        type: 'success',
+        message: t('devices.qrScanSuccess', {
+          deviceId,
+          defaultValue: 'Device selected via QR',
+        }),
+      });
+      setShowQRScanner(false);
+    } catch (error) {
+      setFeedback({
+        visible: true,
+        type: 'error',
+        message: error?.message || t('devices.qrScanFailed', 'Failed to process QR code'),
+      });
+    } finally {
+      setProcessingScan(false);
+    }
+  };
 
   const StatusBadge = ({ status, lastSeenAt }) => {
     const isOnline = (status || '').toLowerCase() === 'online';
@@ -316,18 +388,34 @@ const DeviceSelector = ({
               </View>
               <View style={styles.modalContent}>
                 <Text style={[styles.inputLabel, { color: colors.text }]}>{t('devices.deviceId')}</Text>
-                <TextInput
-                  style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }]}
-                  placeholder={t('devices.deviceIdPlaceholder')}
-                  placeholderTextColor={colors.textSecondary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={newDeviceId}
-                  onChangeText={setNewDeviceId}
-                  maxLength={50}
-                />
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      styles.flexInput,
+                      { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text },
+                    ]}
+                    placeholder={t('devices.deviceIdPlaceholder')}
+                    placeholderTextColor={colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={newDeviceId}
+                    onChangeText={setNewDeviceId}
+                    maxLength={50}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.iconButton,
+                      { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
+                    ]}
+                    onPress={() => setShowQRScanner(true)}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons name="qrcode-scan" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
                 <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
-                  {t('devices.deviceIdHint')}
+                  {t('devices.scanQrHint', 'Scan device QR to select or pair quickly')}
                 </Text>
                 
                 <Text style={[styles.inputLabel, { color: colors.text }]}>{t('devices.deviceName')}</Text>
@@ -445,6 +533,14 @@ const DeviceSelector = ({
         message={feedback.message}
         onHide={() => setFeedback({ ...feedback, visible: false })}
       />
+      <QRScannerModal
+        visible={showQRScanner}
+        onClose={() => {
+          if (!processingScan) setShowQRScanner(false);
+        }}
+        onScan={handleQrScanResult}
+        isProcessing={processingScan}
+      />
     </View>
   );
 };
@@ -540,6 +636,22 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 12,
+  },
+  flexInput: {
+    flex: 1,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconButton: {
+    width: 46,
+    height: 46,
+    borderRadius: CONFIG.DIMENSIONS.borderRadius,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addConfirmButton: {
     marginTop: 6,
