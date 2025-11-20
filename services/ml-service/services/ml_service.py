@@ -52,7 +52,7 @@ class MLService:
                     continue
                 
                 # Process single sensor
-                anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type)
+                anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type, device_id=device_id)
                 sensor_dict = {sensor_type: value}
                 danger_score, is_danger = self.danger_predictor.predict(sensor_dict)
                 
@@ -224,7 +224,7 @@ class MLService:
                 return None
             
             # Anomaly detection
-            anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type)
+            anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type, device_id=device_id)
             
             # Danger prediction using all available sensor data
             sensor_dict = {sensor_type: value}
