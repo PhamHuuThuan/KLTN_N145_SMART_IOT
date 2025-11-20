@@ -161,12 +161,6 @@ function AppContent() {
   };
 
   const handleCheckNow = async () => {
-    try {
-      const ruleId = emergency?.metadata?.ruleId || (emergency?.metadata?.deviceId ? `emergency_${emergency.metadata.deviceId}` : null);
-      if (ruleId) {
-        await rulesService.respondToAlert(ruleId, 'acknowledged', emergency?.metadata || {});
-      }
-    } catch (_) {}
     setCurrentScreen('Main');
     setActiveTab('Home');
     if (dispatch) {
@@ -209,12 +203,6 @@ function AppContent() {
   };
 
   const handleDismissEmergency = async () => {
-    try {
-      const ruleId = emergency?.metadata?.ruleId || (emergency?.metadata?.deviceId ? `emergency_${emergency.metadata.deviceId}` : null);
-      if (ruleId) {
-        await rulesService.respondToAlert(ruleId, 'dismissed', emergency?.metadata || {});
-      }
-    } catch (_) {}
     if (dispatch) {
       dispatch({ type: 'SET_EMERGENCY', payload: null });
     }

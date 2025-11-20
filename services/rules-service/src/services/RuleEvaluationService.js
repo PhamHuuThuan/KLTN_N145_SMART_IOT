@@ -47,6 +47,12 @@ class RuleEvaluationService {
           case 'smoke':
             sensorValue = sensorData.smoke;
             break;
+          case 'flame':
+            sensorValue = sensorData.flame;
+            if (sensorValue !== undefined && sensorValue !== null) {
+              sensorValue = Number(sensorValue);
+            }
+            break;
           default:
             break;
         }
@@ -69,6 +75,8 @@ class RuleEvaluationService {
         return 'Cảnh báo khí gas';
       case 'smoke':
         return 'Cảnh báo khói';
+      case 'flame':
+        return 'Cảnh báo lửa';
       default:
         return `Cảnh báo ${sensorType}`;
     }
@@ -88,7 +96,8 @@ class RuleEvaluationService {
       // 🔎 1. Lấy danh sách rule đang hoạt động
       const query = { 
         deviceId, 
-        isActive: true
+        isActive: true,
+        deletedAt: null
       };
       
       const rules = await Rule.find(query);
@@ -150,6 +159,10 @@ class RuleEvaluationService {
   // Đánh giá một rule cụ thể
   async evaluateRule(rule, sensorData) {
     try {
+      if (!Array.isArray(rule.conditions) || rule.conditions.length === 0) {
+        logger.warn(`Rule ${rule.name} has no conditions; skipping evaluation`);
+        return false;
+      }
       const { priority } = rule;
 
       // Special handling for urgent rules - always trigger regardless of cooldown/limits
@@ -159,13 +172,13 @@ class RuleEvaluationService {
         // Check if rule can trigger with escalation logic
         const canTrigger = await this.checkRuleCanTrigger(rule, sensorData);
         if (!canTrigger) {
-          logger.debug(`${rule.name}: cooldown/daily limit`);
+          logger.debug(`${rule.name}: skipped (cooldown or escalation gating)`);
           return false;
         }
       }
 
       // Đánh giá tất cả conditions với logic
-      const conditionsMet = await this.evaluateConditions(rule.conditions, sensorData, rule.conditionLogic);
+      const conditionsMet = await this.evaluateConditions(rule.conditions, sensorData);
       if (!conditionsMet) {
         return false;
       }
@@ -192,24 +205,6 @@ class RuleEvaluationService {
       return true;
     }
     
-    // 1. Kiểm tra daily limit trước
-    const hasReachedDailyLimit = await rule.hasReachedDailyLimit();
-    if (hasReachedDailyLimit) {
-      logger.warn(`🚨 DAILY LIMIT: ${rule.name} đã đạt giới hạn ${rule.maxTriggersPerDay} triggers/ngày - CHUYỂN SANG URGENT`);
-      
-      // Tạo escalation alert cho daily limit
-      await this.createEscalationAlert(rule, sensorData, {
-        sensor: 'daily_limit',
-        currentValue: rule.triggerCount,
-        threshold: rule.maxTriggersPerDay,
-        reason: 'daily_limit_exceeded'
-      });
-      
-      return true; // Vẫn trigger nhưng với escalation alert
-    }
-    
-    // 2. Kiểm tra cooldown cơ bản VÀ escalation (truyền sensor data)
-    // Sử dụng hàm getSensorInfo() đã có sẵn để tránh duplicate code
     const { sensorType, sensorValue } = this.getSensorInfo(rule, sensorData);
     
     const canTrigger = await rule.canTrigger(sensorValue, sensorType);
@@ -217,7 +212,6 @@ class RuleEvaluationService {
       return true;
     }
     
-    // Nếu không trigger được và đã check escalation trong canTrigger
     // thì cần check nếu có escalation để gửi alert
     if (sensorValue && sensorType) {
       const condition = rule.conditions.find(c => c.sensor === sensorType);
@@ -248,29 +242,27 @@ class RuleEvaluationService {
     
     let title, message;
     
-    if (reason === 'daily_limit_exceeded') {
-      title = `🚨 CẢNH BÁO KHẨN CẤP: ${name} - Daily Limit Exceeded`;
-      message = `🚨 Rule đã vượt quá giới hạn an toàn ${rule.maxTriggersPerDay} triggers/ngày!\n\n` +
-               `📊 Số lần trigger hôm nay: ${rule.triggerCount}/${rule.maxTriggersPerDay}\n` +
-               `⚠️ Tỷ lệ vượt: ${((rule.triggerCount / rule.maxTriggersPerDay - 1) * 100).toFixed(1)}%\n` +
-               `⏰ Thời gian: ${new Date().toLocaleString()}\n\n` +
-               `🚨 ĐÁNH GIÁ: Tình trạng bất thường - Hệ thống chuyển sang chế độ khẩn cấp!`;
-    } else {
-      title = `🚨 CẢNH BÁO KHẨN CẤP: ${name}`;
-      const deviationPercent = ((currentValue - threshold) / threshold * 100).toFixed(1);
-      message = `🚨 ${sensor} đã tăng ĐỘT NGỘT và có nguy cơ nguy hiểm!\n\n` +
-               `📊 Giá trị hiện tại: ${currentValue}\n` +
-               `📈 Ngưỡng ban đầu: ${threshold}\n` +
-               `⚠️ Độ lệch: +${deviationPercent}%\n` +
-               `⏰ Thời gian: ${new Date().toLocaleString()}\n\n` +
-               `🚨 ĐÁNH GIÁ: Tình trạng NGHIÊM TRỌNG - Cần xử lý ngay!`;
-    }
+    title = `🚨 CẢNH BÁO KHẨN CẤP: ${name}`;
+    const hasThreshold = threshold !== undefined && threshold !== null;
+    const deviationPercent = hasThreshold && threshold !== 0
+      ? ((currentValue - threshold) / threshold * 100).toFixed(1)
+      : null;
+    const thresholdText = hasThreshold && deviationPercent !== null
+      ? `📈 Ngưỡng ban đầu: ${threshold}\n⚠️ Độ lệch: +${deviationPercent}%\n`
+      : hasThreshold
+        ? `📈 Ngưỡng ban đầu: ${threshold}\n`
+        : '';
+    message = `🚨 ${sensor} đã tăng ĐỘT NGỘT và có nguy cơ nguy hiểm!\n\n` +
+             `📊 Giá trị hiện tại: ${currentValue}\n` +
+             thresholdText +
+             `⏰ Thời gian: ${new Date().toLocaleString()}\n\n` +
+             `🚨 ĐÁNH GIÁ: Tình trạng NGHIÊM TRỌNG - Cần xử lý ngay!`;
     
     const escalationMessage = {
       userId: createdBy,
       title,
       message,
-      priority: 'urgent', // ✅ LUÔN là URGENT khi có escalation
+      priority: 'urgent',
       type: 'escalation_alert',
       category: 'security', // ✅ Chuyển sang security để FE hiển thị emergency
       metadata: {
@@ -281,9 +273,7 @@ class RuleEvaluationService {
         threshold,
         escalationReason: reason,
         cooldownBypassed: reason === 'escalation',
-        dailyLimitExceeded: reason === 'daily_limit_exceeded',
         triggerCount: rule.triggerCount,
-        maxTriggersPerDay: rule.maxTriggersPerDay,
         deviceId: sensorData.deviceId
       }
     };
@@ -292,14 +282,15 @@ class RuleEvaluationService {
     logger.info(`🚨 ESCALATION ALERT sent as URGENT for rule: ${name} - Reason: ${reason}`);
   }
 
-  // Đánh giá tất cả conditions của rule với logic AND/OR
-  async evaluateConditions(conditions, sensorData, conditionLogic = 'AND') {
+  // Đánh giá tất cả conditions của rule (mặc định AND)
+  async evaluateConditions(conditions, sensorData) {
     if (!conditions || conditions.length === 0) {
-      return true;
+      logger.warn('evaluateConditions() skipped: rule has no conditions configured');
+      return false;
     }
 
-    // Nếu chỉ có 1 điều kiện hoặc conditionLogic là null, chỉ cần đánh giá điều kiện đó
-    if (conditions.length === 1 || conditionLogic === null) {
+    // Nếu chỉ có 1 điều kiện, chỉ cần đánh giá điều kiện đó
+    if (conditions.length === 1) {
       return await this.evaluateCondition(conditions[0], sensorData);
     }
 
@@ -309,13 +300,8 @@ class RuleEvaluationService {
       results.push(conditionMet);
     }
 
-    // Apply logic
-    if (conditionLogic === 'OR') {
-      return results.some(result => result === true);
-    } else {
-      // Default to AND
-      return results.every(result => result === true);
-    }
+    // Mặc định sử dụng logic AND
+    return results.every(result => result === true);
   }
 
   // Đánh giá một condition cụ thể
@@ -346,6 +332,12 @@ class RuleEvaluationService {
       case 'smoke':
         sensorValue = sensorData.smoke;
         break;
+      case 'flame':
+        sensorValue = sensorData.flame;
+        if (sensorValue !== undefined && sensorValue !== null) {
+          sensorValue = Number(sensorValue);
+        }
+        break;
       default:
         logger.warn(`Unknown sensor type: ${sensor}`);
         return false;
@@ -356,8 +348,11 @@ class RuleEvaluationService {
       return false;
     }
 
-    // So sánh giá trị với ngưỡng (no verbose logging)
-    return this.compareValues(sensorValue, operator, value);
+    const normalizedExpected = Array.isArray(value)
+      ? value.map(item => (typeof item === 'string' ? Number(item) : item))
+      : (typeof value === 'string' ? Number(value) : value);
+
+    return this.compareValues(sensorValue, operator, normalizedExpected);
   }
 
   /**
@@ -451,6 +446,11 @@ class RuleEvaluationService {
           case 'smoke':
             detailedMessage = `Cảm biến khói đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`;
             break;
+          case 'flame': {
+            const flameStatus = Number(sensorValue) >= 1 ? 'phát hiện lửa' : 'an toàn';
+            detailedMessage = `Cảm biến lửa ${flameStatus}. Giá trị hiện tại: ${sensorValue}`;
+            break;
+          }
           default:
             detailedMessage = `Rule "${rule.name}" has been triggered. Sensor: ${sensorType}, Value: ${sensorValue}, Threshold: ${threshold}`;
         }
@@ -460,6 +460,7 @@ class RuleEvaluationService {
 
       // Determine if this should be elevated to security alert
       const elevateSecurity = sensorType === 'gas_ppm' || 
+                              sensorType === 'flame' ||
                               (sensorType === 'smoke' && Number(sensorValue) === 1) || 
                               (sensorType === 'temperature' && Number(sensorValue) >= 80);
 
@@ -501,6 +502,7 @@ class RuleEvaluationService {
   async sendAlertAction(action, rule, sensorData) {
     const { sensorType, sensorValue, threshold } = this.getSensorInfo(rule, sensorData);
     const elevateSecurity = sensorType === 'gas_ppm' || 
+                            sensorType === 'flame' ||
                             (sensorType === 'smoke' && Number(sensorValue) === 1) || 
                             (sensorType === 'temperature' && Number(sensorValue) >= 80);
 
@@ -521,7 +523,9 @@ class RuleEvaluationService {
       userId: rule.createdBy,
       ruleId: rule._id.toString(),
       ruleName: rule.name,
-      message: action.message || `Alert: ${rule.name} triggered`
+      message: action.message || (sensorType === 'flame'
+        ? `Cảm biến lửa phát hiện ngọn lửa (Giá trị: ${sensorValue})`
+        : `Alert: ${rule.name} triggered`)
     };
 
     try {
@@ -595,6 +599,8 @@ class RuleEvaluationService {
     const humid = sensorData.humid !== undefined && sensorData.humid !== null ? sensorData.humid : 'N/A';
     const smoke = sensorData.smoke !== undefined && sensorData.smoke !== null ? sensorData.smoke : 'N/A';
     const gasPpm = sensorData.gas_ppm !== undefined && sensorData.gas_ppm !== null ? sensorData.gas_ppm : 'N/A';
+    const flameValue = sensorData.flame !== undefined && sensorData.flame !== null ? Number(sensorData.flame) : null;
+    const flameDisplay = flameValue !== null && !Number.isNaN(flameValue) ? flameValue : 'N/A';
 
     // Thay thế các placeholder chung
     let result = message
@@ -602,6 +608,7 @@ class RuleEvaluationService {
       .replace(/\{humidity\}/g, humid)
       .replace(/\{smoke\}/g, smoke)
       .replace(/\{gas_ppm\}/g, gasPpm)
+      .replace(/\{flame\}/g, flameDisplay)
       .replace(/\{sensorValue\}/g, sensorValue !== undefined ? sensorValue : 'N/A')
       .replace(/\{threshold\}/g, threshold !== undefined ? threshold : 'N/A')
       .replace(/\{operator\}/g, operator || '>')
@@ -623,84 +630,15 @@ class RuleEvaluationService {
       case 'gas_ppm':
         result = result.replace(/\{gas_value\}/g, gasPpm);
         break;
+      case 'flame': {
+        const flameStatus = flameValue !== null && !Number.isNaN(flameValue) && flameValue >= 1 ? 'có lửa' : 'an toàn';
+        result = result.replace(/\{flame_status\}/g, flameStatus);
+        break;
+      }
     }
     return result;
   }
 
-  // Xử lý phản hồi của người dùng với alert/rule
-  async handleUserResponse({ userId, ruleId, response, metadata = {} }) {
-    try {
-      if (!userId) {
-        throw new Error('Unauthorized - user ID required');
-      }
-      if (!ruleId || !response) {
-        throw new Error('ruleId and response are required');
-      }
-
-      const validResponses = ['acknowledged', 'dismissed', 'false_alarm'];
-      if (!validResponses.includes(response)) {
-        throw new Error(`Invalid response. Must be one of: ${validResponses.join(', ')}`);
-      }
-
-      const rule = await Rule.findOne({ _id: ruleId, deletedAt: null });
-      if (!rule) {
-        const err = new Error('Rule not found');
-        err.statusCode = 404;
-        throw err;
-      }
-
-      // Kiểm tra quyền: chỉ người tạo rule mới có thể respond
-      if (rule.createdBy !== String(userId)) {
-        const err = new Error('Access denied - you can only respond to rules you created');
-        err.statusCode = 403;
-        throw err;
-      }
-
-      logger.info(`User ${userId} responded to rule ${rule.name}: ${response}`);
-
-      // Handle rule pausing based on response
-      if (response === 'dismissed') {
-        rule.pausedUntil = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-        await rule.save();
-        logger.info(`Rule ${rule.name} paused for 1 hour`);
-      } else if (response === 'false_alarm') {
-        rule.pausedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-        await rule.save();
-        logger.info(`Rule ${rule.name} paused for 24 hours`);
-      }
-
-      const responseMessage = {
-        type: response,
-        userId: String(userId),
-        ruleId: String(ruleId),
-        ruleName: rule.name,
-        deviceId: rule.deviceId,
-        priority: rule.priority,
-        timestamp: new Date(),
-        metadata: {
-          ...metadata,
-          responseTime: Date.now(),
-          userAction: response
-        }
-      };
-
-      try {
-        await this.sendToAlertsService({ userId, ...responseMessage });
-        logger.info(`User response sent to alerts-service: ${response}`);
-      } catch (kafkaError) {
-        logger.error('Failed to send user response to alerts-service:', kafkaError);
-      }
-
-      return {
-        ruleId: String(ruleId),
-        ruleName: rule.name,
-        response,
-        timestamp: new Date()
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
 }
 
 export default RuleEvaluationService;

@@ -129,11 +129,9 @@ class RulesService {
         description: customizations.description || template.description,
         deviceId,
         priority: template.priority || 'medium',
-        maxTriggersPerDay: template.maxTriggersPerDay || (template.priority === 'urgent' ? null : 10),
         cooldownPeriod: template.cooldownPeriod || (template.priority === 'urgent' ? null : 300000),
         isActive: true,
         conditions: template.conditions,
-        conditionLogic: template.conditionLogic || 'AND',
         actions: template.actions,
         ...customizations
       };
@@ -151,13 +149,16 @@ class RulesService {
     try {
       const authToken = token || await this.getAuthToken();
       
+      const sanitizedUpdate = { ...updateData };
+      delete sanitizedUpdate.pausedUntil;
+
       const response = await fetch(`${this.baseURL}/api/rules/${ruleId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`,
         },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify(sanitizedUpdate),
       });
 
       if (!response.ok) {
@@ -229,37 +230,6 @@ class RulesService {
     }
   }
 
-  // Respond to an alert related to a rule (acknowledged | dismissed | false_alarm)
-  async respondToAlert(ruleId, response, metadata = {}, timeoutMs = undefined, token = null) {
-    try {
-      if (!ruleId || !response) {
-        throw new Error('ruleId and response are required');
-      }
-      const valid = ['acknowledged', 'dismissed', 'false_alarm'];
-      if (!valid.includes(response)) {
-        throw new Error('Invalid response type');
-      }
-
-      const authToken = token || await this.getAuthToken();
-      const res = await fetch(`${this.baseURL}/api/rules/${ruleId}/respond`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({ response, metadata, ...(timeoutMs ? { timeoutMs } : {}) }),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || `HTTP ${res.status}`);
-      }
-      return await res.json();
-    } catch (error) {
-      this.log.error('respondToAlert error:', error);
-      throw error;
-    }
-  }
 }
 
 export default new RulesService();

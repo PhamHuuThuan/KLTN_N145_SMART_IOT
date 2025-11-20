@@ -11,7 +11,6 @@ const log = createLogger('EmergencyScreen');
 const EmergencyScreen = ({ navigation, emergency, onCheckNow, onActivateEmergency, onDismiss }) => {
   const [activating, setActivating] = useState(false);
   const [showSuccessFeedback, setShowSuccessFeedback] = useState(false);
-  const [pausing, setPausing] = useState(false);
   const deviceName = emergency?.metadata?.deviceName || emergency?.metadata?.deviceId || 'Thiết bị';
   const sensorType = emergency?.metadata?.sensorType || emergency?.type || 'sensor';
   const value = emergency?.metadata?.sensorValue;
@@ -75,28 +74,6 @@ const EmergencyScreen = ({ navigation, emergency, onCheckNow, onActivateEmergenc
           <TouchableOpacity style={[styles.button, styles.emergencyButton]} onPress={handleActivateEmergency} activeOpacity={0.9} disabled={activating}>
             <MaterialCommunityIcons name="shield-alert" size={24} color="#FFFFFF" />
             <Text style={styles.buttonText}>{activating ? 'Đang kích hoạt...' : 'Bật chế độ khẩn cấp'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: '#E53935' }]}
-            onPress={async () => {
-              try {
-                setPausing(true);
-                const rulesService = (await import('../services/rulesService')).default;
-                const ruleId = emergency?.metadata?.ruleId || (emergency?.metadata?.deviceId ? `emergency_${emergency.metadata.deviceId}` : null);
-                if (ruleId) {
-                  await rulesService.respondToAlert(ruleId, 'false_alarm', emergency?.metadata || {});
-                }
-                if (typeof onDismiss === 'function') onDismiss();
-              } finally {
-                setPausing(false);
-              }
-            }}
-            activeOpacity={0.9}
-            disabled={pausing}
-          >
-            <MaterialCommunityIcons name="bell-off" size={24} color="#FFFFFF" />
-            <Text style={styles.buttonText}>{pausing ? 'Đang tạm dừng...' : 'Báo nhầm (24h)'}</Text>
           </TouchableOpacity>
         </View>
 

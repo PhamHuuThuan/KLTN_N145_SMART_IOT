@@ -99,6 +99,7 @@
     "temperature": "Nhiệt độ",
     "humidity": "Độ ẩm",
     "smoke": "Khói",
+    "flame": "Lửa",
     "gas": "Khí gas",
     "outlets": "Ổ cắm",
     "outlet": "Ổ cắm",
@@ -191,10 +192,6 @@
     "ruleDetails": "Chi tiết quy tắc",
     "customizeRule": "Tùy chỉnh quy tắc",
     "ruleNamePlaceholder": "Tên quy tắc",
-    "descriptionPlaceholder": "Mô tả",
-    "conditionsEditable": "Điều kiện (có thể chỉnh sửa):",
-    "operator": "Toán tử",
-    "value": "Giá trị",
     "priorityLabel": "Độ ưu tiên",
     "priority": {
       "low": "Thấp",
@@ -203,22 +200,18 @@
       "urgent": "Khẩn cấp"
     },
     "cooldownPeriod": "Thời gian chờ (phút)",
-    "maxTriggersPerDay": "Số lần kích hoạt tối đa/ngày",
+    "cooldownPeriodSeconds": "Thời gian chờ (giây)",
     "emergencyMode": "Chế độ khẩn cấp",
     "emergencyModeDescription": "Quy tắc khẩn cấp kích hoạt ngay lập tức không có thời gian chờ hoặc giới hạn hàng ngày",
+    "unlimitedAlertsHint": "Hệ thống sẽ gửi cảnh báo mỗi lần vượt ngưỡng, không giới hạn số lần trong ngày.",
     "saveChanges": "Lưu thay đổi",
     "createWithCustomization": "Tạo với tùy chỉnh",
     "acknowledged": "Đã xác nhận",
-    "pause1h": "Tạm dừng 1h",
-    "pause24h": "Tạm dừng 24h",
-    "unpauseNow": "Tiếp tục ngay",
-    "unpausing": "Đang tiếp tục...",
-    "pausedUntil": "Tạm dừng đến",
     "edit": "Chỉnh sửa",
     "delete": "Xóa",
     "conditions": "Điều kiện:",
     "cooldown": "Thời gian chờ:",
-    "maxPerDay": "Tối đa/ngày:",
+    "unlimitedAlerts": "Không giới hạn cảnh báo",
     "triggered": "Đã kích hoạt:",
     "emergencyModeLabel": "Chế độ khẩn cấp",
     "none": "Không",
@@ -230,6 +223,7 @@
     "humidity": "Độ ẩm",
     "gas": "Khí gas",
     "smoke": "Khói",
+    "flame": "Lửa",
     "sensors": "Cảm biến",
     "customizeAndCreate": "Tùy chỉnh & Tạo",
     "creatingLabel": "Đang tạo...",
@@ -239,91 +233,71 @@
     "add": "Thêm",
     "remove": "Bớt",
     "sensorType": "Loại cảm biến",
-    "conditionLogic": "Logic điều kiện",
-    "multipleConditions": "nhiều điều kiện",
-    "singleCondition": "1 điều kiện",
-    "andAll": "VÀ (tất cả)",
-    "orOne": "HOẶC (một trong)",
     "templates": {
-      "gasLeakDetection": {
-        "name": "Phát hiện rò rỉ khí gas",
-        "description": "Phản ứng khẩn cấp khi phát hiện rò rỉ khí gas",
-        "message": "🚨 Cảnh báo: Phát hiện nồng độ khí gas cao! Vui lòng tắt nguồn gas ngay lập tức và thông gió khu vực!"
+      "gasEmergency": {
+        "name": "🚨 Khí gas khẩn cấp",
+        "description": "Cảnh báo khẩn cấp khi khí gas > 1000 ppm",
+        "message": "🚨 CẢNH BÁO KHẨN CẤP: Khí gas ở mức nguy hiểm! Nguy cơ ngộ độc hoặc cháy nổ!"
       },
-      "smokeDetection": {
-        "name": "Phát hiện khói",
-        "description": "Phản ứng khẩn cấp khi phát hiện khói",
-        "message": "🔥 Cảnh báo: Phát hiện khói! Kiểm tra ngay lập tức và liên hệ cứu hỏa nếu cần!"
+      "gasHigh": {
+        "name": "💨 Khí gas cao",
+        "description": "Cảnh báo khi khí gas 401–1000 ppm",
+        "message": "💨 Cảnh báo: Nồng độ khí gas cao! Kiểm tra nguồn rò rỉ ngay."
       },
-      "highTemperature": {
-        "name": "Nhiệt độ cao",
-        "description": "Cảnh báo khi nhiệt độ vượt ngưỡng an toàn",
-        "message": "🌡️ Cảnh báo: Nhiệt độ cao! Kiểm tra nguồn nhiệt và bật quạt/điều hòa."
+      "gasMedium": {
+        "name": "💨 Khí gas trung bình",
+        "description": "Cảnh báo khi khí gas 200–400 ppm",
+        "message": "💨 Cảnh báo: Phát hiện khí gas nhẹ. Theo dõi và kiểm tra định kỳ."
       },
-      "lowHumidity": {
-        "name": "Độ ẩm thấp",
-        "description": "Cảnh báo khi độ ẩm quá thấp",
-        "message": "💧 Cảnh báo: Độ ẩm thấp! Cân nhắc sử dụng máy tạo ẩm."
+      "smokeEmergency": {
+        "name": "🚨 Khói khẩn cấp",
+        "description": "Cảnh báo khẩn cấp khi khói > 700 ppm",
+        "message": "🚨 CẢNH BÁO KHẨN CẤP: Nồng độ khói đậm! Nguy cơ cháy hoặc khí CO cao!"
+      },
+      "smokeHigh": {
+        "name": "🔥 Khói cao",
+        "description": "Cảnh báo khi khói 301–700 ppm",
+        "message": "🔥 Cảnh báo: Phát hiện khói đậm! Kiểm tra ngay để phòng cháy."
+      },
+      "smokeMedium": {
+        "name": "💨 Khói trung bình",
+        "description": "Cảnh báo khi khói 100–300 ppm",
+        "message": "💨 Cảnh báo: Phát hiện khói nhẹ. Có thể do bụi hoặc hơi nóng."
       },
       "tempEmergency": {
-        "name": "🔥 Nhiệt độ khẩn cấp",
+        "name": "🚨 Nhiệt độ khẩn cấp",
         "description": "Cảnh báo khẩn cấp khi nhiệt độ > 40°C",
-        "message": "🚨 CẢNH BÁO KHẨN CẤP: Nhiệt độ quá cao! Nguy cơ cháy nổ!"
+        "message": "🚨 CẢNH BÁO KHẨN CẤP: Nhiệt độ cực cao! Nguy cơ cháy nổ!"
       },
       "tempHigh": {
         "name": "🌡️ Nhiệt độ cao",
-        "description": "Cảnh báo khi nhiệt độ 31-40°C",
-        "message": "🌡️ Cảnh báo: Nhiệt độ cao! Kiểm tra thông gió và tải nhiệt."
+        "description": "Cảnh báo khi nhiệt độ 31–40°C",
+        "message": "🌡️ Cảnh báo: Nhiệt độ cao! Kiểm tra hệ thống làm mát hoặc thông gió."
       },
       "tempLow": {
         "name": "❄️ Nhiệt độ thấp",
         "description": "Cảnh báo khi nhiệt độ < 15°C",
-        "message": "❄️ Cảnh báo: Nhiệt độ thấp! Kiểm tra hệ thống sưởi."
+        "message": "❄️ Cảnh báo: Nhiệt độ thấp! Kiểm tra hệ thống sưởi hoặc môi trường lưu trữ."
       },
       "humidityEmergency": {
-        "name": "💧 Độ ẩm khẩn cấp",
+        "name": "🚨 Độ ẩm khẩn cấp",
         "description": "Cảnh báo khẩn cấp khi độ ẩm > 80%",
-        "message": "🚨 CẢNH BÁO KHẨN CẤP: Độ ẩm quá cao! Nguy cơ chập điện!"
+        "message": "🚨 CẢNH BÁO KHẨN CẤP: Độ ẩm quá cao! Nguy cơ chập điện hoặc hư hại thiết bị!"
       },
       "humidityHigh": {
         "name": "💧 Độ ẩm cao",
-        "description": "Cảnh báo khi độ ẩm 61-80%",
-        "message": "💧 Cảnh báo: Độ ẩm cao! Có thể gây nấm mốc, hỏng linh kiện."
+        "description": "Cảnh báo khi độ ẩm 61–80%",
+        "message": "💧 Cảnh báo: Độ ẩm cao! Có thể gây nấm mốc, ảnh hưởng linh kiện."
       },
       "humidityLow": {
         "name": "💧 Độ ẩm thấp",
         "description": "Cảnh báo khi độ ẩm < 30%",
-        "message": "💧 Cảnh báo: Độ ẩm thấp! Không khí khô, dễ tĩnh điện."
+        "message": "💧 Cảnh báo: Độ ẩm thấp! Không khí khô, dễ gây tĩnh điện."
       },
-      "gasEmergency": {
-        "name": "🚨 Khí gas khẩn cấp",
-        "description": "Cảnh báo khẩn cấp khi khí gas > 1000 ppm",
-        "message": "🚨 CẢNH BÁO KHẨN CẤP: Khí gas nguy hiểm! Nguy cơ ngộ độc hoặc cháy nổ!"
-      },
-      "gasHigh": {
-        "name": "⚠️ Khí gas cao",
-        "description": "Cảnh báo khi khí gas 401-1000 ppm",
-        "message": "⚠️ Cảnh báo: Nồng độ khí gas cao! Kiểm tra nguồn rò rỉ ngay."
-      },
-      "gasMedium": {
-        "name": "🔍 Khí gas trung bình",
-        "description": "Cảnh báo khi khí gas 200-400 ppm",
-        "message": "🔍 Cảnh báo: Phát hiện khí gas nhẹ. Theo dõi và kiểm tra."
-      },
-      "smokeEmergency": {
-        "name": "🔥 Khói khẩn cấp",
-        "description": "Cảnh báo khẩn cấp khi khói > 700 ppm",
-        "message": "🚨 CẢNH BÁO KHẨN CẤP: Khói đậm! Nguy cơ cháy hoặc CO cao!"
-      },
-      "smokeHigh": {
-        "name": "🔥 Khói cao",
-        "description": "Cảnh báo khi khói 301-700 ppm",
-        "message": "🔥 Cảnh báo: Khói đậm! Cảnh báo sớm cháy, kiểm tra ngay."
-      },
-      "smokeMedium": {
-        "name": "💨 Khói trung bình",
-        "description": "Cảnh báo khi khói 100-300 ppm",
-        "message": "💨 Cảnh báo: Phát hiện khói nhẹ. Có thể có bụi hoặc khói."
+      "flameDetected": {
+        "name": "🔥 Phát hiện lửa",
+        "description": "Cảnh báo khẩn cấp khi cảm biến lửa kích hoạt",
+        "message": "🔥 CẢNH BÁO KHẨN CẤP: Phát hiện ngọn lửa! Dừng thiết bị và xử lý ngay lập tức!"
       }
     },
     "valueOutOfRange": "Giá trị nằm ngoài phạm vi cho phép"
@@ -467,7 +441,8 @@
       "temperature": "Nhiệt độ",
       "humidity": "Độ ẩm",
       "gasLevel": "Gas",
-      "smoke": "Khói"
+      "smoke": "Khói",
+      "flame": "Lửa"
     },
     "values": {
       "detected": "Phát hiện",

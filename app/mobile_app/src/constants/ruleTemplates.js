@@ -7,9 +7,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempEmergency.name',
       description: 'rules.templates.tempEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: null,
-      maxTriggersPerDay: null,
-      conditionLogic: 'AND',
+      cooldownPeriod: 30000, // 30 giây
       conditions: [
         {
           type: 'sensor',
@@ -33,8 +31,6 @@ export const RULE_TEMPLATES = {
       description: 'rules.templates.tempHigh.description',
       priority: 'high',
       cooldownPeriod: 300000, // 5 phút
-      maxTriggersPerDay: 20,
-      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
@@ -57,9 +53,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempLow.name',
       description: 'rules.templates.tempLow.description',
       priority: 'low',
-      cooldownPeriod: 1800000, // 30 phút
-      maxTriggersPerDay: 5,
-      conditionLogic: 'AND',
+      cooldownPeriod: 900000, // 15 phút
       conditions: [
         {
           type: 'sensor',
@@ -83,9 +77,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityEmergency.name',
       description: 'rules.templates.humidityEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: null,
-      maxTriggersPerDay: null,
-      conditionLogic: 'AND',
+      cooldownPeriod: 30000, // 30 giây
       conditions: [
         {
           type: 'sensor',
@@ -108,9 +100,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityHigh.name',
       description: 'rules.templates.humidityHigh.description',
       priority: 'high',
-      cooldownPeriod: 600000, // 10 phút
-      maxTriggersPerDay: 15,
-      conditionLogic: 'AND',
+      cooldownPeriod: 300000, // 5 phút
       conditions: [
         {
           type: 'sensor',
@@ -133,9 +123,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityLow.name',
       description: 'rules.templates.humidityLow.description',
       priority: 'low',
-      cooldownPeriod: 1800000, // 30 phút
-      maxTriggersPerDay: 5,
-      conditionLogic: 'AND',
+      cooldownPeriod: 900000, // 15 phút
       conditions: [
         {
           type: 'sensor',
@@ -159,9 +147,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.gasEmergency.name',
       description: 'rules.templates.gasEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: null,
-      maxTriggersPerDay: null,
-      conditionLogic: 'AND',
+      cooldownPeriod: 30000, // 30 giây
       conditions: [
         {
           type: 'sensor',
@@ -185,8 +171,6 @@ export const RULE_TEMPLATES = {
       description: 'rules.templates.gasHigh.description',
       priority: 'high',
       cooldownPeriod: 300000, // 5 phút
-      maxTriggersPerDay: 20,
-      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
@@ -209,9 +193,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.gasMedium.name',
       description: 'rules.templates.gasMedium.description',
       priority: 'medium',
-      cooldownPeriod: 900000, // 15 phút
-      maxTriggersPerDay: 10,
-      conditionLogic: 'AND',
+      cooldownPeriod: 600000, // 10 phút
       conditions: [
         {
           type: 'sensor',
@@ -235,9 +217,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.smokeEmergency.name',
       description: 'rules.templates.smokeEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: null,
-      maxTriggersPerDay: null,
-      conditionLogic: 'AND',
+      cooldownPeriod: 30000, // 30 giây
       conditions: [
         {
           type: 'sensor',
@@ -261,8 +241,6 @@ export const RULE_TEMPLATES = {
       description: 'rules.templates.smokeHigh.description',
       priority: 'high',
       cooldownPeriod: 300000, // 5 phút
-      maxTriggersPerDay: 20,
-      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
@@ -285,9 +263,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.smokeMedium.name',
       description: 'rules.templates.smokeMedium.description',
       priority: 'medium',
-      cooldownPeriod: 900000, // 15 phút
-      maxTriggersPerDay: 10,
-      conditionLogic: 'AND',
+      cooldownPeriod: 600000, // 10 phút
       conditions: [
         {
           type: 'sensor',
@@ -303,6 +279,29 @@ export const RULE_TEMPLATES = {
           message: 'rules.templates.smokeMedium.message'
         }
       ]
+    },
+    
+    // 🔥 FLAME - LỬA
+    flame_detected: {
+      name: 'rules.templates.flameDetected.name',
+      description: 'rules.templates.flameDetected.description',
+      priority: 'urgent',
+      cooldownPeriod: 30000, // 30 giây
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'flame',
+          operator: '==',
+          value: 1,
+          unit: ''
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.flameDetected.message'
+        }
+      ]
     }
   },
   en: {
@@ -311,9 +310,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempEmergency.name',
       description: 'rules.templates.tempEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: null,
-      maxTriggersPerDay: null,
-      conditionLogic: 'AND',
+      cooldownPeriod: 30000, // 30 giây
       conditions: [
         {
           type: 'sensor',
@@ -336,8 +333,6 @@ export const RULE_TEMPLATES = {
       description: 'rules.templates.tempHigh.description',
       priority: 'high',
       cooldownPeriod: 300000,
-      maxTriggersPerDay: 20,
-      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
@@ -359,9 +354,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempLow.name',
       description: 'rules.templates.tempLow.description',
       priority: 'low',
-      cooldownPeriod: 1800000,
-      maxTriggersPerDay: 5,
-      conditionLogic: 'AND',
+      cooldownPeriod: 900000,
       conditions: [
         {
           type: 'sensor',
@@ -384,9 +377,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityEmergency.name',
       description: 'rules.templates.humidityEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: null,
-      maxTriggersPerDay: null,
-      conditionLogic: 'AND',
+      cooldownPeriod: 30000, // 30 giây
       conditions: [
         {
           type: 'sensor',
@@ -408,9 +399,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityHigh.name',
       description: 'rules.templates.humidityHigh.description',
       priority: 'high',
-      cooldownPeriod: 600000,
-      maxTriggersPerDay: 15,
-      conditionLogic: 'AND',
+      cooldownPeriod: 300000,
       conditions: [
         {
           type: 'sensor',
@@ -432,9 +421,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityLow.name',
       description: 'rules.templates.humidityLow.description',
       priority: 'low',
-      cooldownPeriod: 1800000,
-      maxTriggersPerDay: 5,
-      conditionLogic: 'AND',
+      cooldownPeriod: 900000,
       conditions: [
         {
           type: 'sensor',
@@ -457,9 +444,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.gasEmergency.name',
       description: 'rules.templates.gasEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: null,
-      maxTriggersPerDay: null,
-      conditionLogic: 'AND',
+      cooldownPeriod: 30000, // 30 giây
       conditions: [
         {
           type: 'sensor',
@@ -482,8 +467,6 @@ export const RULE_TEMPLATES = {
       description: 'rules.templates.gasHigh.description',
       priority: 'high',
       cooldownPeriod: 300000,
-      maxTriggersPerDay: 20,
-      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
@@ -505,9 +488,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.gasMedium.name',
       description: 'rules.templates.gasMedium.description',
       priority: 'medium',
-      cooldownPeriod: 900000,
-      maxTriggersPerDay: 10,
-      conditionLogic: 'AND',
+      cooldownPeriod: 600000,
       conditions: [
         {
           type: 'sensor',
@@ -530,9 +511,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.smokeEmergency.name',
       description: 'rules.templates.smokeEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: null,
-      maxTriggersPerDay: null,
-      conditionLogic: 'AND',
+      cooldownPeriod: 30000, // 30 giây
       conditions: [
         {
           type: 'sensor',
@@ -555,8 +534,6 @@ export const RULE_TEMPLATES = {
       description: 'rules.templates.smokeHigh.description',
       priority: 'high',
       cooldownPeriod: 300000,
-      maxTriggersPerDay: 20,
-      conditionLogic: 'AND',
       conditions: [
         {
           type: 'sensor',
@@ -578,9 +555,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.smokeMedium.name',
       description: 'rules.templates.smokeMedium.description',
       priority: 'medium',
-      cooldownPeriod: 900000,
-      maxTriggersPerDay: 10,
-      conditionLogic: 'AND',
+      cooldownPeriod: 600000,
       conditions: [
         {
           type: 'sensor',
@@ -594,6 +569,28 @@ export const RULE_TEMPLATES = {
         {
           type: 'send_alert',
           message: 'rules.templates.smokeMedium.message'
+        }
+      ]
+    },
+    
+    flame_detected: {
+      name: 'rules.templates.flameDetected.name',
+      description: 'rules.templates.flameDetected.description',
+      priority: 'urgent',
+      cooldownPeriod: 30000, // 30 giây
+      conditions: [
+        {
+          type: 'sensor',
+          sensor: 'flame',
+          operator: '==',
+          value: 1,
+          unit: ''
+        }
+      ],
+      actions: [
+        {
+          type: 'send_alert',
+          message: 'rules.templates.flameDetected.message'
         }
       ]
     }

@@ -7,6 +7,15 @@ import FCMService from './FCMService.js';
 import InAppService from './InAppService.js';
 import logger from '../utils/logger.js';
 
+const PRIORITY_CHANNEL_MAP = {
+  urgent: ['inApp', 'email', 'sms', 'fcm'],
+  high: ['inApp', 'email', 'sms'],
+  medium: ['inApp', 'email'],
+  low: ['inApp'],
+};
+
+const DEFAULT_CHANNELS = ['inApp'];
+
 class NotificationService {
   constructor() {
     this.emailService = new EmailService();
@@ -99,9 +108,11 @@ class NotificationService {
 
   async _sendThroughChannels(notification, preferences) {
     const { category, priority } = notification;
-    const channels = ['inApp', 'email', 'sms', 'fcm'];
+    const normalizedPriority = (priority || 'medium').toLowerCase();
+    const allowedChannels =
+      PRIORITY_CHANNEL_MAP[normalizedPriority] || PRIORITY_CHANNEL_MAP.medium || DEFAULT_CHANNELS;
 
-    for (const channel of channels) {
+    for (const channel of allowedChannels) {
       try {
         logger.info(`Checking channel ${channel} for category ${category}, priority ${priority}`);
         if (preferences.shouldSendNotification(channel, priority)) {
@@ -117,6 +128,22 @@ class NotificationService {
         await notification.save();
       }
     }
+
+    // Mark all non-requested channels as skipped to avoid stale statuses
+    const allChannels = ['inApp', 'email', 'sms', 'fcm'];
+    for (const channel of allChannels) {
+      if (!allowedChannels.includes(channel) && notification.deliveryStatus[channel]) {
+        notification.deliveryStatus[channel].sent = false;
+        notification.deliveryStatus[channel].error = null;
+        notification.deliveryStatus[channel].sentAt = null;
+      }
+    }
+
+    const savePromise = notification.save();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Notification update timeout')), 5000)
+    );
+    await Promise.race([savePromise, timeoutPromise]);
   }
 
   async _sendThroughChannel(notification, preferences, channel) {

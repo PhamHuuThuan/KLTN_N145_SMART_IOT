@@ -8,6 +8,23 @@ import { useLanguage } from './useLanguage';
 
 const log = createLogger('useRulesData');
 
+// Normalize device status like useDeviceData does
+const computeOnlineState = (device) => {
+  if (!device) {
+    return { status: 'offline', isOnline: false };
+  }
+
+  const statusValue = typeof device.status === 'string' ? device.status.toLowerCase() : null;
+  const isOnline = typeof device.isOnline === 'boolean'
+    ? device.isOnline
+    : statusValue === 'online';
+
+  return {
+    status: isOnline ? 'online' : 'offline',
+    isOnline,
+  };
+};
+
 export const useRulesData = () => {
   const { token } = useAuth();
   const { language } = useLanguage();
@@ -21,9 +38,19 @@ export const useRulesData = () => {
     try {
       const res = await apiService.getDevices();
       const list = res?.data || [];
-      const deviceIds = list.map(d => d.deviceId);
-      setDevices(deviceIds);
-      return deviceIds;
+      // Normalize devices with status like useDeviceData does
+      const normalizedDevices = list.map(device => {
+        const onlineState = computeOnlineState(device);
+        return {
+          ...device,
+          ...onlineState,
+          deviceId: device.deviceId,
+          name: device.name,
+          lastSeenAt: device.lastSeenAt || device.lastUpdate || null,
+        };
+      });
+      setDevices(normalizedDevices);
+      return normalizedDevices;
     } catch (e) {
       log.error('Failed to load devices for RulesScreen:', e);
       setDevices([]);
