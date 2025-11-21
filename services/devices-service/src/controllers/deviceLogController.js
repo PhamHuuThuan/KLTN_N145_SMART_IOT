@@ -41,6 +41,7 @@ export const createDeviceLog = async (req, res) => {
       humid: payload.humid !== null && payload.humid !== undefined ? Number(payload.humid) : 0,
       smoke: payload.smoke !== null && payload.smoke !== undefined ? Number(payload.smoke) : 0,
       gas_ppm: payload.gas_ppm !== null && payload.gas_ppm !== undefined ? Number(payload.gas_ppm) : 0,
+      flame: payload.flame !== null && payload.flame !== undefined ? Boolean(Number(payload.flame)) : false,
       o: {
         o1: Boolean(payload.o?.o1) || false,
         o2: Boolean(payload.o?.o2) || false,
@@ -58,14 +59,21 @@ export const createDeviceLog = async (req, res) => {
       metadata
     });
     
-    await deviceLog.save();
+    let savedSuccessfully = true;
+    try {
+      await deviceLog.save();
+      logger.info(`Device log created for device ${deviceId}`, { type, severity });
+    } catch (saveErr) {
+      savedSuccessfully = false;
+      logger.error('Device log save failed (accepted but not persisted):', saveErr);
+    }
     
-    logger.info(`Device log created for device ${deviceId}`, { type, severity });
-    
-    res.status(201).json({
+    res.status(savedSuccessfully ? 201 : 202).json({
       success: true,
-      data: deviceLog,
-      message: 'Device log created successfully'
+      data: savedSuccessfully ? deviceLog : null,
+      message: savedSuccessfully
+        ? 'Device log created successfully'
+        : 'Log accepted but not persisted'
     });
   } catch (error) {
     logger.error('Error creating device log:', error);
@@ -86,7 +94,6 @@ export const getDeviceLogs = async (req, res) => {
     
     let query = {};
     if (deviceId) {
-      // Check device ownership if deviceId is provided
       if (userId) {
         const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
         if (!ownershipCheck.success) {
@@ -98,7 +105,6 @@ export const getDeviceLogs = async (req, res) => {
       }
       query.deviceId = deviceId;
     } else if (userId && !isAdmin) {
-      // If no deviceId specified, only show logs for user's devices
       const userDevices = await Device.find({ ownerId: userId }).select('deviceId');
       const deviceIds = userDevices.map(d => d.deviceId);
       query.deviceId = { $in: deviceIds };
@@ -226,6 +232,7 @@ export const getTelemetryHistory = async (req, res) => {
         humid: log.payload?.humid ?? 0,
         smoke: log.payload?.smoke ?? 0,
         gas_ppm: log.payload?.gas_ppm ?? 0,
+        flame: log.payload?.flame ?? false,
         o: {
           o1: log.payload?.o?.o1 ?? false,
           o2: log.payload?.o?.o2 ?? false,

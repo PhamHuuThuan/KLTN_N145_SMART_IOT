@@ -92,19 +92,27 @@ function startMqtt() {
         return;
       }
       
-      const data = JSON.parse(message.toString());
+      let data;
+      try {
+        data = JSON.parse(message.toString());
+      } catch (parseErr) {
+        logger.error(`MQTT message parse error on topic ${topic}: ${parseErr.message}`);
+        return;
+      }
+      const toNumber = (value) => (value ?? null) !== null ? Number(value) : null;
+      const toBoolean = (value) => (value ?? null) !== null ? Boolean(Number(value)) : null;
 
       if (messageType === 'telemetry') {
         
         // Store data for this specific device
         const deviceData = {
           deviceId: deviceId,
-          temperature: (data.temp ?? null),
-          humidity: (data.humid ?? null),
-          smoke: (data.smoke ?? null),
-          gasPpm: (data.gas_ppm ?? null),
-          mq2Voltage: (data.mq2_v ?? null),
-          flame: (data.flame ?? null),
+          temperature: toNumber(data.temp),
+          humidity: toNumber(data.humid),
+          smoke: toNumber(data.smoke),
+          gasPpm: toNumber(data.gas_ppm),
+          mq2Voltage: toNumber(data.mq2_v),
+          flame: toBoolean(data.flame),
           outlets: {
             o1: (data.o?.o1 ?? null),
             o2: (data.o?.o2 ?? null),
@@ -136,10 +144,11 @@ function startMqtt() {
           topic,
           payload: {
             ts: Date.now(),
-            temp: (data.temp ?? null) !== null ? Number(data.temp) : null,
-            humid: (data.humid ?? null) !== null ? Number(data.humid) : null,
-            smoke: (data.smoke ?? null) !== null ? Number(data.smoke) : null,
-            gas_ppm: (data.gas_ppm ?? null) !== null ? Number(data.gas_ppm) : null,
+            temp: toNumber(data.temp),
+            humid: toNumber(data.humid),
+            smoke: toNumber(data.smoke),
+            gas_ppm: toNumber(data.gas_ppm),
+            flame: toBoolean(data.flame),
             o: {
               o1: (data.o?.o1 ?? null),
               o2: (data.o?.o2 ?? null),
@@ -154,10 +163,11 @@ function startMqtt() {
           }
         };
 
-        publishTelemetryLog(telemetryData)
-          .catch(error => {
-            logger.error(`Failed to publish to Kafka: ${error.message}`);
-          });
+        try {
+          await publishTelemetryLog(telemetryData);
+        } catch (error) {
+          logger.error(`Failed to publish telemetry to Kafka (skipped): ${error.message}`);
+        }
       } else if (messageType === 'ack') {
         logger.info(`ACK received from ${deviceId}:`, data);
         mqttEvents.emit('ack', data);
@@ -191,13 +201,12 @@ function startMqtt() {
           }
         };
 
-        publishEventLog(ackData)
-          .then(() => {
-            logger.info(`Published event to Kafka: ${deviceId}`);
-          })
-          .catch(error => {
-            logger.error(`Failed to publish ACK to Kafka: ${error.message}`);
-          });
+        try {
+          await publishEventLog(ackData);
+          logger.info(`Published event to Kafka: ${deviceId}`);
+        } catch (error) {
+          logger.error(`Failed to publish ACK to Kafka (skipped): ${error.message}`);
+        }
       }
     } catch (err) {
       logger.error(`Error processing MQTT message: ${err.message}`);

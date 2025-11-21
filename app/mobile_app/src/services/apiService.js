@@ -271,7 +271,6 @@ class ApiService {
   // Get telemetry history for a device
   async getTelemetryHistory(deviceId, hours = 24) {
     try {
-      // Correct endpoint: /api/logs/:deviceId/history (not /api/devices/logs/:deviceId/history)
       const url = `/api/logs/${deviceId}/history?hours=${hours}`;
       const response = await apiClient.get(url);
       return response.data;

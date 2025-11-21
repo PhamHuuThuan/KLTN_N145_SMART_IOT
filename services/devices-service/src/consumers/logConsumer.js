@@ -25,6 +25,17 @@ const consumer = kafka.consumer({
   heartbeatInterval: 3000
 });
 
+const hasValue = (value) => value !== undefined && value !== null;
+
+async function swallowError(label, fn, fallback = null) {
+  try {
+    return await fn();
+  } catch (error) {
+    logger.error(`${label} failed (skipping): ${error.message}`);
+    return fallback;
+  }
+}
+
 // Update device status from telemetry or event data
 async function updateDeviceStatus(data) {
   try {
@@ -75,27 +86,25 @@ async function updateDeviceStatus(data) {
     let shouldPersist = true;
 
     // Update latest telemetry (only set provided fields; do not default to 0)
-    if (payload.temp !== undefined || payload.humid !== undefined || payload.smoke !== undefined || payload.gas_ppm !== undefined || payload.o) {
-      const prev = device.latestTelemetry || { ts: Date.now(), o: {} };
+    if (hasValue(payload.temp) || hasValue(payload.humid) || hasValue(payload.smoke) || hasValue(payload.gas_ppm) || hasValue(payload.flame) || payload.o) {
+      const prev = device.latestTelemetry || { ts: Date.now(), o: {}, flame: false };
       device.latestTelemetry = {
         ts: payload.ts || prev.ts || Date.now(),
-        temp: payload.temp !== undefined ? payload.temp : prev.temp,
-        humid: payload.humid !== undefined ? payload.humid : prev.humid,
-        smoke: payload.smoke !== undefined ? payload.smoke : prev.smoke,
-        gas_ppm: payload.gas_ppm !== undefined ? payload.gas_ppm : prev.gas_ppm,
+        temp: hasValue(payload.temp) ? payload.temp : prev.temp,
+        humid: hasValue(payload.humid) ? payload.humid : prev.humid,
+        smoke: hasValue(payload.smoke) ? payload.smoke : prev.smoke,
+        gas_ppm: hasValue(payload.gas_ppm) ? payload.gas_ppm : prev.gas_ppm,
+        flame: hasValue(payload.flame) ? payload.flame : prev.flame,
         o: (payload.o || payload.outlets || prev.o || {})
       };
-      // Emit to socket clients
       logger.info(`Emitting telemetry to socket for ${deviceId}`, device.latestTelemetry);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else if (type === 'event' && payload.o) {
-      // For event logs with outlet data, update outlet status in latestTelemetry
       if (!device.latestTelemetry) {
         device.latestTelemetry = { ts: Date.now(), o: {} };
       }
       device.latestTelemetry.o = payload.o || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();
-      // Emit to socket clients
       logger.info(`Emitting event telemetry to socket for ${deviceId}`, device.latestTelemetry);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else {
@@ -103,7 +112,7 @@ async function updateDeviceStatus(data) {
     }
     
     if (shouldPersist) {
-      await device.save();
+      await swallowError('Device save', () => device.save());
     }
     
   } catch (error) {
@@ -129,180 +138,192 @@ async function startLogConsumer() {
     
     logger.info('Subscribed to topics: iot.telemetry.logs, iot.events.logs');
 
-    // Utility: per-op timeout to avoid stalling the consumer
     const withTimeout = async (promise, ms, label) => {
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${label} after ${ms}ms`)), ms));
       return Promise.race([promise, timeout]);
     };
 
+    const messageTimeoutMs = Number(process.env.KAFKA_MESSAGE_TIMEOUT_MS || 4000);
+
     await consumer.run({
       autoCommit: true,
       autoCommitInterval: 5000,
-      // optionally: partitionsConsumedConcurrently: 3,
       eachMessage: async ({ topic, partition, message }) => {
-        try {
-          logger.info(`LogConsumer received message from topic: ${topic}, partition: ${partition}`);
-          
-          let logData;
+        const processMessage = async () => {
           try {
-            logData = JSON.parse(message.value.toString());
-          } catch (parseErr) {
-            logger.error(`Invalid JSON message, skipping: ${parseErr.message}`);
-            return; // skip this message
-          }
-          logger.info(`Processing ${logData.type} from ${logData.deviceId}`);
-
-          // Increment persisted counters: per-topic (daily) and per-device (daily)
-          try {
-            const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-            // topic counter
-            await MessageCount.increment({ kind: 'topic', topic, date });
-            // device counter (if present)
-            if (logData.deviceId) {
-              await MessageCount.increment({ kind: 'device', deviceId: logData.deviceId, date });
-            }
-
-            // Read back counters to confirm (best-effort, non-critical)
+            logger.info(`LogConsumer received message from topic: ${topic}, partition: ${partition}`);
+            
+            let logData;
             try {
-              const topicKey = [ 'topic', topic, date ].join('|');
-              const topicDoc = await MessageCount.findOne({ key: topicKey }).lean();
-              const topicCount = topicDoc ? topicDoc.count : 0;
-              logger.info(`MessageCount topic=${topic} date=${date} => ${topicCount}`);
+              logData = JSON.parse(message.value.toString());
+            } catch (parseErr) {
+              logger.error(`Invalid JSON message, skipping: ${parseErr.message}`);
+              return;
+            }
+            logger.info(`Processing ${logData.type} from ${logData.deviceId}`);
 
+            try {
+              const date = new Date().toISOString().slice(0, 10);
+              await swallowError('MessageCount topic increment', () =>
+                MessageCount.increment({ kind: 'topic', topic, date })
+              );
               if (logData.deviceId) {
-                const deviceKey = [ 'device', logData.deviceId, date ].join('|');
-                const deviceDoc = await MessageCount.findOne({ key: deviceKey }).lean();
-                const deviceCount = deviceDoc ? deviceDoc.count : 0;
-                logger.info(`MessageCount device=${logData.deviceId} date=${date} => ${deviceCount}`);
+                await swallowError('MessageCount device increment', () =>
+                  MessageCount.increment({ kind: 'device', deviceId: logData.deviceId, date })
+                );
               }
-            } catch (readErr) {
-              logger.warn(`Could not read message counters after increment: ${readErr.message}`);
-            }
-          } catch (incErr) {
-            logger.error(`Failed to increment message counters: ${incErr.message}`);
-          }
 
-          // Check if log should be saved (skip if changes are too small)
-          const shouldSaveLog = async (logData) => {
-            if (logData.type === 'event' && logData.payload?.ack === true) {
-              return true; // Always save ACK events
-            }
-            
-            if (logData.type !== 'telemetry') {
-              return true; // Save non-telemetry logs
-            }
-            
-            // Get last log for comparison
-            const lastLog = await DeviceLog.findOne({
-              deviceId: logData.deviceId,
-              type: 'telemetry'
-            }).sort({ createdAt: -1 }).lean();
-            
-            if (!lastLog) {
-              return true; // Save first log
-            }
-            
-            const payload = logData.payload || {};
-            const lastPayload = lastLog.payload || {};
-            
-            // Thresholds: temp/humid < 0.2, gas < 4 units
-            const tempDiff = Math.abs((payload.temp || 0) - (lastPayload.temp || 0));
-            const humidDiff = Math.abs((payload.humid || 0) - (lastPayload.humid || 0));
-            const gasDiff = Math.abs((payload.gas_ppm || 0) - (lastPayload.gas_ppm || 0));
-            const smokeDiff = Math.abs((payload.smoke || 0) - (lastPayload.smoke || 0));
-            
-            // Check if outlet status changed
-            const outletChanged = payload.o && lastPayload.o && (
-              (payload.o.o1 !== lastPayload.o.o1) ||
-              (payload.o.o2 !== lastPayload.o.o2) ||
-              (payload.o.o3 !== lastPayload.o.o3) ||
-              (payload.o.o4 !== lastPayload.o.o4)
-            );
-            
-            // Save if significant change or outlet changed
-            if (tempDiff >= 0.2 || humidDiff >= 0.2 || gasDiff >= 4 || smokeDiff > 0 || outletChanged) {
-              return true;
-            }
-            
-            return false; // Skip saving - change too small
-          };
+              try {
+                const topicKey = [ 'topic', topic, date ].join('|');
+                const topicDoc = await swallowError('MessageCount topic read', () =>
+                  MessageCount.findOne({ key: topicKey }).lean()
+                );
+                const topicCount = topicDoc ? topicDoc.count : 0;
+                logger.info(`MessageCount topic=${topic} date=${date} => ${topicCount}`);
 
-          // Create and save device log (including event/ack)
-          let savedLog = null;
-          try {
-            // Check if should save (skip small changes)
-            const save = await shouldSaveLog(logData);
-            if (!save) {
-              logger.debug(`Skipping log save for ${logData.deviceId} - changes too small`);
-              // Still update device status but don't save log
-            } else {
-              // Handle event/ack logs with minimal payload
-              let logToSave = logData;
+                if (logData.deviceId) {
+                  const deviceKey = [ 'device', logData.deviceId, date ].join('|');
+                  const deviceDoc = await swallowError('MessageCount device read', () =>
+                    MessageCount.findOne({ key: deviceKey }).lean()
+                  );
+                  const deviceCount = deviceDoc ? deviceDoc.count : 0;
+                  logger.info(`MessageCount device=${logData.deviceId} date=${date} => ${deviceCount}`);
+                }
+              } catch (readErr) {
+                logger.warn(`Could not read message counters after increment: ${readErr.message}`);
+              }
+            } catch (incErr) {
+              logger.error(`Failed to increment message counters: ${incErr.message}`);
+            }
+
+            const shouldSaveLog = async (logData) => {
               if (logData.type === 'event' && logData.payload?.ack === true) {
-                // Extract outlet info from ACK if available
-                const ackOutlets = logData.payload.o || logData.metadata?.ackData?.o || {};
-                
-                logToSave = {
-                  ...logData,
-                  payload: {
-                    ts: logData.payload.ts || Date.now(),
-                    temp: 0,
-                    humid: 0,
-                    smoke: 0,
-                    gas_ppm: 0,
-                    o: {
-                          o1: ackOutlets.o1 ?? false,
-                          o2: ackOutlets.o2 ?? false,
-                          o3: ackOutlets.o3 ?? false,
-                          o4: ackOutlets.o4 ?? false
-                        }
-                  },
-                  metadata: {
-                    ...logData.metadata
-                  }
-                };
+                return true;
               }
               
-              // Normalize null values to 0
-              if (logToSave.payload) {
-                logToSave.payload.temp = logToSave.payload.temp ?? 0;
-                logToSave.payload.humid = logToSave.payload.humid ?? 0;
-                logToSave.payload.smoke = logToSave.payload.smoke ?? 0;
-                logToSave.payload.gas_ppm = logToSave.payload.gas_ppm ?? 0;
+              if (logData.type !== 'telemetry') {
+                return true;
               }
               
-              const deviceLog = new DeviceLog(logToSave);
-              await withTimeout(deviceLog.save(), 2000, 'saving device log');
-              savedLog = deviceLog;
-            }
-          } catch (saveError) {
-            logger.error(`Error saving device log (skipped): ${saveError.message}`);
-          }
-          
-          // Update device status if it's telemetry or event data (skip ack events)
-          if ((logData.type === 'telemetry' || (logData.type === 'event' && !logData.payload?.ack)) && logData.deviceId) {
-            try {
-              logger.info(`Updating device status for ${logData.deviceId}`);
-              await withTimeout(updateDeviceStatus(logData), 1500, 'updating device status');
-              logger.info(`Device status updated for ${logData.deviceId}`);
-            } catch (updErr) {
-              logger.error(`Update device status failed (skipped): ${updErr.message}`);
-            }
-          }
-          
-          // Mark log as processed when we created one
-          if (savedLog) {
-            try {
-              savedLog.markAsProcessed();
-              await withTimeout(savedLog.save(), 1500, 'mark processed');
-            } catch (markErr) {
-              logger.error(`Mark processed failed (skipped): ${markErr.message}`);
-            }
-          }
+              const lastLog = await swallowError('Fetch last telemetry log', () =>
+                DeviceLog.findOne({
+                  deviceId: logData.deviceId,
+                  type: 'telemetry'
+                }).sort({ createdAt: -1 }).lean()
+              );
+              
+              if (!lastLog) {
+                return true;
+              }
+              
+              const payload = logData.payload || {};
+              const lastPayload = lastLog.payload || {};
+              
+              const tempDiff = Math.abs((payload.temp || 0) - (lastPayload.temp || 0));
+              const humidDiff = Math.abs((payload.humid || 0) - (lastPayload.humid || 0));
+              const gasDiff = Math.abs((payload.gas_ppm || 0) - (lastPayload.gas_ppm || 0));
+              const lastSmoke = lastPayload.smoke !== undefined && lastPayload.smoke !== null ? lastPayload.smoke : 0;
+              const currentSmoke = hasValue(payload.smoke) ? payload.smoke : lastSmoke;
+              const smokeDiff = Math.abs(currentSmoke - lastSmoke);
+              const prevFlame = lastPayload.flame !== undefined ? lastPayload.flame : false;
+              const flameChanged = hasValue(payload.flame) ? payload.flame !== prevFlame : false;
+              
+              const outletChanged = payload.o && lastPayload.o && (
+                (payload.o.o1 !== lastPayload.o.o1) ||
+                (payload.o.o2 !== lastPayload.o.o2) ||
+                (payload.o.o3 !== lastPayload.o.o3) ||
+                (payload.o.o4 !== lastPayload.o.o4)
+              );
+              
+              if (tempDiff >= 0.2 || humidDiff >= 0.2 || gasDiff >= 4 || smokeDiff >= 0.05 || flameChanged || outletChanged) {
+                return true;
+              }
+              
+              return false;
+            };
 
-        } catch (error) {
-          // Keep errors contained per-message, never throw to KafkaJS runner
-          logger.error(`Error processing message from ${topic}: ${error.message}`);
+            let savedLog = null;
+            try {
+              const save = await shouldSaveLog(logData);
+              if (!save) {
+                logger.debug(`Skipping log save for ${logData.deviceId} - changes too small`);
+              } else {
+                let logToSave = logData;
+                if (logData.type === 'event' && logData.payload?.ack === true) {
+                  const ackOutlets = logData.payload.o || logData.metadata?.ackData?.o || {};
+                  
+                  logToSave = {
+                    ...logData,
+                    payload: {
+                      ts: logData.payload.ts || Date.now(),
+                      temp: 0,
+                      humid: 0,
+                      smoke: 0,
+                      gas_ppm: 0,
+                      flame: false,
+                      o: {
+                            o1: ackOutlets.o1 ?? false,
+                            o2: ackOutlets.o2 ?? false,
+                            o3: ackOutlets.o3 ?? false,
+                            o4: ackOutlets.o4 ?? false
+                          }
+                    },
+                    metadata: {
+                      ...logData.metadata
+                    }
+                  };
+                }
+                
+                if (logToSave.payload) {
+                  logToSave.payload.temp = logToSave.payload.temp ?? 0;
+                  logToSave.payload.humid = logToSave.payload.humid ?? 0;
+                  logToSave.payload.smoke = logToSave.payload.smoke ?? 0;
+                  logToSave.payload.gas_ppm = logToSave.payload.gas_ppm ?? 0;
+                  logToSave.payload.flame = logToSave.payload.flame ?? false;
+                }
+                
+                const deviceLog = new DeviceLog(logToSave);
+                await withTimeout(
+                  swallowError('Saving device log', () => deviceLog.save()),
+                  2000,
+                  'saving device log'
+                );
+                savedLog = deviceLog;
+              }
+            } catch (saveError) {
+              logger.error(`Error saving device log (skipped): ${saveError.message}`);
+            }
+            
+            if ((logData.type === 'telemetry' || (logData.type === 'event' && !logData.payload?.ack)) && logData.deviceId) {
+              try {
+                logger.info(`Updating device status for ${logData.deviceId}`);
+                await withTimeout(updateDeviceStatus(logData), 1500, 'updating device status');
+                logger.info(`Device status updated for ${logData.deviceId}`);
+              } catch (updErr) {
+                logger.error(`Update device status failed (skipped): ${updErr.message}`);
+              }
+            }
+            
+            if (savedLog) {
+              try {
+                await swallowError('Mark log processed', async () => {
+                  savedLog.markAsProcessed();
+                  await withTimeout(savedLog.save(), 1500, 'mark processed');
+                });
+              } catch (markErr) {
+                logger.error(`Mark processed failed (skipped): ${markErr.message}`);
+              }
+            }
+
+          } catch (error) {
+            logger.error(`Error processing message from ${topic}: ${error.message}`);
+          }
+        };
+
+        try {
+          await withTimeout(processMessage(), messageTimeoutMs, 'processing kafka message');
+        } catch (timeoutErr) {
+          logger.error(`Log processing timed out, message skipped: ${timeoutErr.message}`);
         }
       },
     });

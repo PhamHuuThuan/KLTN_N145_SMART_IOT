@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next';
 import ChatMessageList from '../components/ChatMessageList';
 import ChatInput from '../components/ChatInput';
 import VoiceCommandsHelp from '../components/VoiceCommandsHelp';
-import ChatDeviceSelector from '../components/ChatDeviceSelector';
+import DeviceSelector from '../components/DeviceSelector';
+import { useDeviceData } from '../hooks/useDeviceData';
 import OutletDetail from '../components/OutletDetail';
 import useSpeechToText from '../hooks/useSpeechToText';
 import useVoiceControl from '../hooks/useVoiceControl';
@@ -26,26 +27,36 @@ const ChatScreen = ({ onNavigateToHome }) => {
   const myId = 'me';
   const [messages, setMessages] = useState([]);
   
-  // Device and outlet control state
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [devices, setDevices] = useState([]);
-  const [showDeviceSelector, setShowDeviceSelector] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // Use useDeviceData hook like HomeScreen
+  const {
+    devicesList,
+    selectedDevice: hookSelectedDevice,
+    selectDevice,
+    fetchDevices,
+    hasMore,
+    loadingMore,
+    loadMoreDevices,
+  } = useDeviceData();
+  
+  const selectedDevice = hookSelectedDevice ? devicesList.find(d => d.deviceId === hookSelectedDevice) : null;
   
   // Outlet detail modal state
   const [showOutletDetail, setShowOutletDetail] = useState(false);
   const [selectedOutlet, setSelectedOutlet] = useState(null);
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  const [voiceDraft, setVoiceDraft] = useState('');
+  const [skipVoiceSend, setSkipVoiceSend] = useState(false);
 
   const { parseVoiceCommand, executeVoiceCommand, processTranscript } = useVoiceControl();
   const { controlOutlet: controlOutletHook } = useOutletControl();
 
   // Load devices and messages on component mount
   useEffect(() => {
-    loadDevices();
     if (user?.id) {
+      fetchDevices(1, 20);
       loadChatSession();
     }
-  }, [user?.id]);
+  }, [user?.id, fetchDevices]);
 
   // Load chat session
   const loadChatSession = async () => {
@@ -107,27 +118,14 @@ const ChatScreen = ({ onNavigateToHome }) => {
     });
   };
 
-  const loadDevices = async () => {
-    try {
-      setLoading(true);
-      const response = await apiService.getDevices();
-      if (response.success) {
-        setDevices(response.data || []);
-        // Auto-select first device if available
-        if (response.data && response.data.length > 0) {
-          const firstDevice = response.data[0];
-          log.info('Auto-selecting first device:', firstDevice);
-          setSelectedDevice(firstDevice);
-        }
-      } else {
-        log.error('Failed to load devices:', response.message);
-      }
-    } catch (error) {
-      log.error('Error loading devices:', error);
-    } finally {
-      setLoading(false);
+  // Auto-select first device if available
+  useEffect(() => {
+    if (devicesList && devicesList.length > 0 && !hookSelectedDevice) {
+      const firstDevice = devicesList[0];
+      log.info('Auto-selecting first device:', firstDevice);
+      selectDevice(firstDevice.deviceId);
     }
-  };
+  }, [devicesList, hookSelectedDevice, selectDevice]);
 
   const handleSend = (text) => {
     const msg = { id: `m_${Date.now()}`, userId: myId, text, time: Date.now() };
@@ -198,9 +196,9 @@ const ChatScreen = ({ onNavigateToHome }) => {
 
   // Silent version for voice command (doesn't add messages)
   const handleOutletControlSilent = async (action, outletId) => {
-    const deviceId = selectedDevice?.deviceId;
+    const deviceId = hookSelectedDevice;
     
-    if (!selectedDevice || !deviceId) {
+    if (!hookSelectedDevice || !deviceId) {
       return false;
     }
 
@@ -231,9 +229,9 @@ const ChatScreen = ({ onNavigateToHome }) => {
 
   // Version that adds messages (for direct calls)
   const handleOutletControl = async (action, outletId) => {
-    const deviceId = selectedDevice?.deviceId;
+    const deviceId = hookSelectedDevice;
     
-    if (!selectedDevice || !deviceId) {
+    if (!hookSelectedDevice || !deviceId) {
       const errorMsg = { 
         id: `bot_${Date.now()}`, 
         userId: 'bot', 
@@ -276,7 +274,7 @@ const ChatScreen = ({ onNavigateToHome }) => {
 
   const controlOutlet = async (outletId, action) => {
     try {
-      const deviceId = selectedDevice?.deviceId;
+      const deviceId = hookSelectedDevice;
       
       // Get device details first to find outlet info
       const deviceResponse = await apiService.getDeviceDetail(deviceId);
@@ -368,8 +366,7 @@ const ChatScreen = ({ onNavigateToHome }) => {
 
   const controlAllOutlets = async (action) => {
     try {
-      // Use device.id (not _id) for API calls
-      const deviceId = selectedDevice?.deviceId;
+      const deviceId = hookSelectedDevice;
       // Get device outlets first
       const deviceResponse = await apiService.getDeviceDetail(deviceId);
       if (!deviceResponse.success || !deviceResponse.data?.outlets) {
@@ -399,21 +396,49 @@ const ChatScreen = ({ onNavigateToHome }) => {
     }
   };
 
-  const { listening, transcript, toggle } = useSpeechToText({
+  const { listening, transcript, toggle, stop } = useSpeechToText({
     locale: 'vi-VN',
-    onResult: undefined,
   });
 
   const [compose, setCompose] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   
   useEffect(() => {
-    // bind transcript to input when listening
-    if (transcript && transcript !== compose) {
-      setCompose(transcript);
+    if (transcript && transcript !== voiceDraft) {
+      setVoiceDraft(transcript);
     }
-    log.info("Listening.transcript", transcript);
-  }, [transcript]);
+  }, [transcript, voiceDraft]);
+
+  useEffect(() => {
+    if (listening) {
+      setVoiceModalVisible(true);
+    } else if (voiceModalVisible) {
+      if (voiceDraft.trim() && !skipVoiceSend) {
+        handleSend(voiceDraft.trim());
+      }
+      setVoiceDraft('');
+      setVoiceModalVisible(false);
+      setSkipVoiceSend(false);
+    }
+  }, [listening, voiceDraft, voiceModalVisible, skipVoiceSend]);
+
+  const handleVoiceToggle = async () => {
+    if (!listening) {
+      setVoiceDraft('');
+    setSkipVoiceSend(false);
+      setVoiceModalVisible(true);
+      await toggle(true);
+    } else {
+      await toggle(false);
+    }
+  };
+
+  const handleVoiceCancel = async () => {
+    setVoiceDraft('');
+    setVoiceModalVisible(false);
+  setSkipVoiceSend(true);
+    await stop();
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -424,17 +449,8 @@ const ChatScreen = ({ onNavigateToHome }) => {
       >
         <View style={[styles.frame, { backgroundColor: colors.surface }]}>
           <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}> 
-            <Text style={[styles.headerTitle, { color: colors.primary }]}>Chat</Text>
+            <Text style={[styles.headerTitle, { color: colors.primary }]}>{t('navigation.chat', 'Chat')}</Text>
             <View style={styles.headerActions}>
-              <TouchableOpacity 
-                style={[styles.deviceButton, { backgroundColor: colors.backgroundSecondary }]}
-                onPress={() => setShowDeviceSelector(true)}
-              >
-                <Ionicons name="hardware-chip-outline" size={20} color={colors.primary} />
-                <Text style={[styles.deviceButtonText, { color: colors.text }]} numberOfLines={1}>
-                  {selectedDevice ? selectedDevice.name || selectedDevice.id : t('chat.selectDevice')}
-                </Text>
-              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.helpButton}
                 onPress={() => setShowHelp(true)}
@@ -442,6 +458,20 @@ const ChatScreen = ({ onNavigateToHome }) => {
                 <Ionicons name="help-circle-outline" size={24} color={colors.primary} />
               </TouchableOpacity>
             </View>
+          </View>
+          {/* Device Selector - same as HomeScreen */}
+          <View style={styles.deviceSelectorContainer}>
+            <DeviceSelector
+              devices={devicesList}
+              selectedDevice={hookSelectedDevice}
+              onSelectDevice={async (deviceId) => {
+                await selectDevice(deviceId);
+              }}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={loadMoreDevices}
+              showAddButton={false}
+            />
           </View>
           <View style={styles.messagesArea}>
             <ChatMessageList 
@@ -457,7 +487,7 @@ const ChatScreen = ({ onNavigateToHome }) => {
           </View>
           <ChatInput
             onSend={(t) => { handleSend(t); setCompose(''); }}
-            onVoiceToggle={toggle}
+            onVoiceToggle={handleVoiceToggle}
             listening={listening}
             value={compose}
             onChangeText={setCompose}
@@ -470,12 +500,6 @@ const ChatScreen = ({ onNavigateToHome }) => {
         onClose={() => setShowHelp(false)} 
       />
       
-      <ChatDeviceSelector
-        visible={showDeviceSelector}
-        onClose={() => setShowDeviceSelector(false)}
-        onDeviceSelect={setSelectedDevice}
-        selectedDevice={selectedDevice}
-      />
       
       <OutletDetail
         visible={showOutletDetail}
@@ -487,6 +511,63 @@ const ChatScreen = ({ onNavigateToHome }) => {
           loadDevices();
         }}
       />
+
+      <Modal
+        visible={voiceModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleVoiceCancel}
+      >
+        <View style={styles.voiceModalBackdrop}>
+          <View style={[styles.voiceModal, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity style={styles.voiceClose} onPress={handleVoiceCancel}>
+              <Ionicons name="close" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={[
+              styles.voiceMicCircle,
+              { backgroundColor: listening ? colors.primary : colors.border }
+            ]}>
+              <Ionicons
+                name={listening ? 'mic' : 'mic-outline'}
+                size={28}
+                color={listening ? colors.white : colors.textSecondary}
+              />
+            </View>
+            <Text style={[styles.voiceHint, { color: colors.textSecondary }]}>
+              {listening
+                ? t('chat.voiceListening', 'Đang ghi âm...')
+                : t('chat.voicePreview', 'Đang gửi...')}
+            </Text>
+            <View style={styles.voiceTranscriptBox}>
+              <Text style={[styles.voiceTranscript, { color: colors.text }]}>
+                {voiceDraft || (listening 
+                  ? t('chat.voiceListeningPlaceholder', 'Nói nội dung bạn muốn gửi...')
+                  : t('chat.voiceStoppedPlaceholder', 'Đã dừng ghi âm, đang gửi...'))}
+              </Text>
+            </View>
+            {listening && (
+              <View style={styles.voiceActions}>
+                <TouchableOpacity
+                  style={[styles.voiceButton, styles.voiceSecondaryButton, { borderColor: colors.border }]}
+                  onPress={handleVoiceCancel}
+                >
+                  <Text style={[styles.voiceButtonText, { color: colors.text }]}>
+                    {t('common.cancel', 'Huỷ')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.voiceButton, { backgroundColor: colors.primary }]}
+                  onPress={() => toggle(false)}
+                >
+                  <Text style={[styles.voiceButtonText, { color: colors.white }]}>
+                    {t('chat.voiceStop', 'Dừng')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -543,6 +624,69 @@ const styles = StyleSheet.create({
   },
   messagesArea: {
     flex: 1,
+  },
+  voiceModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  voiceModal: {
+    width: '100%',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  voiceMicCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  voiceHint: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  voiceTranscriptBox: {
+    width: '100%',
+    minHeight: 80,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    padding: 12,
+    marginBottom: 16,
+  },
+  voiceTranscript: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  voiceClose: {
+    alignSelf: 'flex-end',
+    padding: 6,
+  },
+  voiceActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  voiceButton: {
+    minWidth: 90,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: 'center',
+  },
+  voiceSecondaryButton: {
+    borderWidth: 1,
+  },
+  voiceButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

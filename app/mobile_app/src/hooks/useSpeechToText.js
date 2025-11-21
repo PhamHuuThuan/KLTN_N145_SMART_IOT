@@ -51,22 +51,23 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
   const requestAndroidPermission = async () => {
     if (Platform.OS !== 'android') return true;
     try {
+      const t = (key, fallback) => i18n.t(key, fallback);
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
         {
-          title: 'Microphone Permission',
-          message: 'App needs access to your microphone for voice commands',
-          buttonPositive: 'OK',
+          title: t('voice.permissionTitle', 'Microphone Permission'),
+          message: t('voice.permissionMessage', 'App needs access to your microphone for voice commands'),
+          buttonPositive: t('common.yes', 'OK'),
         }
       );
       if (granted === PermissionsAndroid.RESULTS.GRANTED) return true;
       if (granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
         Alert.alert(
-          'Microphone permission',
-          'Please allow microphone access in Settings > Apps > Smart IoT Kitchen > Permissions.',
+          t('voice.permissionTitle', 'Microphone permission'),
+          t('voice.permissionDeniedMessage', 'Please allow microphone access in Settings > Apps > Smart IoT Kitchen > Permissions.'),
           [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+            { text: t('voice.openSettings', 'Open Settings'), onPress: () => Linking.openSettings() },
           ]
         );
       }
@@ -81,9 +82,10 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
       setTranscript('');
       setError(null);
       setListening(true);
+      const t = (key, fallback) => i18n.t(key, fallback);
       const ok = await requestAndroidPermission();
       if (!ok) {
-        setError('Microphone permission denied');
+        setError(t('voice.permissionDenied', 'Microphone permission denied'));
         setListening(false);
         return;
       }

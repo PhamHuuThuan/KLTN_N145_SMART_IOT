@@ -81,6 +81,21 @@
     "online": "Online",
     "offline": "Offline",
     "lastSeen": "Last seen",
+    "scanQrCode": "Scan QR code",
+    "scanQrHint": "Scan device QR to select or pair quickly",
+    "scanQrInstruction": "Align the QR code inside the frame to scan automatically.",
+    "scanQrPermissionTitle": "Camera permission required",
+    "scanQrPermissionMessage": "Allow camera access to scan device QR codes.",
+    "grantPermission": "Grant permission",
+    "openSettings": "Open Settings",
+    "cameraLoading": "Preparing camera...",
+    "scanAgain": "Scan again",
+    "processingScan": "Processing scanned data...",
+    "torchOn": "Turn torch on",
+    "torchOff": "Turn torch off",
+    "invalidQrCode": "Invalid QR code",
+    "qrScanSuccess": "Device \"{{deviceId}}\" selected via QR",
+    "qrScanFailed": "Failed to process QR code",
     "temperature": "Temperature",
     "humidity": "Humidity",
     "smoke": "Smoke",
@@ -431,6 +446,12 @@
     "values": {
       "detected": "Detected",
       "clear": "Clear"
+    },
+    "legend": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High",
+      "veryHigh": "Very High"
     }
   },
   "charts": {
@@ -504,8 +525,13 @@
     "outletTurnedOn": "✅ Outlet turned on",
     "outletTurnedOff": "✅ Outlet turned off",
     "outletControlFailed": "❌ Failed to control outlet",
+    "voiceListening": "Recording...",
+    "voiceStopped": "Recording stopped",
+    "voiceListeningPlaceholder": "Speak your message...",
+    "voiceStoppedPlaceholder": "Recording stopped, sending...",
+    "voiceStop": "Stop",
     "guidance": {
-      "selectDevice": "💡 Tip: Tap the device button in the header to select a device first.",
+      "selectDevice": "💡 Tip: Select a device above to control outlets.",
       "tryCommands": "💡 Try saying: 'Bật ổ cắm 1' or 'Tắt tất cả ổ cắm'",
       "checkDevice": "💡 Check if your device is online and try again.",
       "general": "💡 Need help? Tap the help button for voice commands guide."
@@ -529,6 +555,11 @@
     "alternativeForOn": "Alternative words for 'turn on'",
     "alternativeForOff": "Alternative words for 'turn off'",
     "englishCommands": "English commands also work",
-    "tip": "Speak clearly and pause briefly between words for better recognition"
+    "tip": "Speak clearly and pause briefly between words for better recognition",
+    "permissionTitle": "Microphone Permission",
+    "permissionMessage": "App needs access to your microphone for voice commands",
+    "permissionDenied": "Microphone permission denied",
+    "permissionDeniedMessage": "Please allow microphone access in Settings > Apps > Smart IoT Kitchen > Permissions.",
+    "openSettings": "Open Settings"
   }
 }

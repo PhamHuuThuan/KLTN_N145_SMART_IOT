@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Alert, ActivityIndicator, FlatList } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, Alert, ActivityIndicator, FlatList, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import CONFIG from '../constants/config';
@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
+import QRScannerModal from './QRScannerModal';
 
 const DeviceSelector = ({
   devices,
@@ -18,7 +19,8 @@ const DeviceSelector = ({
   onDeviceRemoved,
   hasMore,
   loadingMore,
-  onLoadMore
+  onLoadMore,
+  showAddButton = true,
 }) => {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -29,6 +31,8 @@ const DeviceSelector = ({
   const [submitting, setSubmitting] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
   const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [processingScan, setProcessingScan] = useState(false);
   const { user } = useAuth();
 
   const normalizedDevices = Array.isArray(devices)
@@ -36,18 +40,137 @@ const DeviceSelector = ({
     : [];
 
   const selectedDeviceData = normalizedDevices.find((device) => device.deviceId === selectedDevice) || null;
+  const canAddDevice = showAddButton !== false;
+
+  const extractDeviceIdFromPayload = (payload) => {
+    if (!payload) return null;
+    const trimmed = String(payload).trim();
+    if (!trimmed) return null;
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed?.deviceId) return String(parsed.deviceId);
+      if (parsed?.id) return String(parsed.id);
+      if (parsed?.device?.id) return String(parsed.device.id);
+    } catch (error) {
+      // Not JSON
+    }
+
+    if (typeof URL !== 'undefined') {
+      try {
+        const possibleUrl = new URL(trimmed);
+        const params = possibleUrl.searchParams;
+        const fromQuery =
+          params.get('deviceId') ||
+          params.get('device_id') ||
+          params.get('id');
+        if (fromQuery) return String(fromQuery);
+      } catch (error) {
+        // Not URL
+      }
+    }
+
+    if (/^[A-Za-z0-9\-_]+$/i.test(trimmed)) {
+      return trimmed;
+    }
+
+    return null;
+  };
+
+  const handleQrScanResult = async (rawValue) => {
+    if (!rawValue) return;
+    setProcessingScan(true);
+    try {
+      const deviceId = extractDeviceIdFromPayload(rawValue);
+      if (!deviceId) {
+        throw new Error(t('devices.invalidQrCode', 'Invalid QR code'));
+      }
+
+      setNewDeviceId(deviceId);
+      if (!newDeviceName) {
+        setNewDeviceName(deviceId);
+      }
+
+      setFeedback({
+        visible: true,
+        type: 'success',
+        message: t('devices.qrScanSuccess', {
+          deviceId,
+          defaultValue: 'Device selected via QR',
+        }),
+      });
+      setShowQRScanner(false);
+    } catch (error) {
+      setFeedback({
+        visible: true,
+        type: 'error',
+        message: error?.message || t('devices.qrScanFailed', 'Failed to process QR code'),
+      });
+    } finally {
+      setProcessingScan(false);
+    }
+  };
 
   const StatusBadge = ({ status, lastSeenAt }) => {
     const isOnline = (status || '').toLowerCase() === 'online';
     const baseColor = isOnline ? colors.success : colors.danger;
+    const pulseAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      let animation;
+      if (isOnline) {
+        animation = Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 0,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+        animation.start();
+      } else {
+        pulseAnim.stopAnimation(() => {
+          pulseAnim.setValue(0);
+        });
+      }
+
+      return () => {
+        animation?.stop();
+      };
+    }, [isOnline, pulseAnim]);
+
+    const animatedDotStyle = isOnline
+      ? {
+          opacity: pulseAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.5, 1],
+          }),
+          transform: [
+            {
+              scale: pulseAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.9, 1.1],
+              }),
+            },
+          ],
+        }
+      : null;
+
     return (
       <View style={[
         styles.statusBadge,
         { backgroundColor: `${baseColor}22` }
       ]}>
-        <View style={[
+        <Animated.View style={[
           styles.statusDot,
-          { backgroundColor: baseColor }
+          { backgroundColor: baseColor },
+          animatedDotStyle
         ]} />
       </View>
     );
@@ -78,14 +201,16 @@ const DeviceSelector = ({
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            onPress={() => setShowAddModal(true)}
-            activeOpacity={0.9}
-          >
-            <MaterialCommunityIcons name="plus" size={18} color={colors.white} />
-            <Text style={[styles.addText, { color: colors.white }]}>{t('common.add')}</Text>
-          </TouchableOpacity>
+          {canAddDevice && (
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowAddModal(true)}
+              activeOpacity={0.9}
+            >
+              <MaterialCommunityIcons name="plus" size={18} color={colors.white} />
+              <Text style={[styles.addText, { color: colors.white }]}>{t('common.add')}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <View style={styles.emptyState}>
@@ -94,14 +219,16 @@ const DeviceSelector = ({
           <Text style={[styles.emptyStateSubtitle, { color: colors.textSecondary }]}>
             {t('devices.addFirstDevice')}
           </Text>
-          <TouchableOpacity
-            style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
-            onPress={() => setShowAddModal(true)}
-            activeOpacity={0.9}
-          >
-            <MaterialCommunityIcons name="plus" size={20} color={colors.white} />
-            <Text style={[styles.emptyStateButtonText, { color: colors.white }]}>{t('devices.addDevice')}</Text>
-          </TouchableOpacity>
+          {canAddDevice && (
+            <TouchableOpacity
+              style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowAddModal(true)}
+              activeOpacity={0.9}
+            >
+              <MaterialCommunityIcons name="plus" size={20} color={colors.white} />
+              <Text style={[styles.emptyStateButtonText, { color: colors.white }]}>{t('devices.addDevice')}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -244,134 +371,152 @@ const DeviceSelector = ({
       </Modal>
 
       {/* Add device modal */}
-      <Modal
-        visible={showAddModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowAddModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.primary }]}>{t('devices.addDevice')}</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <MaterialCommunityIcons name="close" size={20} color={colors.gray} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalContent}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('devices.deviceId')}</Text>
-              <TextInput
-                style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }]}
-                placeholder={t('devices.deviceIdPlaceholder')}
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={newDeviceId}
-                onChangeText={setNewDeviceId}
-                maxLength={50}
-              />
-              <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
-                {t('devices.deviceIdHint')}
-              </Text>
-              
-              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('devices.deviceName')}</Text>
-              <TextInput
-                style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }]}
-                placeholder={t('devices.deviceNamePlaceholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={newDeviceName}
-                onChangeText={setNewDeviceName}
-                maxLength={50}
-              />
-              <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
-                {t('devices.deviceNameHint')}
-              </Text>
-              <TouchableOpacity
-                style={[styles.addConfirmButton, { backgroundColor: colors.primary }, submitting && { opacity: 0.7 }]}
-                onPress={async () => {
-                  if (!newDeviceId?.trim()) {
-                    Alert.alert(t('common.error'), t('devices.deviceIdRequired'));
-                    return;
-                  }
-                  
-                  if (newDeviceId.trim().length < 3) {
-                    Alert.alert(t('common.error'), t('devices.deviceIdTooShort'));
-                    return;
-                  }
-                  
-                  if (!user?.id) {
-                    Alert.alert(t('auth.authenticationRequired'), t('devices.loginRequired'));
-                    return;
-                  }
-                  
-                  try {
-                    setSubmitting(true);
-                    setShowLoader(true);
+      {canAddDevice && (
+        <Modal
+          visible={showAddModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowAddModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.primary }]}>{t('devices.addDevice')}</Text>
+                <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                  <MaterialCommunityIcons name="close" size={20} color={colors.gray} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.modalContent}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t('devices.deviceId')}</Text>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      styles.flexInput,
+                      { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text },
+                    ]}
+                    placeholder={t('devices.deviceIdPlaceholder')}
+                    placeholderTextColor={colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={newDeviceId}
+                    onChangeText={setNewDeviceId}
+                    maxLength={50}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.iconButton,
+                      { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
+                    ]}
+                    onPress={() => setShowQRScanner(true)}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons name="qrcode-scan" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
+                  {t('devices.scanQrHint', 'Scan device QR to select or pair quickly')}
+                </Text>
+                
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t('devices.deviceName')}</Text>
+                <TextInput
+                  style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary, color: colors.text }]}
+                  placeholder={t('devices.deviceNamePlaceholder')}
+                  placeholderTextColor={colors.textSecondary}
+                  value={newDeviceName}
+                  onChangeText={setNewDeviceName}
+                  maxLength={50}
+                />
+                <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
+                  {t('devices.deviceNameHint')}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.addConfirmButton, { backgroundColor: colors.primary }, submitting && { opacity: 0.7 }]}
+                  onPress={async () => {
+                    if (!newDeviceId?.trim()) {
+                      Alert.alert(t('common.error'), t('devices.deviceIdRequired'));
+                      return;
+                    }
                     
-                    const payload = {
-                      deviceId: newDeviceId.trim(),
-                      ownerId: user.id,
-                      name: (newDeviceName || newDeviceId).trim()
-                    };
+                    if (newDeviceId.trim().length < 3) {
+                      Alert.alert(t('common.error'), t('devices.deviceIdTooShort'));
+                      return;
+                    }
                     
-                    const resp = await apiService.post('/api/devices', payload);
+                    if (!user?.id) {
+                      Alert.alert(t('auth.authenticationRequired'), t('devices.loginRequired'));
+                      return;
+                    }
                     
-                    if (resp?.data?.success) {
-                      setFeedback({ 
-                        visible: true, 
-                        type: 'success', 
-                        message: t('devices.deviceAdded') 
-                      });
-                      setShowAddModal(false);
-                      setNewDeviceId('');
-                      setNewDeviceName('');
-                      onSelectDevice && onSelectDevice(payload.deviceId);
-                      onDeviceAdded && onDeviceAdded(resp.data.data);
-                    } else {
+                    try {
+                      setSubmitting(true);
+                      setShowLoader(true);
+                      
+                      const payload = {
+                        deviceId: newDeviceId.trim(),
+                        ownerId: user.id,
+                        name: (newDeviceName || newDeviceId).trim()
+                      };
+                      
+                      const resp = await apiService.post('/api/devices', payload);
+                      
+                      if (resp?.data?.success) {
+                        setFeedback({ 
+                          visible: true, 
+                          type: 'success', 
+                          message: t('devices.deviceAdded') 
+                        });
+                        setShowAddModal(false);
+                        setNewDeviceId('');
+                        setNewDeviceName('');
+                        onSelectDevice && onSelectDevice(payload.deviceId);
+                        onDeviceAdded && onDeviceAdded(resp.data.data);
+                      } else {
+                        setFeedback({ 
+                          visible: true, 
+                          type: 'error', 
+                          message: resp?.data?.message || t('devices.deviceAddError') 
+                        });
+                      }
+                    } catch (e) {
+                      console.error('Add device error:', e);
+                      let errorMessage = t('devices.deviceAddError');
+                      
+                      if (e.response?.status === 400) {
+                        errorMessage = t('devices.deviceIdInvalid');
+                      } else if (e.response?.status === 401) {
+                        errorMessage = t('auth.authenticationFailed');
+                      } else if (e.response?.status === 500) {
+                        errorMessage = t('errors.serverError');
+                      }
+                      
                       setFeedback({ 
                         visible: true, 
                         type: 'error', 
-                        message: resp?.data?.message || t('devices.deviceAddError') 
+                        message: errorMessage 
                       });
+                    } finally {
+                      setSubmitting(false);
+                      setShowLoader(false);
                     }
-                  } catch (e) {
-                    console.error('Add device error:', e);
-                    let errorMessage = t('devices.deviceAddError');
-                    
-                    if (e.response?.status === 400) {
-                      errorMessage = t('devices.deviceIdInvalid');
-                    } else if (e.response?.status === 401) {
-                      errorMessage = t('auth.authenticationFailed');
-                    } else if (e.response?.status === 500) {
-                      errorMessage = t('errors.serverError');
-                    }
-                    
-                    setFeedback({ 
-                      visible: true, 
-                      type: 'error', 
-                      message: errorMessage 
-                    });
-                  } finally {
-                    setSubmitting(false);
-                    setShowLoader(false);
-                  }
-                }}
-                disabled={submitting}
-                activeOpacity={0.9}
-              >
-                {submitting ? (
-                  <ActivityIndicator color={colors.white} />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name="content-save" size={18} color={colors.white} />
-                    <Text style={[styles.addConfirmText, { color: colors.white }]}>{t('devices.addDevice')}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                  }}
+                  disabled={submitting}
+                  activeOpacity={0.9}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color={colors.white} />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="content-save" size={18} color={colors.white} />
+                      <Text style={[styles.addConfirmText, { color: colors.white }]}>{t('devices.addDevice')}</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Global overlays */}
       <OverlayLoader
@@ -387,6 +532,14 @@ const DeviceSelector = ({
         type={feedback.type}
         message={feedback.message}
         onHide={() => setFeedback({ ...feedback, visible: false })}
+      />
+      <QRScannerModal
+        visible={showQRScanner}
+        onClose={() => {
+          if (!processingScan) setShowQRScanner(false);
+        }}
+        onScan={handleQrScanResult}
+        isProcessing={processingScan}
       />
     </View>
   );
@@ -439,8 +592,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
+    paddingHorizontal: 4,
+    borderRadius: 20,
   },
   statusDot: {
     width: 8,
@@ -483,6 +636,22 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 12,
+  },
+  flexInput: {
+    flex: 1,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconButton: {
+    width: 46,
+    height: 46,
+    borderRadius: CONFIG.DIMENSIONS.borderRadius,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addConfirmButton: {
     marginTop: 6,

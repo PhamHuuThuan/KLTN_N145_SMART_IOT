@@ -180,6 +180,7 @@ const RulesScreen = () => {
               setSelectedDevice(deviceId);
             }
           }}
+          showAddButton={false}
         />
       </View>
 

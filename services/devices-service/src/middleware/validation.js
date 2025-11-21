@@ -81,6 +81,7 @@ export const deviceLogSchema = Joi.object({
     humid: Joi.number().min(0).max(100).required(),
     smoke: Joi.number().min(0).max(10000).required(),
     gas_ppm: Joi.number().min(0).max(10000).required(),
+    flame: Joi.boolean().required(),
     o: Joi.object({
       o1: Joi.boolean().default(false),
       o2: Joi.boolean().default(false),
