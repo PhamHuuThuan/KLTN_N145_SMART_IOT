@@ -36,9 +36,14 @@ class RuleConsumer {
             logger.debug(`[${topic}:${partition}] ${logData.deviceId || 'Unknown Device'}`);
 
             if (logData?.type === 'telemetry' && logData.deviceId && logData.payload) {
+              // Pass ownerId to sensorData if available
+              const sensorData = {
+                ...logData.payload,
+                ownerId: logData.ownerId || logData.payload.ownerId
+              };
               await this.ruleEvaluationService.evaluateRules(
                 logData.deviceId,
-                logData.payload
+                sensorData
               );
             } else {
               logger.warn('Skipped: invalid or non-telemetry message');

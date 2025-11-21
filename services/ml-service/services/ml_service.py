@@ -51,10 +51,14 @@ class MLService:
                 if value is None:
                     continue
                 
-                # Process single sensor
-                anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type)
-                sensor_dict = {sensor_type: value}
-                danger_score, is_danger = self.danger_predictor.predict(sensor_dict)
+                try:
+                    # Process single sensor
+                    anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type, device_id=device_id)
+                    sensor_dict = {sensor_type: value}
+                    danger_score, is_danger = self.danger_predictor.predict(sensor_dict)
+                except Exception as sensor_err:
+                    logger.error(f"Error processing sensor {sensor_type} for {device_id}: {sensor_err}", exc_info=True)
+                    continue
                 
                 # Domain rule overrides
                 try:
@@ -118,14 +122,16 @@ class MLService:
                 "max_individual_score": float(max_combined_score),
                 "correlation_risk": float(correlation_risk),
                 "individual_results": individual_results,
-                "timestamp": datetime.now()
+                "timestamp": datetime.now().isoformat()
             }
             
             logger.info(f"MLMultiOutput: {device_id}, overall={overall_score:.3f}, max_indiv={max_combined_score:.3f}, correlation={correlation_risk:.3f}, alert={overall_alert}")
             return result
             
         except Exception as e:
-            logger.error(f"Error processing multi-sensor data: {e}")
+            logger.error(f"Error processing multi-sensor data: {e}", exc_info=True)
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     def _analyze_multi_sensor_correlation(self, sensors: Dict[str, float]) -> float:
@@ -224,7 +230,7 @@ class MLService:
                 return None
             
             # Anomaly detection
-            anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type)
+            anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type, device_id=device_id)
             
             # Danger prediction using all available sensor data
             sensor_dict = {sensor_type: value}
