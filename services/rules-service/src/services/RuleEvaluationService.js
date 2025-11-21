@@ -2,6 +2,7 @@ import Rule from '../models/Rule.js';
 import { Kafka } from 'kafkajs';
 import RulePriorityService from './RulePriorityService.js';
 import logger from '../utils/logger.js';
+import fetch from 'node-fetch';
 
 class RuleEvaluationService {
   constructor() {
@@ -20,6 +21,15 @@ class RuleEvaluationService {
     
     this.lastEvaluationTime = new Map();
     this.evaluationCooldown = 5000; // 5 seconds minimum between evaluations
+
+    // ML support configuration
+    this.mlSupportEnabled = process.env.ML_SUPPORT_ENABLED !== 'false';
+    this.mlSupportThreshold = Number(process.env.ML_SUPPORT_THRESHOLD || '0.8');
+    this.mlServiceUrl = process.env.ML_SERVICE_URL || 'http://localhost:3007';
+    this.mlRequestTimeoutMs = Number(process.env.ML_SUPPORT_TIMEOUT_MS || '1500');
+    
+    // Log ML configuration for debugging
+    logger.info(`ML Support Configuration: enabled=${this.mlSupportEnabled}, url=${this.mlServiceUrl}, threshold=${this.mlSupportThreshold}`);
   }
 
   // Extract sensor info from rule + sensorData
@@ -85,6 +95,9 @@ class RuleEvaluationService {
   // Đánh giá tất cả rules cho một device khi nhận dữ liệu sensor
   async evaluateRules(deviceId, sensorData) {
     try {
+      if (!sensorData.deviceId) {
+        sensorData.deviceId = deviceId;
+      }
       const now = Date.now();
       const lastTime = this.lastEvaluationTime.get(deviceId);
       if (lastTime && (now - lastTime) < this.evaluationCooldown) {
@@ -93,7 +106,8 @@ class RuleEvaluationService {
       
       this.lastEvaluationTime.set(deviceId, now);
 
-      // 🔎 1. Lấy danh sách rule đang hoạt động
+      await this.evaluateMlAnomaly(deviceId, sensorData);
+
       const query = { 
         deviceId, 
         isActive: true,
@@ -103,10 +117,11 @@ class RuleEvaluationService {
       const rules = await Rule.find(query);
       
       if (!rules.length) {
+        // Không có rules nhưng ML đã được đánh giá ở trên
         return;
       }
   
-      // ⚙️ 2. Đánh giá tất cả rule
+      // ⚙️ 3. Đánh giá tất cả rule
       const triggeredRules = await Promise.all(
         rules.map(async rule => {
           try {
@@ -117,7 +132,7 @@ class RuleEvaluationService {
         })
       ).then(results => results.filter(Boolean));
   
-      // 📢 3. Xử lý kết quả theo priority
+      // 📢 4. Xử lý kết quả theo priority
       if (triggeredRules.length > 1) {
         logger.info(`Multiple rules triggered: ${triggeredRules.map(r => r.name).join(', ')}`);
         
@@ -314,7 +329,7 @@ class RuleEvaluationService {
   }
 
   // Đánh giá sensor condition
-  evaluateSensorCondition(condition, sensorData) {
+  async evaluateSensorCondition(condition, sensorData) {
     const { sensor, operator, value } = condition;
     
     // Lấy giá trị sensor từ dữ liệu
@@ -352,7 +367,40 @@ class RuleEvaluationService {
       ? value.map(item => (typeof item === 'string' ? Number(item) : item))
       : (typeof value === 'string' ? Number(value) : value);
 
-    return this.compareValues(sensorValue, operator, normalizedExpected);
+    const thresholdMet = this.compareValues(sensorValue, operator, normalizedExpected);
+
+    if (!this.mlSupportEnabled || !sensorData.deviceId) {
+      return thresholdMet;
+    }
+
+    try {
+      const mlSupport = await this.fetchMlSupport(sensorData.deviceId, sensorData);
+      if (!mlSupport || !mlSupport.predictions) {
+        return thresholdMet;
+      }
+
+      const sensorMl = mlSupport.predictions[sensor];
+      const supportScore = sensorMl?.prediction_score ?? mlSupport.device?.overall_score;
+      const mlAlertLevel = sensorMl?.alert_level ?? mlSupport.device?.alert_level;
+      const mlPromoted = !thresholdMet && typeof supportScore === 'number' && supportScore >= this.mlSupportThreshold;
+
+      if (mlPromoted) {
+        logger.info(`ML support promoted condition for ${sensorData.deviceId}:${sensor} (score=${supportScore})`);
+      }
+
+      this.attachMlMetadata(sensorData, sensor, {
+        score: supportScore,
+        alertLevel: mlAlertLevel,
+        promoted: mlPromoted,
+        thresholdMet,
+      });
+      logger.info(`ML support promoted condition for ${sensorData.deviceId}:${sensor} (score=${supportScore}) and promoted=${mlPromoted}`);
+
+      return thresholdMet || mlPromoted;
+    } catch (error) {
+      logger.warn(`ML support check failed: ${error.message}`);
+      return thresholdMet;
+    }
   }
 
   /**
@@ -489,7 +537,8 @@ class RuleEvaluationService {
           sensorType: sensorType,
           sensorValue: sensorValue,
           threshold: threshold,
-          operator: operator
+          operator: operator,
+          mlSupport: sensorData.__mlMeta?.[sensorType] || null
         }
       };
       await this.sendToAlertsService(message);
@@ -525,7 +574,8 @@ class RuleEvaluationService {
       ruleName: rule.name,
       message: action.message || (sensorType === 'flame'
         ? `Cảm biến lửa phát hiện ngọn lửa (Giá trị: ${sensorValue})`
-        : `Alert: ${rule.name} triggered`)
+        : `Alert: ${rule.name} triggered`),
+      mlSupport: sensorData.__mlMeta?.[sensorType] || null
     };
 
     try {
@@ -637,6 +687,229 @@ class RuleEvaluationService {
       }
     }
     return result;
+  }
+
+  buildMlPayload(deviceId, sensorData) {
+    if (!deviceId) {
+      return null;
+    }
+    const payload = {};
+    const keys = ['temp', 'humid', 'smoke', 'gas_ppm', 'gas'];
+    for (const key of keys) {
+      const value = sensorData[key];
+      // Chỉ thêm giá trị nếu là số hợp lệ (không phải null, undefined, NaN)
+      if (value !== undefined && value !== null && !isNaN(value) && typeof value === 'number') {
+        payload[key] = value;
+      }
+    }
+    if (Object.keys(payload).length === 0) {
+      logger.debug(`No valid sensor values for ML payload: deviceId=${deviceId}, sensorData keys=${Object.keys(sensorData).join(',')}`);
+      return null;
+    }
+    return {
+      doc: {
+        deviceId,
+        payload
+      }
+    };
+  }
+
+  async fetchMlSupport(deviceId, sensorData) {
+    if (!this.mlSupportEnabled) {
+      return null;
+    }
+    sensorData.__mlSupportCache = sensorData.__mlSupportCache || {};
+    if (sensorData.__mlSupportCache.fetched) {
+      return sensorData.__mlSupportCache.result;
+    }
+
+    const body = this.buildMlPayload(deviceId, sensorData);
+    if (!body) {
+      sensorData.__mlSupportCache.fetched = true;
+      sensorData.__mlSupportCache.result = null;
+      return null;
+    }
+
+    const url = `${this.mlServiceUrl}/api/ml/predict/event/aggregate?compact=true&include_details=true`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.mlRequestTimeoutMs);
+
+    try {
+      logger.debug(`ML request to ${url}: payload=${JSON.stringify(body)}`);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        // Try to get error details from response
+        let errorDetail = `ML service ${response.status}`;
+        try {
+          const errorBody = await response.text();
+          if (errorBody) {
+            errorDetail += `: ${errorBody}`;
+          }
+        } catch (e) {
+          // Ignore error reading response body
+        }
+        throw new Error(errorDetail);
+      }
+
+      const data = await response.json();
+      sensorData.__mlSupportCache.result = {
+        device: data.device,
+        predictions: data.predictions || {}
+      };
+      sensorData.__mlSupportCache.fetched = true;
+      return sensorData.__mlSupportCache.result;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        logger.warn(`ML support timeout for ${deviceId}`);
+      } else {
+        logger.warn(`ML support request failed for ${deviceId}: ${error.message}`);
+      }
+      sensorData.__mlSupportCache.result = null;
+      sensorData.__mlSupportCache.fetched = true;
+      return null;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  attachMlMetadata(sensorData, sensorType, meta) {
+    sensorData.__mlMeta = sensorData.__mlMeta || {};
+    sensorData.__mlMeta[sensorType] = {
+      score: meta.score,
+      alertLevel: meta.alertLevel,
+      promoted: meta.promoted,
+      thresholdMet: meta.thresholdMet,
+      timestamp: Date.now()
+    };
+  }
+
+  async evaluateMlAnomaly(deviceId, sensorData) {
+    if (!this.mlSupportEnabled || !deviceId) {
+      return;
+    }
+
+    try {
+      const mlResult = await this.fetchMlSupport(deviceId, sensorData);
+      if (!mlResult || !mlResult.predictions) {
+        return;
+      }
+
+      const deviceScore = mlResult.device?.overall_score;
+      const deviceAlertLevel = mlResult.device?.alert_level;
+      
+      // Chỉ gửi cảnh báo nếu ML phát hiện anomaly nghiêm trọng
+      // (score >= threshold và alert_level là 'high' hoặc 'critical')
+      const shouldAlert = deviceScore >= this.mlSupportThreshold && 
+                         (deviceAlertLevel === 'high' || deviceAlertLevel === 'critical');
+
+      if (!shouldAlert) {
+        logger.debug(`ML anomaly detected but below alert threshold for ${deviceId}: score=${deviceScore}, level=${deviceAlertLevel}`);
+        return;
+      }
+
+      // Tìm sensor có anomaly score cao nhất
+      let maxScore = 0;
+      let maxSensor = null;
+      let maxSensorValue = null;
+
+      for (const [sensor, prediction] of Object.entries(mlResult.predictions)) {
+        const score = prediction.prediction_score || 0;
+        if (score > maxScore) {
+          maxScore = score;
+          maxSensor = sensor;
+          // Lấy giá trị sensor tương ứng
+          switch (sensor) {
+            case 'temperature':
+              maxSensorValue = sensorData.temp;
+              break;
+            case 'humidity':
+              maxSensorValue = sensorData.humid;
+              break;
+            case 'gas_ppm':
+              maxSensorValue = sensorData.gas_ppm;
+              break;
+            case 'smoke':
+              maxSensorValue = sensorData.smoke;
+              break;
+            case 'flame':
+              maxSensorValue = sensorData.flame;
+              break;
+            default:
+              maxSensorValue = null;
+          }
+        }
+      }
+
+      // Lấy ownerId từ sensorData hoặc skip nếu không có
+      const ownerId = sensorData.ownerId;
+      if (!ownerId) {
+        logger.warn(`ML anomaly detected for ${deviceId} but no ownerId available, skipping alert`);
+        return;
+      }
+
+      // Xác định mức độ nghiêm trọng
+      const isCritical = deviceAlertLevel === 'critical' || 
+                        (maxSensor === 'gas_ppm' && maxSensorValue > 1000) ||
+                        (maxSensor === 'flame' && maxSensorValue) ||
+                        (maxSensor === 'smoke' && maxSensorValue > 500);
+
+      const title = isCritical 
+        ? `🚨 CẢNH BÁO KHẨN CẤP: Phát hiện bất thường từ hệ thống nhận diện thông minh`
+        : `⚠️ Cảnh báo: Phát hiện bất thường từ hệ thống nhận diện thông minh`;
+
+      const sensorNameMap = {
+        'temperature': 'Nhiệt độ',
+        'humidity': 'Độ ẩm',
+        'gas_ppm': 'Khí gas',
+        'smoke': 'Khói',
+        'flame': 'Lửa'
+      };
+
+      const sensorName = sensorNameMap[maxSensor] || maxSensor;
+      const message = `Hệ thống nhận diện thông minh đã phát hiện dữ liệu bất thường từ cảm biến ${sensorName}.\n\n` +
+                     `Giá trị: ${maxSensorValue !== null ? maxSensorValue : 'N/A'}\n` +
+                     `Độ tin cậy: ${(maxScore * 100).toFixed(1)}%\n` +
+                     `Mức độ: ${deviceAlertLevel === 'critical' ? 'Nghiêm trọng' : deviceAlertLevel === 'high' ? 'Cao' : 'Trung bình'}\n` +
+                     `Thời gian: ${new Date().toLocaleString('vi-VN')}\n\n` +
+                     `${isCritical ? '🚨 Cần kiểm tra ngay lập tức!' : '⚠️ Vui lòng kiểm tra thiết bị.'}`;
+
+      const alertMessage = {
+        userId: ownerId,
+        title: title,
+        message: message,
+        type: isCritical ? 'security_alert' : 'device_alert',
+        category: isCritical ? 'security' : 'ml_anomaly',
+        priority: isCritical ? 'urgent' : 'high',
+        metadata: {
+          deviceId: deviceId,
+          deviceName: sensorData.deviceName || `Device ${deviceId}`,
+          source: 'ml_anomaly_detection',
+          mlData: {
+            overallScore: deviceScore,
+            alertLevel: deviceAlertLevel,
+            predictions: mlResult.predictions,
+            primaryAnomaly: {
+              sensor: maxSensor,
+              value: maxSensorValue,
+              score: maxScore
+            }
+          },
+          sensorData: sensorData
+        }
+      };
+
+      await this.sendToAlertsService(alertMessage);
+      logger.info(`ML anomaly alert sent for ${deviceId}: score=${deviceScore}, level=${deviceAlertLevel}, sensor=${maxSensor}`);
+
+    } catch (error) {
+      logger.warn(`ML anomaly evaluation failed for ${deviceId}: ${error.message}`);
+    }
   }
 
 }
