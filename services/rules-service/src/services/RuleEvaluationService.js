@@ -106,8 +106,6 @@ class RuleEvaluationService {
       
       this.lastEvaluationTime.set(deviceId, now);
 
-      await this.evaluateMlAnomaly(deviceId, sensorData);
-
       const query = { 
         deviceId, 
         isActive: true,
@@ -115,25 +113,24 @@ class RuleEvaluationService {
       };
       
       const rules = await Rule.find(query);
-      
-      if (!rules.length) {
-        // Không có rules nhưng ML đã được đánh giá ở trên
-        return;
+  
+      let triggeredRules = [];
+      if (rules.length > 0) {
+        triggeredRules = await Promise.all(
+          rules.map(async rule => {
+            try {
+              return (await this.evaluateRule(rule, sensorData)) ? rule : null;
+            } catch (err) {
+              return null;
+            }
+          })
+        ).then(results => results.filter(Boolean));
       }
   
-      // ⚙️ 3. Đánh giá tất cả rule
-      const triggeredRules = await Promise.all(
-        rules.map(async rule => {
-          try {
-            return (await this.evaluateRule(rule, sensorData)) ? rule : null;
-          } catch (err) {
-            return null;
-          }
-        })
-      ).then(results => results.filter(Boolean));
-  
-      // 📢 4. Xử lý kết quả theo priority
+      // 📢 Xử lý kết quả theo priority
+      let hasRuleTriggered = false;
       if (triggeredRules.length > 1) {
+        hasRuleTriggered = true;
         logger.info(`Multiple rules triggered: ${triggeredRules.map(r => r.name).join(', ')}`);
         
         // Sắp xếp theo priority: urgent → high → medium → low
@@ -159,12 +156,19 @@ class RuleEvaluationService {
         }
         
       } else if (triggeredRules.length === 1) {
+        hasRuleTriggered = true;
         logger.info(`Single rule triggered: ${triggeredRules[0].name}`);
         
         // Send individual notification for single rule
         const rule = triggeredRules[0];
         await this.executeActions(rule, sensorData).catch(err => {});
         logger.info(`Single rule alert sent - Rule: ${rule.name}`);
+      }
+
+      if (!hasRuleTriggered) {
+        await this.evaluateMlAnomaly(deviceId, sensorData);
+      } else {
+        logger.debug(`Skipping ML anomaly alert for ${deviceId} - rule(s) already triggered`);
       }
     } catch (err) {
       logger.error(`evaluateRules() error for device ${deviceId}:`, err);
