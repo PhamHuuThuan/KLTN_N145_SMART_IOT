@@ -3,6 +3,7 @@ import { OUTLET_TYPES } from '../constants/outletTypes.js';
 import DeviceLog from '../models/DeviceLog.js';
 import { producer } from '../config/kafka.js';
 import logger from '../utils/logger.js';
+import { activateEmergencyMode, cancelAutoEmergency } from '../services/autoEmergencyScheduler.js';
 
 // Check device ownership
 const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
@@ -368,66 +369,22 @@ export const enterEmergencyMode = async (req, res) => {
     }
     
     const device = ownershipCheck.device;
-    device.enterEmergencyMode();
-    await device.save();
     
-  try {
-    const timeoutMs = Number(process.env.KAFKA_SEND_TIMEOUT_MS || 1500);
-    const sendTasks = device.outlets.map((o) => {
-      const outletId = o.id;
-      const outletName = o.name;
-      const status = !!o.status;
-      const sendPromise = producer.send({
-        topic: 'outlet.toggled',
-        messages: [{
-          key: deviceId,
-          value: JSON.stringify({
-            userId: device.ownerId,
-            deviceId,
-            deviceName: device.name,
-            outletId,
-            outletName,
-            status,
-            action: 'outlet_toggled',
-            result: 'success',
-            reason: 'emergency_mode',
-            timestamp: new Date()
-          })
-        }]
-      });
-      return Promise.race([
-        sendPromise,
-        new Promise((resolve) => setTimeout(() => resolve('timeout'), timeoutMs))
-      ]).catch((err) => {
-        logger.error('Kafka send error in emergency dispatch (non-fatal):', err?.message || err);
-      });
+    cancelAutoEmergency(deviceId, 'manual_activation');
+
+    const updatedDevice = await activateEmergencyMode(device, {
+      reason: req.body?.reason || 'manual_activation',
+      triggeredBy: 'manual',
+      initiatedBy: userId,
+      metadata: {
+        source: 'api_enter_emergency',
+        triggeredByUser: userId
+      }
     });
-    await Promise.all(sendTasks);
-  } catch (dispatchError) {
-    logger.error('Error dispatching emergency outlet toggles:', dispatchError);
-  }
-  
-    producer.send({
-      topic: 'user-actions',
-      messages: [{
-        key: deviceId,
-        value: JSON.stringify({
-          userId: device.ownerId,
-          deviceId,
-          deviceName: device.name,
-          action: 'emergency_mode_activated',
-          result: 'success',
-          timestamp: new Date(),
-          reason: 'manual_activation'
-        })
-      }]
-    }).catch((kafkaError) => {
-      logger.error('Failed to publish emergency mode activation event to Kafka:', kafkaError);
-    });
-    
+
     res.json({
       success: true,
-      data: device,
+      data: updatedDevice,
       message: 'Emergency mode activated successfully'
     });
   } catch (error) {
@@ -458,6 +415,7 @@ export const exitEmergencyMode = async (req, res) => {
     }
     
     const device = ownershipCheck.device;
+    cancelAutoEmergency(deviceId, 'manual_exit');
     device.exitEmergencyMode();
     await device.save();
     

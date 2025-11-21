@@ -1,6 +1,7 @@
 import { Kafka } from 'kafkajs';
 import Device from '../models/Device.js';
 import logger from '../utils/logger.js';
+import { scheduleAutoEmergency } from '../services/autoEmergencyScheduler.js';
 
 const kafka = new Kafka({
   clientId: 'devices-status-consumer',
@@ -18,15 +19,22 @@ const consumer = kafka.consumer({
   heartbeatInterval: 3000
 });
 
+const TEMP_EMERGENCY_THRESHOLD = Number(process.env.EMERGENCY_AUTO_TEMP_THRESHOLD || 80);
+const EMERGENCY_SENSOR_TYPES = new Set(['gas_ppm', 'gas', 'smoke', 'flame']);
+const AUTO_EMERGENCY_TOPICS = ['device-alerts', 'iot.alerts.ml'];
+const LEGACY_TOPICS = ['device.status.updated', 'outlet.toggled'];
+
 async function startDeviceStatusConsumer() {
   try {
     await consumer.connect();
 
-    await consumer.subscribe({ 
-      topics: [
-      ],
-      fromBeginning: false 
-    });
+    const topicsToSubscribe = [...new Set([...AUTO_EMERGENCY_TOPICS, ...LEGACY_TOPICS])];
+    for (const topic of topicsToSubscribe) {
+      await consumer.subscribe({
+        topic,
+        fromBeginning: false
+      });
+    }
 
     await consumer.run({
       autoCommit: true,
@@ -41,6 +49,15 @@ async function startDeviceStatusConsumer() {
             case 'device.status.updated':
               logger.info(`Handling device status update`);
               await handleDeviceStatusUpdate(messageData);
+              break;
+            case 'outlet.toggled':
+              await handleOutletToggle(messageData);
+              break;
+            case 'device-alerts':
+              await handleDeviceAlert(messageData);
+              break;
+            case 'iot.alerts.ml':
+              await handleMlAlert(messageData);
               break;
             default:
               logger.info(`Unknown topic: ${topic}`);
@@ -137,6 +154,94 @@ async function handleOutletToggle(data) {
       stack: error.stack,
       data
     });
+  }
+}
+
+function isEmergencyAlert(message) {
+  if (!message) return false;
+
+  const priority = String(message.priority || '').toLowerCase();
+  const category = String(message.category || '').toLowerCase();
+  if (priority === 'urgent' || category === 'security') {
+    return true;
+  }
+
+  const sensorType = String(message.sensorType || '').toLowerCase();
+  if (EMERGENCY_SENSOR_TYPES.has(sensorType)) {
+    return true;
+  }
+
+  if (sensorType === 'temperature') {
+    const sensorValue = Number(message.sensorValue);
+    return !Number.isNaN(sensorValue) && sensorValue >= TEMP_EMERGENCY_THRESHOLD;
+  }
+
+  return false;
+}
+
+async function handleDeviceAlert(message) {
+  try {
+    if (!message?.deviceId) {
+      logger.warn('Device alert missing deviceId, skipping auto emergency scheduling', { message });
+      return;
+    }
+
+    if (!isEmergencyAlert(message)) {
+      logger.debug('Device alert is not emergency-grade, skipping auto schedule', {
+        deviceId: message.deviceId,
+        priority: message.priority,
+        category: message.category,
+        sensorType: message.sensorType
+      });
+      return;
+    }
+
+    scheduleAutoEmergency({
+      deviceId: message.deviceId,
+      userId: message.userId,
+      reason: `alert_${message.sensorType || 'security'}`,
+      triggeredBy: 'rule_alert',
+      source: 'device-alerts',
+      metadata: {
+        ruleId: message.ruleId,
+        ruleName: message.ruleName,
+        sensorType: message.sensorType,
+        sensorValue: message.sensorValue,
+        threshold: message.threshold,
+        alertType: message.alertType,
+        priority: message.priority,
+        category: message.category
+      }
+    });
+  } catch (error) {
+    logger.error('handleDeviceAlert failed:', error);
+  }
+}
+
+async function handleMlAlert(message) {
+  try {
+    const deviceId = message?.device_id || message?.deviceId;
+    if (!deviceId) {
+      logger.warn('ML alert missing deviceId, skipping', { message });
+      return;
+    }
+
+    const alertLevel = String(message.alert_level || '').toLowerCase();
+    if (!['critical', 'high'].includes(alertLevel)) {
+      logger.debug('ML alert level below emergency threshold', { deviceId, alertLevel });
+      return;
+    }
+
+    scheduleAutoEmergency({
+      deviceId,
+      userId: message.userId,
+      reason: `ml_${alertLevel}`,
+      triggeredBy: 'ml_alert',
+      source: 'iot.alerts.ml',
+      metadata: message
+    });
+  } catch (error) {
+    logger.error('handleMlAlert failed:', error);
   }
 }
 
