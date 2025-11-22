@@ -141,19 +141,44 @@ services:
       - NODE_ENV=production
       - LOG_LEVEL=info
       - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
-      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:-http://host.docker.internal:4001}
+      - AUTH_SERVICE_URL=http://auth-service:4001
       - DEVICES_SERVICE_URL=http://devices-service:3001
       - RULES_SERVICE_URL=${RULES_SERVICE_URL:-http://34.171.183.30:3003}
       - ALERTS_SERVICE_URL=${ALERTS_SERVICE_URL:-http://34.171.183.30:3004}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - smart-iot-network
     depends_on:
+      - auth-service
       - devices-service
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+    container_name: smart-iot-auth-service
+    ports:
+      - "4001:4001"
+    environment:
+      - PORT=4001
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb-auth:27017/smart_iot_auth
+      - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
+      - MQTT_HOST=${VPS1_IP:-34.59.250.63}
+      - MQTT_PORT=1883
+    networks:
+      - smart-iot-network
+    depends_on:
+      - mongodb-auth
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
       timeout: 10s
       retries: 3
