@@ -79,7 +79,7 @@ class SensorConsumer:
                             'is_danger': result.get('is_danger'),
                             'correlation_risk': result.get('correlation_risk'),
                             'max_individual_score': result.get('max_individual_score'),
-                            'timestamp': result.get('timestamp').isoformat() if result.get('timestamp') else None
+                            'timestamp': result.get('timestamp') if result.get('timestamp') else None
                         }
 
                         # Optional: include top sensors for explainability (top 2 by combined_score)

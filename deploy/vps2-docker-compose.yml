@@ -47,8 +47,10 @@ services:
     networks:
       - smart-iot-network
     depends_on:
-      - mongodb-rules
-      - ml-service
+      mongodb-rules:
+        condition: service_healthy
+      ml-service:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
