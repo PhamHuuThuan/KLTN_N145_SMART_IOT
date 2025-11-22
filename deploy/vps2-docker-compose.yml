@@ -1,0 +1,63 @@
+version: '3.8'
+
+networks:
+  smart-iot-network:
+    driver: bridge
+
+services:
+  mongodb-rules:
+    image: mongo:7
+    container_name: smart-iot-mongodb-rules
+    ports:
+      - "27020:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=smart_iot
+    volumes:
+      - mongodb_rules_data:/data/db
+    networks:
+      - smart-iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ML Service
+  ml-service:
+    build:
+      context: ../services/ml-service
+      dockerfile: Dockerfile
+    container_name: smart-iot-ml-service
+    ports:
+      - "3007:3007"
+    environment:
+      - PORT=3007
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI:-mongodb://${VPS1_IP:-localhost}:27017/smart_iot}
+      - KAFKA_ENABLED=true
+      - KAFKA_BROKERS=${VPS1_IP:-34.59.250.63}:29092
+      - KAFKA_GROUP_ID=ml-service-group
+      - KAFKA_TOPICS=iot.telemetry.logs,iot.events.logs
+      - MODEL_SAVE_DIR=./models
+      - RETRAIN_INTERVAL_HOURS=24
+      - PREDICTION_THRESHOLD=0.7
+      - ANOMALY_THRESHOLD=0.85
+      - FALSE_ALERT_THRESHOLD=0.3
+      - ALERT_COOLDOWN_MINUTES=5
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ml_models:/app/models
+    networks:
+      - smart-iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mongodb_rules_data:
+  ml_models:
+
