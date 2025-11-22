@@ -42,6 +42,8 @@ services:
       - ML_SUPPORT_THRESHOLD=0.8
       - ML_SUPPORT_TIMEOUT_MS=1500
       - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
+    extra_hosts:
+      - "kafka:34.59.250.63"
     networks:
       - smart-iot-network
     depends_on:
@@ -82,6 +84,8 @@ services:
       - FCM_PROJECT_ID=${FCM_PROJECT_ID:-}
       - FCM_PRIVATE_KEY=${FCM_PRIVATE_KEY:-}
       - FCM_CLIENT_EMAIL=${FCM_CLIENT_EMAIL:-}
+    extra_hosts:
+      - "kafka:34.59.250.63"
     networks:
       - smart-iot-network
     restart: unless-stopped
@@ -116,6 +120,8 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://34.59.250.63:3000,http://localhost:3000}
     volumes:
       - ml_models:/app/models
+    extra_hosts:
+      - "kafka:34.59.250.63"
     networks:
       - smart-iot-network
     restart: unless-stopped
