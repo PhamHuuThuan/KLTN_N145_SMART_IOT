@@ -8,7 +8,7 @@ const PADDING_X = 50;
 const PADDING_Y = 40; 
 const PADDING_BOTTOM = 20;
 const PADDING_LEFT = 10;
-const MAX_POINTS = 500;
+const MAX_POINTS = 800; // Increased for better detail on longer time ranges
 const MIN_HEIGHT = 120;
 const TOUCH_TOLERANCE = 30;
 const Y_AXIS_LABELS = 5;
@@ -87,70 +87,20 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       let ts = timestamps;
       let gapPoints = isGapPoints;
       if (numeric.length > MAX_POINTS) {
-        // Peak-preserving downsampling: preserve min/max in each segment
+        // Use simple step sampling for all cases (faster performance)
         const targetPoints = MAX_POINTS;
-        const segmentSize = Math.ceil(numeric.length / targetPoints);
+        const step = Math.ceil(numeric.length / targetPoints);
         const tmp = [];
         const tmpTs = [];
         const tmpGaps = [];
         
-        // Always include first point
-        tmp.push(numeric[0]);
-        tmpTs.push(timestamps[0]);
-        tmpGaps.push(isGapPoints[0]);
-        
-        for (let i = segmentSize; i < numeric.length; i += segmentSize) {
-          const segmentStart = i - segmentSize;
-          const segmentEnd = Math.min(i, numeric.length - 1);
-          
-          // Find min and max in this segment
-          let segmentMin = numeric[segmentStart];
-          let segmentMax = numeric[segmentStart];
-          let minIdx = segmentStart;
-          let maxIdx = segmentStart;
-          
-          for (let j = segmentStart + 1; j <= segmentEnd; j++) {
-            if (numeric[j] < segmentMin) {
-              segmentMin = numeric[j];
-              minIdx = j;
-            }
-            if (numeric[j] > segmentMax) {
-              segmentMax = numeric[j];
-              maxIdx = j;
-            }
-          }
-          
-          // Add min and max points (if different)
-          if (minIdx !== maxIdx) {
-            // Add the one that comes first
-            if (minIdx < maxIdx) {
-              tmp.push(numeric[minIdx]);
-              tmpTs.push(timestamps[minIdx]);
-              tmpGaps.push(isGapPoints[minIdx]);
-              if (maxIdx <= segmentEnd) {
-                tmp.push(numeric[maxIdx]);
-                tmpTs.push(timestamps[maxIdx]);
-                tmpGaps.push(isGapPoints[maxIdx]);
-              }
-            } else {
-              tmp.push(numeric[maxIdx]);
-              tmpTs.push(timestamps[maxIdx]);
-              tmpGaps.push(isGapPoints[maxIdx]);
-              if (minIdx <= segmentEnd) {
-                tmp.push(numeric[minIdx]);
-                tmpTs.push(timestamps[minIdx]);
-                tmpGaps.push(isGapPoints[minIdx]);
-              }
-            }
-          } else {
-            // Min and max are the same point, just add it once
-            tmp.push(numeric[minIdx]);
-            tmpTs.push(timestamps[minIdx]);
-            tmpGaps.push(isGapPoints[minIdx]);
-          }
+        for (let i = 0; i < numeric.length; i += step) {
+          tmp.push(numeric[i]);
+          tmpTs.push(timestamps[i]);
+          tmpGaps.push(isGapPoints[i]);
         }
         
-        // Always include last point if not already included
+        // Always include last point
         if (tmp[tmp.length - 1] !== numeric[numeric.length - 1]) {
           tmp.push(numeric[numeric.length - 1]);
           tmpTs.push(timestamps[timestamps.length - 1]);
@@ -220,70 +170,20 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       let finalTimestamps = timestamps;
       let finalIsGapPoints = isGapPoints || [];
       if (values.length > maxPointsForWidth) {
-        // Peak-preserving downsampling: preserve min/max in each segment
+        // Use simple step sampling for all cases (faster performance)
         const targetPoints = maxPointsForWidth;
-        const segmentSize = Math.ceil(values.length / targetPoints);
+        const step = Math.ceil(values.length / targetPoints);
         const tmp = [];
         const tmpTs = [];
         const tmpGaps = [];
         
-        // Always include first point
-        tmp.push(values[0]);
-        tmpTs.push(timestamps[0]);
-        tmpGaps.push(isGapPoints[0] || false);
-        
-        for (let i = segmentSize; i < values.length; i += segmentSize) {
-          const segmentStart = i - segmentSize;
-          const segmentEnd = Math.min(i, values.length - 1);
-          
-          // Find min and max in this segment
-          let segmentMin = values[segmentStart];
-          let segmentMax = values[segmentStart];
-          let minIdx = segmentStart;
-          let maxIdx = segmentStart;
-          
-          for (let j = segmentStart + 1; j <= segmentEnd; j++) {
-            if (values[j] < segmentMin) {
-              segmentMin = values[j];
-              minIdx = j;
-            }
-            if (values[j] > segmentMax) {
-              segmentMax = values[j];
-              maxIdx = j;
-            }
-          }
-          
-          // Add min and max points (if different)
-          if (minIdx !== maxIdx) {
-            // Add the one that comes first
-            if (minIdx < maxIdx) {
-              tmp.push(values[minIdx]);
-              tmpTs.push(timestamps[minIdx]);
-              tmpGaps.push(isGapPoints[minIdx] || false);
-              if (maxIdx <= segmentEnd) {
-                tmp.push(values[maxIdx]);
-                tmpTs.push(timestamps[maxIdx]);
-                tmpGaps.push(isGapPoints[maxIdx] || false);
-              }
-            } else {
-              tmp.push(values[maxIdx]);
-              tmpTs.push(timestamps[maxIdx]);
-              tmpGaps.push(isGapPoints[maxIdx] || false);
-              if (minIdx <= segmentEnd) {
-                tmp.push(values[minIdx]);
-                tmpTs.push(timestamps[minIdx]);
-                tmpGaps.push(isGapPoints[minIdx] || false);
-              }
-            }
-          } else {
-            // Min and max are the same point, just add it once
-            tmp.push(values[minIdx]);
-            tmpTs.push(timestamps[minIdx]);
-            tmpGaps.push(isGapPoints[minIdx] || false);
-          }
+        for (let i = 0; i < values.length; i += step) {
+          tmp.push(values[i]);
+          tmpTs.push(timestamps[i]);
+          tmpGaps.push(isGapPoints[i] || false);
         }
         
-        // Always include last point if not already included
+        // Always include last point
         if (tmp[tmp.length - 1] !== values[values.length - 1]) {
           tmp.push(values[values.length - 1]);
           tmpTs.push(timestamps[timestamps.length - 1]);
