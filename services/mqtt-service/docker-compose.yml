@@ -59,7 +59,7 @@ services:
       CONNECT_GROUP_ID: "mqtt-connect-group"
       CONNECT_CONFIG_STORAGE_TOPIC: "mqtt-connect-configs"
       CONNECT_OFFSET_STORAGE_TOPIC: "mqtt-connect-offsets"
-      CONNECT_STATUS_STORATION_TOPIC: "mqtt-connect-status"
+      CONNECT_STATUS_STORAGE_TOPIC: "mqtt-connect-status"
       CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
       CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
       CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
@@ -69,6 +69,9 @@ services:
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
     volumes:
       - ./kafka-connect-plugins:/usr/share/confluent-hub-components
+    networks:
+      - default
+      - smart-iot-kafka-network
     restart: unless-stopped
 
   # Redis (for caching MQTT messages and session management)
