@@ -6,9 +6,12 @@ import fetch from 'node-fetch';
 
 class RuleEvaluationService {
   constructor() {
+    const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:29092').split(',').map(b => b.trim());
+    logger.info(`Kafka brokers (producer) configured: ${JSON.stringify(kafkaBrokers)}`);
+    
     this.kafka = new Kafka({
       clientId: 'rules-service',
-      brokers: (process.env.KAFKA_BROKERS || 'localhost:29092').split(','),
+      brokers: kafkaBrokers,
       retry: {
         initialRetryTime: 100,
         retries: 8
