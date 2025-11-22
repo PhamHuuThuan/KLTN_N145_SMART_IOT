@@ -23,6 +23,72 @@ services:
       timeout: 5s
       retries: 5
 
+  # Rules Service
+  rules-service:
+    build:
+      context: ../services/rules-service
+      dockerfile: Dockerfile
+    container_name: smart-iot-rules-service
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://${VPS1_IP:-34.59.250.63}:27017/smart_iot
+      - KAFKA_BROKERS=${VPS1_IP:-34.59.250.63}:29092
+      - ML_SERVICE_URL=http://ml-service:3007
+      - ML_SUPPORT_ENABLED=true
+      - ML_SUPPORT_THRESHOLD=0.8
+      - ML_SUPPORT_TIMEOUT_MS=1500
+      - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
+    networks:
+      - smart-iot-network
+    depends_on:
+      - ml-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Alerts Service
+  alerts-service:
+    build:
+      context: ../services/alerts-service
+      dockerfile: Dockerfile
+    container_name: smart-iot-alerts-service
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://${VPS1_IP:-34.59.250.63}:27019/smart_iot_alerts
+      - KAFKA_BROKERS=${VPS1_IP:-34.59.250.63}:29092
+      - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
+      - APP_URL=http://${VPS1_IP:-34.59.250.63}:3000
+      - ALLOWED_ORIGINS=http://${VPS1_IP:-34.59.250.63}:3000,http://localhost:3000
+      - LOG_LEVEL=info
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=100
+      # Email (optional - set nếu có)
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      # FCM (optional - set nếu có)
+      - FCM_PROJECT_ID=${FCM_PROJECT_ID:-}
+      - FCM_PRIVATE_KEY=${FCM_PRIVATE_KEY:-}
+      - FCM_CLIENT_EMAIL=${FCM_CLIENT_EMAIL:-}
+    networks:
+      - smart-iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3004/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # ML Service
   ml-service:
     build:
