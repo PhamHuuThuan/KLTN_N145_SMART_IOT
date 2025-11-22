@@ -213,6 +213,7 @@ class DangerPredictor:
         """
         try:
             if not self.is_trained:
+                logger.debug("Danger predictor not trained yet, returning default score")
                 return 0.5, False
             
             # Convert sensor data to feature vector
@@ -221,8 +222,12 @@ class DangerPredictor:
             if feature_vector is None:
                 return 0.5, False
             
-            # Scale features
-            feature_vector_scaled = self.scaler.transform([feature_vector])
+            # Scale features (only if scaler is fitted)
+            if not hasattr(self.scaler, 'mean_') or self.scaler.mean_ is None:
+                logger.warning("Scaler not fitted yet, using raw features")
+                feature_vector_scaled = [feature_vector]
+            else:
+                feature_vector_scaled = self.scaler.transform([feature_vector])
             
             # Get predictions from both models
             gb_proba = self.gradient_boosting.predict_proba(feature_vector_scaled)[0]
