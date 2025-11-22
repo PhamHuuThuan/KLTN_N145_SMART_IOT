@@ -36,7 +36,7 @@ services:
       - PORT=3003
       - NODE_ENV=production
       - MONGODB_URI=mongodb://mongodb-rules:27017/smart_iot_rules
-      - KAFKA_BROKERS=${VPS1_IP:-34.59.250.63}:29092
+      - KAFKA_BROKERS=34.59.250.63:29092
       - ML_SERVICE_URL=http://ml-service:3007
       - ML_SUPPORT_ENABLED=true
       - ML_SUPPORT_THRESHOLD=0.8
@@ -65,11 +65,11 @@ services:
     environment:
       - PORT=3004
       - NODE_ENV=production
-      - MONGODB_URI=mongodb://${VPS1_IP:-34.59.250.63}:27019/smart_iot_alerts
-      - KAFKA_BROKERS=${VPS1_IP:-34.59.250.63}:29092
+      - MONGODB_URI=mongodb://34.59.250.63:27019/smart_iot_alerts
+      - KAFKA_BROKERS=34.59.250.63:29092
       - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
-      - APP_URL=http://${VPS1_IP:-34.59.250.63}:3000
-      - ALLOWED_ORIGINS=http://${VPS1_IP:-34.59.250.63}:3000,http://localhost:3000
+      - APP_URL=http://34.59.250.63:3000
+      - ALLOWED_ORIGINS=http://34.59.250.63:3000,http://localhost:3000
       - LOG_LEVEL=info
       - RATE_LIMIT_WINDOW_MS=900000
       - RATE_LIMIT_MAX_REQUESTS=100
@@ -102,9 +102,9 @@ services:
     environment:
       - PORT=3007
       - NODE_ENV=production
-      - MONGODB_URI=${MONGODB_URI:-mongodb://${VPS1_IP:-34.59.250.63}:27021/smart_iot_ml}
+      - MONGODB_URI=mongodb://34.59.250.63:27021/smart_iot_ml
       - KAFKA_ENABLED=true
-      - KAFKA_BROKERS=${VPS1_IP:-34.59.250.63}:29092
+      - KAFKA_BROKERS=34.59.250.63:29092
       - KAFKA_GROUP_ID=ml-service-group
       - KAFKA_TOPICS=iot.telemetry.logs,iot.events.logs
       - MODEL_SAVE_DIR=./models
