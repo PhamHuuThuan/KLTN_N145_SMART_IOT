@@ -212,7 +212,11 @@ class DangerPredictor:
         Returns: (danger_score, is_danger)
         """
         try:
-            if not self.is_trained:
+            # Check if models are actually trained (not just flag)
+            gb_trained = hasattr(self.gradient_boosting, 'n_estimators') and self.gradient_boosting.n_estimators > 0
+            nn_trained = hasattr(self.neural_network, 'coefs_') and self.neural_network.coefs_ is not None
+            
+            if not self.is_trained or not gb_trained or not nn_trained:
                 logger.debug("Danger predictor not trained yet, returning default score")
                 return 0.5, False
             
@@ -229,9 +233,18 @@ class DangerPredictor:
             else:
                 feature_vector_scaled = self.scaler.transform([feature_vector])
             
-            # Get predictions from both models
-            gb_proba = self.gradient_boosting.predict_proba(feature_vector_scaled)[0]
-            nn_proba = self.neural_network.predict_proba(feature_vector_scaled)[0]
+            # Get predictions from both models (only if trained)
+            try:
+                gb_proba = self.gradient_boosting.predict_proba(feature_vector_scaled)[0]
+            except Exception as gb_err:
+                logger.warning(f"GradientBoosting not ready: {gb_err}, using default")
+                gb_proba = [0.5, 0.5]
+            
+            try:
+                nn_proba = self.neural_network.predict_proba(feature_vector_scaled)[0]
+            except Exception as nn_err:
+                logger.warning(f"NeuralNetwork not ready: {nn_err}, using default")
+                nn_proba = [0.5, 0.5]
             
             # Ensemble prediction (weighted average)
             danger_score = (0.6 * gb_proba[1] + 0.4 * nn_proba[1])
