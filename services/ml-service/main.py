@@ -97,11 +97,13 @@ app_state = {}
 async def health_check():
     """Health check endpoint - must return 200 OK"""
     try:
-        # Simple health check - just verify service is running
+
+        ml_ready = ml_service_instance is not None
         return {
-            "status": "healthy",
+            "status": "healthy" if ml_ready else "starting",
             "service": "ml-service",
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "ml_initialized": ml_ready
         }
     except Exception as e:
         logger.error(f"Health check error: {e}")
