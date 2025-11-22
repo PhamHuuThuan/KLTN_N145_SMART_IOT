@@ -99,5 +99,5 @@ volumes:
 networks:
   default:
     name: mqtt-service-network
-  smart-iot-kafka-network:
+  deploy_smart-iot-network:
     external: true
