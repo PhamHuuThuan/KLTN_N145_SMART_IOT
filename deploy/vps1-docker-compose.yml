@@ -65,12 +65,12 @@ services:
 
   # Kafka Message Broker
   kafka:
-    image: bitnami/kafka:latest
+    image: bitnamilegacy/kafka:3.3.1-debian-11-r9
     container_name: smart-iot-kafka
     restart: unless-stopped
     ports:
-      - "9092:9092"    # Internal
-      - "29092:29092"  # External
+      - "9092:9092"
+      - "29092:29092"
     environment:
       - KAFKA_ENABLE_KRAFT=yes
       - KAFKA_CFG_PROCESS_ROLES=broker,controller
