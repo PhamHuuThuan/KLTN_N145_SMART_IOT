@@ -84,23 +84,28 @@ services:
 
   # Kafka Message Broker
   kafka:
-    image: bitnamilegacy/kafka:3.3.1-debian-11-r9
+    image: bitnami/kafka:3.7
     container_name: smart-iot-kafka
     restart: unless-stopped
     ports:
       - "9092:9092"
       - "29092:29092"
     environment:
+      # KRaft mode configuration
       - KAFKA_ENABLE_KRAFT=yes
       - KAFKA_CFG_PROCESS_ROLES=broker,controller
       - KAFKA_CFG_NODE_ID=1
+      # Listeners
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://${VPS1_IP:-localhost}:29092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      # Controller configuration
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      # Cluster ID for KRaft
       - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+      # Topic configuration
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
       - KAFKA_CFG_LOG_RETENTION_HOURS=168
       - KAFKA_CFG_NUM_PARTITIONS=3
@@ -113,6 +118,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 60s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
