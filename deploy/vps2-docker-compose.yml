@@ -5,13 +5,14 @@ networks:
     driver: bridge
 
 services:
+  # MongoDB cho Rules Service
   mongodb-rules:
     image: mongo:7
     container_name: smart-iot-mongodb-rules
     ports:
       - "27020:27017"
     environment:
-      - MONGO_INITDB_DATABASE=smart_iot
+      - MONGO_INITDB_DATABASE=smart_iot_rules
     volumes:
       - mongodb_rules_data:/data/db
     networks:
@@ -34,7 +35,7 @@ services:
     environment:
       - PORT=3003
       - NODE_ENV=production
-      - MONGODB_URI=mongodb://${VPS1_IP:-34.59.250.63}:27017/smart_iot
+      - MONGODB_URI=mongodb://mongodb-rules:27017/smart_iot_rules
       - KAFKA_BROKERS=${VPS1_IP:-34.59.250.63}:29092
       - ML_SERVICE_URL=http://ml-service:3007
       - ML_SUPPORT_ENABLED=true
@@ -44,6 +45,7 @@ services:
     networks:
       - smart-iot-network
     depends_on:
+      - mongodb-rules
       - ml-service
     restart: unless-stopped
     healthcheck:
@@ -100,7 +102,7 @@ services:
     environment:
       - PORT=3007
       - NODE_ENV=production
-      - MONGODB_URI=${MONGODB_URI:-mongodb://${VPS1_IP:-localhost}:27017/smart_iot}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://${VPS1_IP:-34.59.250.63}:27021/smart_iot_ml}
       - KAFKA_ENABLED=true
       - KAFKA_BROKERS=${VPS1_IP:-34.59.250.63}:29092
       - KAFKA_GROUP_ID=ml-service-group
@@ -111,7 +113,7 @@ services:
       - ANOMALY_THRESHOLD=0.85
       - FALSE_ALERT_THRESHOLD=0.3
       - ALERT_COOLDOWN_MINUTES=5
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://34.59.250.63:3000,http://localhost:3000}
     volumes:
       - ml_models:/app/models
     networks:
@@ -122,6 +124,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
 volumes:
   mongodb_rules_data:

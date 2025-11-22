@@ -5,17 +5,17 @@ networks:
     driver: bridge
 
 services:
-  # MongoDB Database - Chính (dùng chung cho tất cả services)
-  mongodb:
+  # MongoDB cho Devices Service
+  mongodb-devices:
     image: mongo:7
-    container_name: smart-iot-mongodb
+    container_name: smart-iot-mongodb-devices
     ports:
       - "27017:27017"
     environment:
-      - MONGO_INITDB_DATABASE=smart_iot
+      - MONGO_INITDB_DATABASE=smart_iot_devices
     volumes:
-      - mongodb_data:/data/db
-      - mongodb_config:/data/configdb
+      - mongodb_devices_data:/data/db
+      - mongodb_devices_config:/data/configdb
     networks:
       - smart-iot-network
     restart: unless-stopped
@@ -25,14 +25,14 @@ services:
       timeout: 5s
       retries: 5
 
-  # MongoDB cho Auth Service (optional - có thể dùng chung mongodb ở trên)
+  # MongoDB cho Auth Service
   mongodb-auth:
     image: mongo:7
     container_name: smart-iot-mongodb-auth
     ports:
       - "27018:27017"
     environment:
-      - MONGO_INITDB_DATABASE=smart_iot
+      - MONGO_INITDB_DATABASE=smart_iot_auth
     volumes:
       - mongodb_auth_data:/data/db
     networks:
@@ -54,6 +54,25 @@ services:
       - MONGO_INITDB_DATABASE=smart_iot_alerts
     volumes:
       - mongodb_alerts_data:/data/db
+    networks:
+      - smart-iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB cho ML Service
+  mongodb-ml:
+    image: mongo:7
+    container_name: smart-iot-mongodb-ml
+    ports:
+      - "27021:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=smart_iot_ml
+    volumes:
+      - mongodb_ml_data:/data/db
     networks:
       - smart-iot-network
     restart: unless-stopped
@@ -150,18 +169,20 @@ services:
     environment:
       - PORT=3001
       - NODE_ENV=production
-      - MONGODB_URI=mongodb://mongodb:27017/smart_iot
+      - MONGODB_URI=mongodb://mongodb-devices:27017/smart_iot_devices
       - KAFKA_BROKERS=kafka:9092
       - MQTT_BROKER_URL=mqtt://host.docker.internal:1883
       - MQTT_TOPIC_PREFIX=iot
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
       - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=100
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
       - smart-iot-network
     depends_on:
-      - mongodb
+      - mongodb-devices
       - kafka
     restart: unless-stopped
     healthcheck:
@@ -171,10 +192,11 @@ services:
       retries: 3
 
 volumes:
-  mongodb_data:
-  mongodb_config:
+  mongodb_devices_data:
+  mongodb_devices_config:
   mongodb_auth_data:
   mongodb_alerts_data:
+  mongodb_ml_data:
   kafka_data:
   redis_data:
 
