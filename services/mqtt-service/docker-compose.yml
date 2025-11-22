@@ -46,33 +46,33 @@ services:
   #   restart: unless-stopped
 
   # MQTT Bridge to Kafka (Optional - for integration with devices-service)
-  mqtt-kafka-bridge:
-    image: confluentinc/cp-kafka-connect:7.4.0
-    container_name: mqtt-kafka-bridge
-    depends_on:
-      - mosquitto
-    ports:
-      - "8083:8083"
-    environment:
-      CONNECT_BOOTSTRAP_SERVERS: "kafka:9092"
-      CONNECT_REST_PORT: 8083
-      CONNECT_GROUP_ID: "mqtt-connect-group"
-      CONNECT_CONFIG_STORAGE_TOPIC: "mqtt-connect-configs"
-      CONNECT_OFFSET_STORAGE_TOPIC: "mqtt-connect-offsets"
-      CONNECT_STATUS_STORAGE_TOPIC: "mqtt-connect-status"
-      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
-      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
-      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
-      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
-      CONNECT_LOG4J_ROOT_LOGLEVEL: "INFO"
-      CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.apache.kafka.clients=WARN"
-      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
-    volumes:
-      - ./kafka-connect-plugins:/usr/share/confluent-hub-components
-    networks:
-      - default
-      - smart-iot-kafka-network
-    restart: unless-stopped
+  # mqtt-kafka-bridge:
+  #   image: confluentinc/cp-kafka-connect:7.4.0
+  #   container_name: mqtt-kafka-bridge
+  #   depends_on:
+  #     - mosquitto
+  #   ports:
+  #     - "8083:8083"
+  #   environment:
+  #     CONNECT_BOOTSTRAP_SERVERS: "kafka:9092"
+  #     CONNECT_REST_PORT: 8083
+  #     CONNECT_GROUP_ID: "mqtt-connect-group"
+  #     CONNECT_CONFIG_STORAGE_TOPIC: "mqtt-connect-configs"
+  #     CONNECT_OFFSET_STORAGE_TOPIC: "mqtt-connect-offsets"
+  #     CONNECT_STATUS_STORAGE_TOPIC: "mqtt-connect-status"
+  #     CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+  #     CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+  #     CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+  #     CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+  #     CONNECT_LOG4J_ROOT_LOGLEVEL: "INFO"
+  #     CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.apache.kafka.clients=WARN"
+  #     CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+  #   volumes:
+  #     - ./kafka-connect-plugins:/usr/share/confluent-hub-components
+  #   networks:
+  #     - default
+  #     - smart-iot-kafka-network
+  #   restart: unless-stopped
 
   # Redis (for caching MQTT messages and session management)
   redis:
