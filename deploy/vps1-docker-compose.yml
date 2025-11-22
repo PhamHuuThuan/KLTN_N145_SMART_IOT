@@ -65,7 +65,7 @@ services:
 
   # Kafka Message Broker
   kafka:
-    image: bitnami/kafka:3.7
+    image: bitnami/kafka:3.7.0
     container_name: smart-iot-kafka
     restart: unless-stopped
     ports:
