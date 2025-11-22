@@ -86,10 +86,14 @@ function startMqtt() {
       const deviceId = topicParts[1];
       const messageType = topicParts[2];
       
-      // Validate deviceId from database
-      const isValidDevice = await deviceService.isValidDevice(deviceId);
-      if (!isValidDevice) {
-        return;
+      // Validate deviceId from database (skip if validation disabled)
+      const validationEnabled = process.env.DEVICE_VALIDATION_ENABLED === 'true';
+      if (validationEnabled) {
+        const isValidDevice = await deviceService.isValidDevice(deviceId);
+        if (!isValidDevice) {
+          logger.warn(`Device validation failed for ${deviceId}, skipping message`);
+          return;
+        }
       }
       
       let data;
@@ -132,11 +136,15 @@ function startMqtt() {
         mqttEvents.emit('sensorData', deviceData);
         mqttEvents.emit('deviceData', { deviceId, data: deviceData });
 
-        // Get device info to get ownerId
-        const deviceInfo = await deviceService.getDevice(deviceId);
-        const ownerId = deviceInfo?.ownerId; // Fallback to known ownerId
+        // Get device info to get ownerId (skip if validation disabled for better performance)
+        // ownerId will be set by devices-service when processing from Kafka
+        let ownerId = null;
+        if (validationEnabled) {
+          const deviceInfo = await deviceService.getDevice(deviceId);
+          ownerId = deviceInfo?.ownerId;
+        }
 
-        // Publish to Kafka 
+        // Publish to Kafka (let devices-service handle device creation/validation) 
         const telemetryData = {
           type: 'telemetry',
           deviceId: deviceId,
@@ -172,9 +180,12 @@ function startMqtt() {
         logger.info(`ACK received from ${deviceId}:`, data);
         mqttEvents.emit('ack', data);
         
-        // Get device info to get ownerId
-        const deviceInfo = await deviceService.getDevice(deviceId);
-        const ownerId = deviceInfo?.ownerId;
+        // Get device info to get ownerId (skip if validation disabled)
+        let ownerId = null;
+        if (validationEnabled) {
+          const deviceInfo = await deviceService.getDevice(deviceId);
+          ownerId = deviceInfo?.ownerId;
+        }
         
         // Publish ACK event to Kafka with outlet info if available
         const ackData = {
