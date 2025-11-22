@@ -738,51 +738,81 @@ class RuleEvaluationService {
     }
 
     const url = `${this.mlServiceUrl}/api/ml/predict/event/aggregate?compact=true&include_details=true`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.mlRequestTimeoutMs);
+    
+    // Retry logic for connection issues
+    let lastError = null;
+    const maxRetries = 2;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.mlRequestTimeoutMs);
 
-    try {
-      logger.debug(`ML request to ${url}: payload=${JSON.stringify(body)}`);
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-
-      if (!response.ok) {
-        // Try to get error details from response
-        let errorDetail = `ML service ${response.status}`;
-        try {
-          const errorBody = await response.text();
-          if (errorBody) {
-            errorDetail += `: ${errorBody}`;
-          }
-        } catch (e) {
-          // Ignore error reading response body
+      try {
+        if (attempt > 0) {
+          logger.debug(`ML request retry ${attempt}/${maxRetries} to ${url}`);
+          await new Promise(resolve => setTimeout(resolve, 500 * attempt)); // Exponential backoff
+        } else {
+          logger.debug(`ML request to ${url}: payload=${JSON.stringify(body)}`);
         }
-        throw new Error(errorDetail);
-      }
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
 
-      const data = await response.json();
-      sensorData.__mlSupportCache.result = {
-        device: data.device,
-        predictions: data.predictions || {}
-      };
-      sensorData.__mlSupportCache.fetched = true;
-      return sensorData.__mlSupportCache.result;
-    } catch (error) {
-      if (error.name === 'AbortError') {
+        if (!response.ok) {
+          // Try to get error details from response
+          let errorDetail = `ML service ${response.status}`;
+          try {
+            const errorBody = await response.text();
+            if (errorBody) {
+              errorDetail += `: ${errorBody}`;
+            }
+          } catch (e) {
+            // Ignore error reading response body
+          }
+          throw new Error(errorDetail);
+        }
+
+        const data = await response.json();
+        sensorData.__mlSupportCache.result = {
+          device: data.device,
+          predictions: data.predictions || {}
+        };
+        sensorData.__mlSupportCache.fetched = true;
+        return sensorData.__mlSupportCache.result;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        lastError = error;
+        
+        // Retry on connection errors
+        if (attempt < maxRetries && (
+          error.message.includes('ECONNREFUSED') ||
+          error.message.includes('fetch failed') ||
+          error.name === 'AbortError'
+        )) {
+          continue; // Retry
+        }
+        
+        // Don't retry on other errors
+        throw error;
+      }
+    }
+    
+    // If we get here, all retries failed
+    if (lastError) {
+      if (lastError.name === 'AbortError') {
         logger.warn(`ML support timeout for ${deviceId}`);
       } else {
-        logger.warn(`ML support request failed for ${deviceId}: ${error.message}`);
+        logger.warn(`ML support request failed for ${deviceId}: ${lastError.message}`);
       }
-      sensorData.__mlSupportCache.result = null;
-      sensorData.__mlSupportCache.fetched = true;
-      return null;
-    } finally {
-      clearTimeout(timeoutId);
     }
+    sensorData.__mlSupportCache.result = null;
+    sensorData.__mlSupportCache.fetched = true;
+    return null;
   }
 
   attachMlMetadata(sensorData, sensorType, meta) {
