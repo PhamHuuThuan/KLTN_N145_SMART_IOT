@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Global services
 ml_service_instance = None
 consumer_instance = None
+app_state = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,14 +48,25 @@ async def lifespan(app: FastAPI):
         router = setup_routes(ml_service_instance)
         app.include_router(router)
 
-        # Optionally start Kafka consumer
+        logger.info("✅ ML Service initialized - FastAPI ready to accept requests")
+        
+        # Optionally start Kafka consumer (non-blocking, can start after uvicorn is ready)
         kafka_enabled = os.getenv("KAFKA_ENABLED", "false").lower() == "true"
         if kafka_enabled:
-            consumer_instance = SensorConsumer(ml_service_instance)
-            await consumer_instance.start()
-            brokers = os.getenv("KAFKA_BROKERS", "localhost:29092")
-            topics = os.getenv("KAFKA_TOPICS", "iot.telemetry.logs,iot.events.logs")
-            logger.info(f"✅ Kafka consumer enabled. Brokers={brokers}, Topics={topics}")
+            # Start Kafka consumer in background (don't block uvicorn startup)
+            import asyncio
+            async def start_kafka_consumer():
+                try:
+                    consumer_instance = SensorConsumer(ml_service_instance)
+                    await consumer_instance.start()
+                    brokers = os.getenv("KAFKA_BROKERS", "localhost:29092")
+                    topics = os.getenv("KAFKA_TOPICS", "iot.telemetry.logs,iot.events.logs")
+                    logger.info(f"✅ Kafka consumer enabled. Brokers={brokers}, Topics={topics}")
+                except Exception as kafka_err:
+                    logger.error(f"Kafka consumer startup error: {kafka_err}")
+            
+            # Start Kafka consumer as background task
+            asyncio.create_task(start_kafka_consumer())
         else:
             logger.info("Kafka consumer disabled. Set KAFKA_ENABLED=true to enable.")
 
@@ -89,8 +101,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Store app-level dependencies  
-app_state = {}
+# app_state already defined at top
 
 # Health check endpoint - MUST be defined early and always return 200
 @app.get("/health")
