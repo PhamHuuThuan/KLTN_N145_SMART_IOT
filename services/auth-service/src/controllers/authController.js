@@ -205,11 +205,7 @@ export const updateProfile = async (req, res) => {
     if (phone !== undefined) updateData.phone = phone;
     if (avatar !== undefined) updateData.avatar = avatar;
 
-    const user = await User.findByIdAndUpdate(
-      payload.sub,
-      updateData,
-      { new: true, select: '-passwordHash' }
-    );
+    const user = await User.findOneAndUpdate({ userId: payload.sub }, updateData, { new: true, select: '-passwordHash' });
 
     if (!user) {
       return res.status(404).json({ error: 'user_not_found' });
@@ -255,7 +251,9 @@ export const changePassword = async (req, res) => {
       return res.status(400).json({ error: 'new_password_must_be_at_least_6_characters' });
     }
 
-    const user = await User.findById(payload.sub);
+    // payload.sub is userId string, payload.id is MongoDB ObjectId
+    const user = await User.findOne({ userId: payload.sub });
+    
     if (!user) {
       return res.status(404).json({ error: 'user_not_found' });
     }
@@ -269,8 +267,7 @@ export const changePassword = async (req, res) => {
     // Hash new password
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
     
-    // Update password
-    await User.findByIdAndUpdate(payload.sub, { passwordHash: newPasswordHash });
+    await User.findOneAndUpdate({ userId: payload.sub }, { passwordHash: newPasswordHash });
 
     res.json({
       message: 'Password changed successfully'
