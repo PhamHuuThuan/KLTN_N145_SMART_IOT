@@ -4,6 +4,9 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import connectDB from './config/database.js';
 import ruleRoutes from './routes/ruleRoutes.js';
+import adminRuleRoutes from './routes/adminRuleRoutes.js';
+import adminTemplateRoutes from './routes/adminTemplateRoutes.js';
+import templateRoutes from './routes/templateRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import RuleConsumer from './consumers/RuleConsumer.js';
 import logger from './utils/logger.js';
@@ -21,6 +24,9 @@ function createServer() {
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
   app.use('/api/rules', ruleRoutes);
+  app.use('/api/templates', templateRoutes);
+  app.use('/api/admin/rules', adminRuleRoutes);
+  app.use('/api/admin/templates', adminTemplateRoutes);
   app.get('/', (_req, res) => res.json({ service: 'rules-service' }));
 
   app.use(notFound);
