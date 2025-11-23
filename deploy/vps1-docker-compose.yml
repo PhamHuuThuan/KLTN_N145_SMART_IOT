@@ -207,7 +207,7 @@ services:
       - MQTT_PORT=1883
       - MQTT_WS_PORT=9001
       - TOPIC_PREFIX=iot
-      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_BROKERS=smart-iot-kafka:29092
       - REDIS_HOST=host.docker.internal
       - REDIS_PORT=6379
       - DEVICE_SERVICE_URL=http://devices-service:3001
@@ -244,7 +244,7 @@ services:
       - PORT=3001
       - NODE_ENV=production
       - MONGODB_URI=mongodb://mongodb-devices:27017/smart_iot_devices
-      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_BROKERS=smart-iot-kafka:29092
       - MQTT_BROKER_URL=mqtt://host.docker.internal:1883
       - MQTT_TOPIC_PREFIX=iot
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
