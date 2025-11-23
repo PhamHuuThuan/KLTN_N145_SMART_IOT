@@ -230,6 +230,56 @@ class RulesService {
     }
   }
 
+  // Get all templates (public endpoint, no auth required)
+  async getTemplates(language = 'vi') {
+    try {
+      this.log.info('Fetching templates from API, language:', language);
+      
+      const response = await fetch(`${this.baseURL}/api/templates?language=${language}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.log.error('Templates API error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      this.log.debug('Templates loaded successfully:', Object.keys(data?.data || {}).length, 'templates');
+      return data;
+    } catch (error) {
+      this.log.error('Error fetching templates:', error);
+      throw error;
+    }
+  }
+
+  // Get template by key (public endpoint, no auth required)
+  async getTemplateByKey(templateKey, language = 'vi') {
+    try {
+      const response = await fetch(`${this.baseURL}/api/templates/${templateKey}?language=${language}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      this.log.error('Error fetching template:', error);
+      throw error;
+    }
+  }
+
 }
 
 export default new RulesService();
