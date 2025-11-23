@@ -8,7 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from services.ml_service import MLService
 from controllers.ml_controller import setup_routes
-from consumers.sensor_consumer import SensorConsumer
+# Kafka consumer disabled
+# from consumers.sensor_consumer import SensorConsumer
 
 # Load .env if available (optional)
 try:
@@ -28,13 +29,12 @@ logger = logging.getLogger(__name__)
 
 # Global services
 ml_service_instance = None
-consumer_instance = None
 app_state = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events for startup and shutdown"""
-    global ml_service_instance, consumer_instance
+    global ml_service_instance
     
     # Startup
     logger.info("🚀 Starting ML Service...")
@@ -50,25 +50,8 @@ async def lifespan(app: FastAPI):
 
         logger.info("✅ ML Service initialized - FastAPI ready to accept requests")
         
-        # Optionally start Kafka consumer (non-blocking, can start after uvicorn is ready)
-        kafka_enabled = os.getenv("KAFKA_ENABLED", "false").lower() == "true"
-        if kafka_enabled:
-            # Start Kafka consumer in background (don't block uvicorn startup)
-            import asyncio
-            async def start_kafka_consumer():
-                try:
-                    consumer_instance = SensorConsumer(ml_service_instance)
-                    await consumer_instance.start()
-                    brokers = os.getenv("KAFKA_BROKERS", "localhost:29092")
-                    topics = os.getenv("KAFKA_TOPICS", "iot.telemetry.logs,iot.events.logs")
-                    logger.info(f"✅ Kafka consumer enabled. Brokers={brokers}, Topics={topics}")
-                except Exception as kafka_err:
-                    logger.error(f"Kafka consumer startup error: {kafka_err}")
-            
-            # Start Kafka consumer as background task
-            asyncio.create_task(start_kafka_consumer())
-        else:
-            logger.info("Kafka consumer disabled. Set KAFKA_ENABLED=true to enable.")
+        # Kafka consumer disabled - ML service only accepts HTTP API requests
+        logger.info("Kafka consumer disabled - ML service operates via HTTP API only")
 
         logger.info("✅ ML Service started successfully (minimal)")
         
@@ -79,8 +62,6 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("🛑 Shutting down ML Service...")
-    if consumer_instance:
-        await consumer_instance.stop()
     logger.info("✅ ML Service shut down")
 
 # Create FastAPI app

@@ -110,11 +110,9 @@ services:
       - PORT=3007
       - NODE_ENV=production
       - MONGODB_URI=mongodb://34.59.250.63:27021/smart_iot_ml
-      - KAFKA_ENABLED=true
-      - KAFKA_BROKERS=34.59.250.63:9092
-      - KAFKA_GROUP_ID=ml-service-group
-      - KAFKA_TOPICS=iot.telemetry.logs,iot.events.logs
+      - KAFKA_ENABLED=false
       - MODEL_SAVE_DIR=./models
+      # Kafka config removed - ML service operates via HTTP API only
       - RETRAIN_INTERVAL_HOURS=24
       - PREDICTION_THRESHOLD=0.7
       - ANOMALY_THRESHOLD=0.85
@@ -123,8 +121,6 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://34.59.250.63:3000,http://localhost:3000}
     volumes:
       - ml_models:/app/models
-    extra_hosts:
-      - "kafka:34.59.250.63"
     networks:
       - smart-iot-network
     restart: unless-stopped
