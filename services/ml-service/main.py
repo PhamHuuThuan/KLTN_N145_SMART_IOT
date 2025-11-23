@@ -92,33 +92,16 @@ app.add_middleware(
 # Store app-level dependencies  
 app_state = {}
 
-# Health check endpoint
+# Health check endpoint - MUST be defined early and always return 200
 @app.get("/health")
-async def health_check():
-    """Health check endpoint - must return 200 OK"""
-    try:
-        # Check if ML service is initialized (from app_state or global)
-        ml_ready = (
-            ml_service_instance is not None or 
-            app_state.get('ml_service') is not None
-        )
-        
-        # If service is running and processing messages, it's healthy
-        # (Even if ml_service_instance is None due to timing, service is functional)
-        return {
-            "status": "healthy",
-            "service": "ml-service",
-            "version": "1.0.0",
-            "ml_initialized": ml_ready
-        }
-    except Exception as e:
-        logger.error(f"Health check error: {e}")
-        # Still return 200 to avoid healthcheck failure
-        return {
-            "status": "healthy",  # Return healthy even on error to avoid false negatives
-            "service": "ml-service",
-            "error": str(e)
-        }
+def health_check():
+    """Health check endpoint - must return 200 OK immediately"""
+    # Always return healthy - service is running if this endpoint is accessible
+    return {
+        "status": "healthy",
+        "service": "ml-service",
+        "version": "1.0.0"
+    }
 
 # Root endpoint
 @app.get("/")
