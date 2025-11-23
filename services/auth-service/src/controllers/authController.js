@@ -27,10 +27,11 @@ export const register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const userId = User.generateUserId();
     const user = await User.create({ userId, email, passwordHash, name, phone, avatar });
-    const token = signToken({ 
-      sub: user.userId, 
+    const token = signToken({
+      sub: user.userId,
       id: user._id.toString(),
-      email 
+      email: user.email,
+      role: user.role || 'user'
     });
 
     // Fire-and-forget: initialize notification preferences in alerts-service
@@ -135,7 +136,8 @@ export const login = async (req, res) => {
     const token = signToken({ 
       sub: user.userId, 
       id: user._id.toString(),
-      email 
+      email: user.email,
+      role: user.role || 'user'
     });
 
     res.json({
@@ -325,10 +327,9 @@ export const changePassword = async (req, res) => {
     if (newPassword.length < 6) {
       return res.status(400).json({ error: 'new_password_must_be_at_least_6_characters' });
     }
-
-    // payload.sub is userId string, payload.id is MongoDB ObjectId
+    // payload.sub is userId string (format: user_xxx)
     const user = await User.findOne({ userId: payload.sub });
-    
+
     if (!user) {
       return res.status(404).json({ error: 'user_not_found' });
     }
@@ -341,7 +342,8 @@ export const changePassword = async (req, res) => {
 
     // Hash new password
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
-    
+
+    // Update password
     await User.findOneAndUpdate({ userId: payload.sub }, { passwordHash: newPasswordHash });
 
     res.json({

@@ -102,13 +102,14 @@ export const getDeviceById = async (req, res) => {
 export const createDevice = async (req, res) => {
   try {
     const userId = req.user.sub;
+    const userRole = req.user.role || 'user';
     const {
       deviceId,
       name,
       outlets
     } = req.body;
     
-    logger.info(`Creating device ${deviceId} for user ${userId}`);
+    logger.info(`Creating device ${deviceId} for user ${userId} (role: ${userRole})`);
     
     const existingDevice = await Device.findOne({ deviceId });
     if (existingDevice) {
@@ -119,7 +120,9 @@ export const createDevice = async (req, res) => {
         });
       }
       
-      existingDevice.ownerId = userId;
+      if (userRole !== 'admin') {
+        existingDevice.ownerId = userId;
+      }
       existingDevice.name = name || existingDevice.name;
       await existingDevice.save();
       
@@ -140,7 +143,7 @@ export const createDevice = async (req, res) => {
     
     const device = new Device({
       deviceId,
-      ownerId: userId,
+      ownerId: userRole === 'admin' ? null : userId,
       name,
       outlets: defaultOutlets
     });
@@ -574,4 +577,3 @@ export const updateOutletSettings = async (req, res) => {
     });
   }
 };
-
