@@ -139,10 +139,8 @@ function startMqtt() {
         // Get device info to get ownerId (skip if validation disabled for better performance)
         // ownerId will be set by devices-service when processing from Kafka
         let ownerId = null;
-        if (validationEnabled) {
-          const deviceInfo = await deviceService.getDevice(deviceId);
-          ownerId = deviceInfo?.ownerId;
-        }
+        const deviceInfo = await deviceService.getDevice(deviceId);
+        ownerId = deviceInfo?.ownerId;
 
         // Publish to Kafka (let devices-service handle device creation/validation) 
         const telemetryData = {
