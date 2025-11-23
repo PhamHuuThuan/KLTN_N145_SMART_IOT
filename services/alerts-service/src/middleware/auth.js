@@ -75,7 +75,8 @@ export const checkResourceAccess = (resourceParam = 'userId') => {
     }
 
     const userId = req.params[resourceParam];
-    const currentUserId = req.user.sub || req.user.userId || req.user.id;
+    const currentUserId = req.user.sub;
+    const currentUserObjectId = req.user._id;
 
     // Admin can access all resources
     if (req.user.role === 'admin') {
@@ -89,8 +90,13 @@ export const checkResourceAccess = (resourceParam = 'userId') => {
     }
 
     // User can only access their own resources
-    if (currentUserId !== userId) {
-      logger.warn(`Access denied: User ${currentUserId} trying to access ${userId}'s resource`);
+    const isMatch = currentUserId === userId || 
+                    currentUserObjectId === userId ||
+                    String(currentUserId) === String(userId) ||
+                    String(currentUserObjectId) === String(userId);
+
+    if (!isMatch) {
+      logger.warn(`Access denied: User ${currentUserId} (ObjectId: ${currentUserObjectId}) trying to access ${userId}'s resource`);
       return res.status(403).json({
         success: false,
         message: 'Access denied: You can only access your own resources'

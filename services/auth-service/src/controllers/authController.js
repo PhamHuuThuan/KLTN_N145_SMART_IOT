@@ -27,7 +27,11 @@ export const register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const userId = User.generateUserId();
     const user = await User.create({ userId, email, passwordHash, name, phone, avatar });
-    const token = signToken({ sub: user.userId, email });
+    const token = signToken({ 
+      sub: user.userId, 
+      id: user._id.toString(),
+      email 
+    });
 
     // Fire-and-forget: initialize notification preferences in alerts-service
     (async () => {
@@ -125,7 +129,11 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'invalid_credentials' });
     }
 
-    const token = signToken({ sub: user.userId, email });
+    const token = signToken({ 
+      sub: user.userId, 
+      id: user._id.toString(), // Add MongoDB ObjectId for compatibility
+      email 
+    });
 
     res.json({
       token,
