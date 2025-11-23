@@ -180,6 +180,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
       - MQTT_HOST=${VPS1_IP:-34.59.250.63}
       - MQTT_PORT=1883
+      - ALERTS_SERVICE_URL=http://34.171.183.30:3004
     networks:
       - smart-iot-network
     depends_on:
