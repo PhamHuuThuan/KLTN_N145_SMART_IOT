@@ -19,6 +19,10 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
       setListening(true);
     };
     
+    const onSpeechEnd = () => {
+      // Keep listening active for continuous recognition
+    };
+    
     const onSpeechError = (e) => {
       const msg = e?.error?.message || 'Speech error';
       setError(msg);
