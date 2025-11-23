@@ -50,7 +50,7 @@ services:
       mongodb-rules:
         condition: service_healthy
       ml-service:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
@@ -95,7 +95,8 @@ services:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3004/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 40s
 
   # ML Service
   ml-service:
@@ -128,11 +129,11 @@ services:
       - smart-iot-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3007/health || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 10
-      start_period: 120s
+      test: ["CMD-SHELL", "curl -sf http://localhost:3007/health > /dev/null || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   mongodb_rules_data:
