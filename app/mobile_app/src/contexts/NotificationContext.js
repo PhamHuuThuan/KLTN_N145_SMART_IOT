@@ -218,6 +218,7 @@ export const NotificationProvider = ({ children }) => {
     const connectSocket = () => {
       try {
         const gatewayUrl = ENV.getApiUrl('GATEWAY');
+        log.info('[NotifContext] Connecting WebSocket to:', gatewayUrl);
         
         socket = io(gatewayUrl, {
           path: '/ws/notifications',
@@ -345,11 +346,30 @@ export const NotificationProvider = ({ children }) => {
         });
 
         socket.on('error', (error) => {
-          log.error('WebSocket error', error?.message || error);
+          log.error('[NotifContext] WebSocket error:', {
+            message: error?.message,
+            name: error?.name,
+            description: error?.description,
+            type: error?.type,
+            stack: error?.stack,
+            rawError: error
+          });
         });
 
         socket.on('connect_error', (error) => {
-          log.error('WebSocket connect_error', error?.message || error);
+          log.error('[NotifContext] WebSocket connect_error:', {
+            message: error?.message,
+            name: error?.name,
+            description: error?.description,
+            type: error?.type,
+            stack: error?.stack,
+            code: error?.code,
+            errno: error?.errno,
+            syscall: error?.syscall,
+            address: error?.address,
+            port: error?.port,
+            rawError: error
+          });
         });
 
       } catch (error) {

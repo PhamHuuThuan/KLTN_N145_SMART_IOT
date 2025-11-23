@@ -4,9 +4,13 @@ import logger from '../utils/logger.js';
 
 class RuleConsumer {
   constructor() {
+    const kafkaBrokers = (process.env.KAFKA_BROKERS || 'localhost:29092').split(',').map(b => b.trim());
+    logger.info(`Kafka brokers configured: ${JSON.stringify(kafkaBrokers)}`);
+    logger.info(`KAFKA_BROKERS env: ${process.env.KAFKA_BROKERS || 'NOT SET'}`);
+    
     this.kafka = new Kafka({
       clientId: 'rules-service-consumer',
-      brokers: (process.env.KAFKA_BROKERS || 'localhost:29092').split(','),
+      brokers: kafkaBrokers,
       retry: { initialRetryTime: 100, retries: 8 },
     });
 

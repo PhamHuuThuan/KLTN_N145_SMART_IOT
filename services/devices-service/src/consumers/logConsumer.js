@@ -219,6 +219,14 @@ async function startLogConsumer() {
               const payload = logData.payload || {};
               const lastPayload = lastLog.payload || {};
               
+              const currentTime = payload.ts || Date.now();
+              const lastTime = lastPayload.ts || lastLog.createdAt?.getTime() || Date.now();
+              const timeDiffSeconds = Math.abs(currentTime - lastTime) / 1000;
+              
+              if (timeDiffSeconds >= 180) {
+                return true;
+              }
+              
               const tempDiff = Math.abs((payload.temp || 0) - (lastPayload.temp || 0));
               const humidDiff = Math.abs((payload.humid || 0) - (lastPayload.humid || 0));
               const gasDiff = Math.abs((payload.gas_ppm || 0) - (lastPayload.gas_ppm || 0));
@@ -235,7 +243,7 @@ async function startLogConsumer() {
                 (payload.o.o4 !== lastPayload.o.o4)
               );
               
-              if (tempDiff >= 0.2 || humidDiff >= 0.2 || gasDiff >= 4 || smokeDiff >= 0.05 || flameChanged || outletChanged) {
+              if (tempDiff >= 0.5 || humidDiff >= 3 || gasDiff >= 50 || smokeDiff >= 0.05 || flameChanged || outletChanged) {
                 return true;
               }
               

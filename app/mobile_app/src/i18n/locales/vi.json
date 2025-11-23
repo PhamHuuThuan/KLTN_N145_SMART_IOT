@@ -528,6 +528,7 @@
     "outletTurnedOff": "✅ Đã tắt ổ cắm",
     "outletControlFailed": "❌ Không thể điều khiển ổ cắm",
     "voiceListening": "Đang ghi âm...",
+    "voicePreview": "Đang gửi...",
     "voiceStopped": "Đã dừng ghi âm",
     "voiceListeningPlaceholder": "Nói nội dung bạn muốn gửi...",
     "voiceStoppedPlaceholder": "Đã dừng ghi âm, đang gửi...",

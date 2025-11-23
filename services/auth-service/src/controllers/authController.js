@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import axios from 'axios';
 import User from '../models/User.js';
 import EmailService from '../services/EmailService.js';
 import logger from '../utils/logger.js';
@@ -26,7 +27,11 @@ export const register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const userId = User.generateUserId();
     const user = await User.create({ userId, email, passwordHash, name, phone, avatar });
-    const token = signToken({ sub: user.userId, email });
+    const token = signToken({ 
+      sub: user.userId, 
+      id: user._id.toString(),
+      email 
+    });
 
     // Fire-and-forget: initialize notification preferences in alerts-service
     (async () => {
@@ -124,7 +129,11 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'invalid_credentials' });
     }
 
-    const token = signToken({ sub: user.userId, email });
+    const token = signToken({ 
+      sub: user.userId, 
+      id: user._id.toString(), // Add MongoDB ObjectId for compatibility
+      email 
+    });
 
     res.json({
       token,
@@ -153,7 +162,7 @@ export const me = async (req, res) => {
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(payload.sub).select('-passwordHash');
+    const user = await User.findOne({ userId: payload.sub }).select('-passwordHash');
     
     if (!user) {
       return res.status(404).json({ error: 'user_not_found' });
@@ -196,11 +205,7 @@ export const updateProfile = async (req, res) => {
     if (phone !== undefined) updateData.phone = phone;
     if (avatar !== undefined) updateData.avatar = avatar;
 
-    const user = await User.findByIdAndUpdate(
-      payload.sub,
-      updateData,
-      { new: true, select: '-passwordHash' }
-    );
+    const user = await User.findOneAndUpdate({ userId: payload.sub }, updateData, { new: true, select: '-passwordHash' });
 
     if (!user) {
       return res.status(404).json({ error: 'user_not_found' });
@@ -246,7 +251,9 @@ export const changePassword = async (req, res) => {
       return res.status(400).json({ error: 'new_password_must_be_at_least_6_characters' });
     }
 
-    const user = await User.findById(payload.sub);
+    // payload.sub is userId string, payload.id is MongoDB ObjectId
+    const user = await User.findOne({ userId: payload.sub });
+    
     if (!user) {
       return res.status(404).json({ error: 'user_not_found' });
     }
@@ -260,8 +267,7 @@ export const changePassword = async (req, res) => {
     // Hash new password
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
     
-    // Update password
-    await User.findByIdAndUpdate(payload.sub, { passwordHash: newPasswordHash });
+    await User.findOneAndUpdate({ userId: payload.sub }, { passwordHash: newPasswordHash });
 
     res.json({
       message: 'Password changed successfully'

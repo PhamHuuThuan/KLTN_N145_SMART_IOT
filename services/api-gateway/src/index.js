@@ -155,7 +155,45 @@ function secureProxy(targetBaseUrl) {
 app.use('/api/devices', ...secureProxy(DEVICES_SERVICE_URL));
 
 // Logs service (part of devices-service, preserve '/api/logs' path)
-app.use('/api/logs', ...secureProxy(DEVICES_SERVICE_URL));
+// Use optional auth proxy since devices-service uses optionalAuth for logs
+function optionalAuthProxy(targetBaseUrl) {
+  return [
+    createProxyMiddleware({
+      target: targetBaseUrl,
+      changeOrigin: true,
+      logLevel: 'silent',
+      pathRewrite: (path, req) => req.originalUrl,
+      onProxyReq: (proxyReq, req, res) => {
+        const incomingAuthHeader = req.headers.authorization;
+        if (incomingAuthHeader) {
+          proxyReq.setHeader('authorization', incomingAuthHeader);
+          const rawToken = incomingAuthHeader.startsWith('Bearer ')
+            ? incomingAuthHeader.slice(7)
+            : incomingAuthHeader;
+          proxyReq.setHeader('x-access-token', rawToken);
+          try {
+            const payload = jwt.verify(rawToken, JWT_SECRET);
+            proxyReq.setHeader('x-user-id', payload?.sub || '');
+            proxyReq.setHeader('x-user-role', payload?.role || 'user');
+          } catch (_) {
+            // Token invalid or missing - allow request to proceed (optional auth)
+          }
+        }
+        fixRequestBody(proxyReq, req);
+        try { req.proxiedUrl = new URL(req.originalUrl, targetBaseUrl).toString(); } catch (_) {}
+      },
+      onError: (err, req, res) => {
+        console.error('Proxy error:', req.method, req.originalUrl, '-', err?.message || err);
+        if (!res.headersSent) {
+          res.status(502).json({ error: 'gateway_proxy_error', message: String(err?.message || err) });
+        }
+      },
+      onProxyRes: (_proxyRes, _req, _res) => {}
+    })
+  ];
+}
+
+app.use('/api/logs', ...optionalAuthProxy(DEVICES_SERVICE_URL));
 
 // Rules service (preserve '/api/rules')
 app.use('/api/rules', ...secureProxy(RULES_SERVICE_URL));
