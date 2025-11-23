@@ -181,7 +181,7 @@ const QRScannerModal = ({
       animationType="slide"
       presentationStyle="fullScreen"
       onRequestClose={onClose}
-      transparent
+      transparent={false}
     >
       <View style={styles.wrapper}>
         <View style={[styles.content, { backgroundColor: colors.surface }]}>

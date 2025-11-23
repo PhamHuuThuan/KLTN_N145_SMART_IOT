@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Modal, FlatList, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CONFIG from '../constants/config';
@@ -46,6 +46,8 @@ const ChatScreen = ({ onNavigateToHome }) => {
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [voiceDraft, setVoiceDraft] = useState('');
   const [skipVoiceSend, setSkipVoiceSend] = useState(false);
+  const autoSendTimeoutRef = useRef(null);
+  const lastTranscriptTimeRef = useRef(null);
 
   const { parseVoiceCommand, executeVoiceCommand, processTranscript } = useVoiceControl();
   const { controlOutlet: controlOutletHook } = useOutletControl();
@@ -404,39 +406,97 @@ const ChatScreen = ({ onNavigateToHome }) => {
   const [showHelp, setShowHelp] = useState(false);
   
   useEffect(() => {
-    if (transcript && transcript !== voiceDraft) {
+    if (transcript !== undefined && transcript !== voiceDraft) {
       setVoiceDraft(transcript);
+      lastTranscriptTimeRef.current = Date.now();
     }
-  }, [transcript, voiceDraft]);
+  }, [transcript]);
 
   useEffect(() => {
-    if (listening) {
-      setVoiceModalVisible(true);
-    } else if (voiceModalVisible) {
-      if (voiceDraft.trim() && !skipVoiceSend) {
-        handleSend(voiceDraft.trim());
+    if (!listening || !voiceModalVisible || skipVoiceSend) {
+      if (autoSendTimeoutRef.current) {
+        clearTimeout(autoSendTimeoutRef.current);
+        autoSendTimeoutRef.current = null;
       }
-      setVoiceDraft('');
-      setVoiceModalVisible(false);
-      setSkipVoiceSend(false);
+      return;
     }
-  }, [listening, voiceDraft, voiceModalVisible, skipVoiceSend]);
+
+    if (autoSendTimeoutRef.current) {
+      clearTimeout(autoSendTimeoutRef.current);
+    }
+
+    autoSendTimeoutRef.current = setTimeout(() => {
+      if (voiceDraft.trim() && !skipVoiceSend && listening && voiceModalVisible) {
+        handleSend(voiceDraft.trim());
+        setVoiceDraft('');
+        setVoiceModalVisible(false);
+        setSkipVoiceSend(false);
+        stop();
+      }
+      autoSendTimeoutRef.current = null;
+    }, 3000);
+
+    return () => {
+      if (autoSendTimeoutRef.current) {
+        clearTimeout(autoSendTimeoutRef.current);
+        autoSendTimeoutRef.current = null;
+      }
+    };
+  }, [voiceDraft, listening, voiceModalVisible, skipVoiceSend]);
+
+  useEffect(() => {
+    if (listening && !voiceModalVisible) {
+      setVoiceModalVisible(true);
+      lastTranscriptTimeRef.current = Date.now();
+    }
+  }, [listening]);
 
   const handleVoiceToggle = async () => {
     if (!listening) {
+      if (voiceModalVisible) return;
+      
       setVoiceDraft('');
-    setSkipVoiceSend(false);
+      setSkipVoiceSend(false);
+      if (autoSendTimeoutRef.current) {
+        clearTimeout(autoSendTimeoutRef.current);
+        autoSendTimeoutRef.current = null;
+      }
+      lastTranscriptTimeRef.current = Date.now();
       setVoiceModalVisible(true);
-      await toggle(true);
+      
+      try {
+        await toggle(true);
+      } catch (error) {
+        log.error('Error starting voice:', error);
+        setVoiceModalVisible(false);
+      }
     } else {
-      await toggle(false);
+      if (autoSendTimeoutRef.current) {
+        clearTimeout(autoSendTimeoutRef.current);
+        autoSendTimeoutRef.current = null;
+      }
+      try {
+        await toggle(false);
+        if (voiceDraft.trim() && !skipVoiceSend) {
+          handleSend(voiceDraft.trim());
+        }
+        setVoiceDraft('');
+        setVoiceModalVisible(false);
+        setSkipVoiceSend(false);
+      } catch (error) {
+        log.error('Error stopping voice:', error);
+      }
     }
   };
 
   const handleVoiceCancel = async () => {
+    if (autoSendTimeoutRef.current) {
+      clearTimeout(autoSendTimeoutRef.current);
+      autoSendTimeoutRef.current = null;
+    }
     setVoiceDraft('');
     setVoiceModalVisible(false);
-  setSkipVoiceSend(true);
+    setSkipVoiceSend(true);
     await stop();
   };
 
@@ -517,6 +577,7 @@ const ChatScreen = ({ onNavigateToHome }) => {
         transparent
         animationType="fade"
         onRequestClose={handleVoiceCancel}
+        presentationStyle="overFullScreen"
       >
         <View style={styles.voiceModalBackdrop}>
           <View style={[styles.voiceModal, { backgroundColor: colors.surface }]}>
@@ -536,35 +597,35 @@ const ChatScreen = ({ onNavigateToHome }) => {
             <Text style={[styles.voiceHint, { color: colors.textSecondary }]}>
               {listening
                 ? t('chat.voiceListening', 'Đang ghi âm...')
-                : t('chat.voicePreview', 'Đang gửi...')}
+                : voiceDraft.trim()
+                  ? t('chat.voicePreview', 'Đang gửi...')
+                  : t('chat.voiceListening', 'Đang ghi âm...')}
             </Text>
             <View style={styles.voiceTranscriptBox}>
               <Text style={[styles.voiceTranscript, { color: colors.text }]}>
-                {voiceDraft || (listening 
-                  ? t('chat.voiceListeningPlaceholder', 'Nói nội dung bạn muốn gửi...')
-                  : t('chat.voiceStoppedPlaceholder', 'Đã dừng ghi âm, đang gửi...'))}
+                {voiceDraft || t('chat.voiceListeningPlaceholder', 'Nói nội dung bạn muốn gửi...')}
               </Text>
             </View>
-            {listening && (
-              <View style={styles.voiceActions}>
-                <TouchableOpacity
-                  style={[styles.voiceButton, styles.voiceSecondaryButton, { borderColor: colors.border }]}
-                  onPress={handleVoiceCancel}
-                >
-                  <Text style={[styles.voiceButtonText, { color: colors.text }]}>
-                    {t('common.cancel', 'Huỷ')}
-                  </Text>
-                </TouchableOpacity>
+            <View style={styles.voiceActions}>
+              <TouchableOpacity
+                style={[styles.voiceButton, styles.voiceSecondaryButton, { borderColor: colors.border }]}
+                onPress={handleVoiceCancel}
+              >
+                <Text style={[styles.voiceButtonText, { color: colors.text }]}>
+                  {t('common.cancel', 'Huỷ')}
+                </Text>
+              </TouchableOpacity>
+              {listening && (
                 <TouchableOpacity
                   style={[styles.voiceButton, { backgroundColor: colors.primary }]}
-                  onPress={() => toggle(false)}
+                  onPress={handleVoiceToggle}
                 >
                   <Text style={[styles.voiceButtonText, { color: colors.white }]}>
                     {t('chat.voiceStop', 'Dừng')}
                   </Text>
                 </TouchableOpacity>
-              </View>
-            )}
+              )}
+            </View>
           </View>
         </View>
       </Modal>
