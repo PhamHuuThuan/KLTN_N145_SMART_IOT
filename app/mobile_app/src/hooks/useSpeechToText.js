@@ -15,18 +15,12 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
     log.info('Setting up Voice recognition callbacks');
     
     const onSpeechStart = () => {
-      log.info('✅ onSpeechStart fired');
       setError(null);
       setListening(true);
     };
     
-    const onSpeechEnd = () => {
-      log.info('✅ onSpeechEnd fired');
-    };
-    
     const onSpeechError = (e) => {
       const msg = e?.error?.message || 'Speech error';
-      log.error('❌ onSpeechError:', msg);
       setError(msg);
       setListening(false);
     };
@@ -34,7 +28,6 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
     const onSpeechResults = (e) => {
       const text = e?.value?.[0] || '';
       lastResultRef.current = text;
-      log.info('✅ onSpeechResults - final:', text);
       setTranscript(text);
       if (onResult && text) onResult(text);
     };
@@ -42,7 +35,6 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
     const onSpeechPartialResults = (e) => {
       const text = e?.value?.[0] || '';
       if (text) {
-        log.info('✅ onSpeechPartialResults - partial:', text);
         setTranscript(text);
       }
     };
@@ -75,7 +67,6 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
       );
       
       if (currentPermission) {
-        log.info('✅ Permission already granted');
         return true;
       }
 
@@ -90,7 +81,6 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
       );
       
       if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        log.info('✅ Permission granted');
         return true;
       }
       
@@ -107,13 +97,12 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
       
       return false;
     } catch (e) {
-      log.error('❌ Permission error:', e);
+      log.error('Permission error:', e);
       return false;
     }
   };
 
   const start = useCallback(async () => {
-    log.info('🚀 Starting voice recognition');
     
     try {
       setTranscript('');
@@ -141,20 +130,18 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
           EXTRA_PREFER_OFFLINE: false,
           EXTRA_PARTIAL_RESULTS: true,
         });
-        log.info('✅ Voice.start succeeded');
       } catch (e) {
         log.warn('Voice.start failed, retry default locale', e?.message);
         try {
           await Voice.start(undefined, { EXTRA_PARTIAL_RESULTS: true });
-          log.info('✅ Voice.start with default locale succeeded');
         } catch (e2) {
-          log.error('❌ Voice.start failed completely:', e2?.message);
+          log.error('Voice.start failed completely:', e2?.message);
           setListening(false);
           setError(e2?.message || e?.message || String(e2 || e));
         }
       }
     } catch (e) {
-      log.error('❌ Start error:', e);
+      log.error('Start error:', e);
       setError(e?.message || String(e));
       setListening(false);
     }
