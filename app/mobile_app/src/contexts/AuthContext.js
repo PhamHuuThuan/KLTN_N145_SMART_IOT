@@ -104,10 +104,9 @@ export const AuthProvider = ({ children }) => {
         
         // Register FCM token after successful login
         try {
-          await registerFCMToken(result.user.id);
+          await registerFCMToken(result.user.userId);
         } catch (fcmError) {
           log.warn('FCM token registration failed during login', fcmError?.message || fcmError);
-          // Don't fail login if FCM registration fails
         }
         
         return { success: true };
@@ -143,11 +142,9 @@ export const AuthProvider = ({ children }) => {
       // Remove FCM token and clear chat session before logout
       if (user?.id) {
         try {
-          await removeFCMToken(user.id);
-          log.info('FCM token removed successfully during logout');
+          await removeFCMToken(user.userId);
         } catch (fcmError) {
           log.warn('Failed to remove FCM token during logout', fcmError?.message || fcmError);
-          // Don't fail logout if FCM token removal fails
         }
         
         // Clear chat session for the user
@@ -253,7 +250,6 @@ export const AuthProvider = ({ children }) => {
   const registerFCMToken = async (userId) => {
     try {
       if (!userId) {
-        log.warn('No userId provided for FCM token registration');
         return;
       }
 
@@ -264,10 +260,8 @@ export const AuthProvider = ({ children }) => {
       try {
         const devicePushToken = await Notifications.getDevicePushTokenAsync();
         fcmToken = devicePushToken?.data;
-        log.info('Native push token acquired', fcmToken ? fcmToken.substring(0, 20) + '...' : null);
       } catch (nativeErr) {
-        log.warn('Native device token not available. Skipping FCM registration.', nativeErr?.message || nativeErr);
-        return; // do not throw to avoid UI errors
+        return;
       }
 
       if (!fcmToken) {
@@ -275,16 +269,12 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // Register token with notification service via gateway
       const result = await notificationService.addFCMToken(userId, fcmToken, platform);
       if (result?.success) {
-        log.info('FCM token registered successfully for user', userId);
-        log.debug('Token count', result.data?.tokenCount);
       } else {
         log.warn('FCM token registration failed', result?.message);
       }
     } catch (error) {
-      // Do not propagate failures to UI; just warn
       log.warn('Error registering FCM token (non-fatal)', error?.message || String(error));
     }
   };
@@ -303,21 +293,14 @@ export const AuthProvider = ({ children }) => {
         // Try to get device push token (preferred method)
         const devicePushToken = await Notifications.getDevicePushTokenAsync();
         fcmToken = devicePushToken?.data;
-        log.debug('Getting device push token for removal', fcmToken?.substring(0, 20) + '...');
       } catch (deviceError) {
-        log.warn('Device push token not available, trying Expo push token', deviceError.message);
         
         try {
-          // Fallback to Expo push token
           const token = await Notifications.getExpoPushTokenAsync({
             projectId: '5ea86a56-b10e-4a1b-88a7-6692b50872ed'
           });
 
-          log.debug('Getting Expo push token for removal', token?.data?.substring(0, 20) + '...');
-          
-          // Check if it's a real FCM token or Expo push token
           if (token.data.startsWith('ExponentPushToken[')) {
-            log.warn('Got Expo push token instead of FCM token - skipping removal');
             return;
           } else {
             fcmToken = token.data;
@@ -362,7 +345,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     refreshProfile,
     checkAuthStatus,
-    registerFCMToken, // Export FCM token registration function
+    registerFCMToken,
   };
 
   return (

@@ -35,25 +35,9 @@ class InAppService {
           global.io.to(`user_${userId}`).emit('notification', notification);
         }
         
-        logger.info('In-app notification sent via Socket.IO', { 
-          userId, 
-          title, 
-          notificationId: notification.id,
-          isEmergency,
-          priority,
-          category
-        });
-        logger.info(`Socket.IO notification sent to user_${userId} (emergency: ${isEmergency})`);
       } else {
         logger.error('Socket.IO not available (global.io is null)');
       }
-
-      logger.info('In-app notification created', { 
-        userId, 
-        title, 
-        notificationId: notification.id 
-      });
-
       return notification;
     } catch (error) {
       logger.error('Error sending in-app notification:', error);
@@ -68,11 +52,6 @@ class InAppService {
           type: 'notification',
           data: notification
         }));
-        
-        logger.info('In-app notification sent via WebSocket', { 
-          userId: notification.userId,
-          notificationId: notification.id 
-        });
       }
     } catch (error) {
       logger.error('Error sending via WebSocket:', error);

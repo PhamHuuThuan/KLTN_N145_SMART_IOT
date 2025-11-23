@@ -2,11 +2,9 @@ import mongoose from 'mongoose';
 
 const userNotificationPreferencesSchema = new mongoose.Schema({
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: mongoose.Schema.Types.String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   email: {
     enabled: { type: Boolean, default: true },
@@ -127,13 +125,13 @@ userNotificationPreferencesSchema.methods.updateFCMTokenUsage = function(token) 
 
 // get preferences for user
 userNotificationPreferencesSchema.statics.getUserPreferences = function(userId) {
-  return this.findOne({ userId });
+  return this.findOne({ userId: userId });
 };
 
 // create default preferences for new user
 userNotificationPreferencesSchema.statics.createDefaultPreferences = function(userId, email, phoneNumber = null) {
   return this.create({
-    userId,
+    userId: userId,
     email: {
       enabled: true,
       addresses: email ? [{
@@ -164,7 +162,7 @@ userNotificationPreferencesSchema.statics.createDefaultPreferences = function(us
 
 // Ensure default preferences exist for a user; create if missing
 userNotificationPreferencesSchema.statics.ensureDefaultPreferences = async function(userId, email, phoneNumber = null) {
-  const existing = await this.findOne({ userId });
+  const existing = await this.findOne({ userId: userId });
   if (existing) return existing;
   return this.createDefaultPreferences(userId, email, phoneNumber);
 };

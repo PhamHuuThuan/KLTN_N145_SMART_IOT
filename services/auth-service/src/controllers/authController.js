@@ -56,7 +56,7 @@ export const register = async (req, res) => {
         });
         
         // Try to create default preferences
-        const response = await client.put(`/user/${user._id.toString()}/preferences`, {
+        const response = await client.put(`/user/${user.userId.toString()}/preferences`, {
           email: { 
             enabled: true, 
             addresses: [{
@@ -90,7 +90,6 @@ export const register = async (req, res) => {
           }
         });
         
-        logger.info('✅ UserNotificationPreferences created for user:', user._id.toString());
       } catch (e) {
         // Log only, do not block registration
         logger.warn('❌ Failed to initialize notification preferences:', e?.message || e);
@@ -101,6 +100,7 @@ export const register = async (req, res) => {
       token,
       user: {
         id: user._id,
+        userId: user.userId,
         email: user.email,
         name: user.name,
         phone: user.phone,
@@ -142,6 +142,7 @@ export const login = async (req, res) => {
       token,
       user: {
         id: user._id,
+        userId: user.userId,
         email: user.email,
         name: user.name,
         phone: user.phone,
@@ -174,6 +175,7 @@ export const me = async (req, res) => {
     res.json({
       user: {
         id: user._id,
+        userId: user.userId,
         email: user.email,
         name: user.name,
         phone: user.phone,
@@ -234,7 +236,7 @@ export const updateProfile = async (req, res) => {
           }
         });
 
-        const currentPrefsResponse = await client.get(`/user/${user._id.toString()}/preferences`);
+        const currentPrefsResponse = await client.get(`/user/${user.userId.toString()}/preferences`);
         const currentPrefs = currentPrefsResponse.data?.data || {};
         const preferencesUpdate = {};
         
@@ -267,7 +269,8 @@ export const updateProfile = async (req, res) => {
           preferencesUpdate.sms = {
             ...currentPrefs.sms,
             phoneNumbers: phone ? [{
-              number: phone,
+              name: user.name,
+              phoneNumber: phone,
               isDefault: true,
               addedAt: new Date()
             }] : []
@@ -275,7 +278,7 @@ export const updateProfile = async (req, res) => {
         }
 
         if (Object.keys(preferencesUpdate).length > 0) {
-          await client.put(`/user/${user._id.toString()}/preferences`, preferencesUpdate);
+          await client.put(`/user/${user.userId.toString()}/preferences`, preferencesUpdate);
         }
       } catch (e) {
         logger.warn(`Failed to update notification preferences: ${e?.message || e}`);
@@ -286,6 +289,7 @@ export const updateProfile = async (req, res) => {
       message: 'Profile updated successfully',
       user: {
         id: user._id,
+        userId: user.userId,
         email: user.email,
         name: user.name,
         phone: user.phone,
