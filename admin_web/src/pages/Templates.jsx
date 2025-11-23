@@ -5,7 +5,8 @@ import templatesService from '../services/templatesService';
 
 function Templates() {
   const { t } = useTranslation();
-  const [templates, setTemplates] = useState([]);
+  const [allTemplates, setAllTemplates] = useState([]); // All templates for counting
+  const [templates, setTemplates] = useState([]); // Filtered templates for display
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, active, inactive
   const [languageFilter, setLanguageFilter] = useState('all'); // all, vi, en
@@ -17,6 +18,19 @@ function Templates() {
 
   const fetchTemplates = async () => {
     try {
+      // Fetch all templates first for counting
+      const allParams = { limit: 1000 };
+      const allResponse = await templatesService.getAllTemplates(allParams);
+      const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+      const allSorted = (allResponse.data || []).sort((a, b) => {
+        const aPriority = priorityOrder[a.priority] ?? 99;
+        const bPriority = priorityOrder[b.priority] ?? 99;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return a.templateKey.localeCompare(b.templateKey);
+      });
+      setAllTemplates(allSorted);
+      
+      // Then apply filters for display
       const params = { 
         limit: 1000 
       };
@@ -29,7 +43,6 @@ function Templates() {
       if (priorityFilter) params.priority = priorityFilter;
       
       const response = await templatesService.getAllTemplates(params);
-      const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
       const sorted = (response.data || []).sort((a, b) => {
         const aPriority = priorityOrder[a.priority] ?? 99;
         const bPriority = priorityOrder[b.priority] ?? 99;
@@ -136,9 +149,23 @@ function Templates() {
             onChange={(e) => setFilter(e.target.value)}
             style={styles.select}
           >
-            <option value="all">{t('common.all')} ({templates.length})</option>
-            <option value="active">{t('common.active')} ({templates.filter(t => t.isActive).length})</option>
-            <option value="inactive">{t('common.inactive')} ({templates.filter(t => !t.isActive).length})</option>
+            {(() => {
+              // Filter templates by current language and priority filters for counting
+              let filteredForCount = allTemplates;
+              if (languageFilter !== 'all') {
+                filteredForCount = filteredForCount.filter(t => t.language === languageFilter);
+              }
+              if (priorityFilter) {
+                filteredForCount = filteredForCount.filter(t => t.priority === priorityFilter);
+              }
+              return (
+                <>
+                  <option value="all">{t('common.all')} ({filteredForCount.length})</option>
+                  <option value="active">{t('common.active')} ({filteredForCount.filter(t => t.isActive).length})</option>
+                  <option value="inactive">{t('common.inactive')} ({filteredForCount.filter(t => !t.isActive).length})</option>
+                </>
+              );
+            })()}
           </select>
         </div>
 

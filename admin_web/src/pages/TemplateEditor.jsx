@@ -12,6 +12,7 @@ function TemplateEditor() {
   const languageParam = searchParams.get('language') || 'vi';
 
   const [loading, setLoading] = useState(isEdit);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     templateKey: '',
     name: '',
@@ -55,17 +56,18 @@ function TemplateEditor() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(''); // Clear previous error
     
     // Validate
     if (!formData.templateKey || !formData.name || !formData.conditions.length || !formData.actions.length) {
-      alert(t('templateEditor.validation.required'));
+      setError(t('templateEditor.validation.required'));
       return;
     }
 
     // Validate conditions
     for (const condition of formData.conditions) {
       if (!condition.sensor || !condition.operator || condition.value === '') {
-        alert(t('templateEditor.validation.conditionsRequired'));
+        setError(t('templateEditor.validation.conditionsRequired'));
         return;
       }
     }
@@ -73,7 +75,7 @@ function TemplateEditor() {
     // Validate actions
     for (const action of formData.actions) {
       if (!action.type || !action.message) {
-        alert(t('templateEditor.validation.actionsRequired'));
+        setError(t('templateEditor.validation.actionsRequired'));
         return;
       }
     }
@@ -89,7 +91,29 @@ function TemplateEditor() {
       navigate('/templates');
     } catch (error) {
       console.error('Error saving template:', error);
-      alert(t('templateEditor.saveError') + ': ' + (error.response?.data?.message || error.message));
+      // Format server error message
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message;
+      if (errorMsg.includes('status code')) {
+        const statusMatch = errorMsg.match(/status code (\d+)/);
+        if (statusMatch) {
+          const statusCode = statusMatch[1];
+          if (statusCode === '504') {
+            setError(t('templateEditor.serverTimeout'));
+          } else if (statusCode === '500') {
+            setError(t('templateEditor.serverError'));
+          } else if (statusCode === '400') {
+            setError(t('templateEditor.invalidData'));
+          } else {
+            setError(`${t('templateEditor.connectionError')} (${statusCode})`);
+          }
+        } else {
+          setError(errorMsg.replace(/^Request failed with /, ''));
+        }
+      } else if (errorMsg.includes('already exists') || errorMsg.includes('đã tồn tại')) {
+        setError(t('templateEditor.templateExists'));
+      } else {
+        setError(errorMsg);
+      }
     }
   };
 
@@ -395,6 +419,12 @@ function TemplateEditor() {
           ))}
         </div>
 
+        {error && (
+          <div style={styles.errorMessage}>
+            {error}
+          </div>
+        )}
+
         <div style={styles.formActions}>
           <button type="button" onClick={() => navigate('/templates')} style={styles.cancelButton}>
             {t('templateEditor.cancel')}
@@ -572,6 +602,15 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '12px'
+  },
+  errorMessage: {
+    padding: '12px 16px',
+    backgroundColor: '#fee',
+    color: '#c33',
+    borderRadius: '6px',
+    fontSize: '14px',
+    marginBottom: '16px',
+    border: '1px solid #fcc'
   },
   formActions: {
     display: 'flex',

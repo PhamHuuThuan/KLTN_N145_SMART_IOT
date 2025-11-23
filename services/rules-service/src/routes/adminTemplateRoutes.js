@@ -5,7 +5,6 @@ import {
   createTemplateAdmin,
   updateTemplateAdmin,
   deleteTemplateAdmin,
-  hardDeleteTemplateAdmin
 } from '../controllers/adminTemplateController.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/adminAuth.js';
@@ -22,6 +21,5 @@ router.get('/:templateKey', getTemplateByIdAdmin);
 router.post('/', createTemplateAdmin);
 router.patch('/:templateKey', updateTemplateAdmin);
 router.delete('/:templateKey', deleteTemplateAdmin);
-router.delete('/:templateKey/hard', hardDeleteTemplateAdmin);
 
 export default router;

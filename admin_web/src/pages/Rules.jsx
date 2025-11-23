@@ -7,7 +7,8 @@ import templatesService from '../services/templatesService';
 
 function Rules() {
   const { t } = useTranslation();
-  const [rules, setRules] = useState([]);
+  const [allRules, setAllRules] = useState([]); // All rules for counting
+  const [rules, setRules] = useState([]); // Filtered rules for display
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, active, inactive
   const [deviceFilter, setDeviceFilter] = useState('');
@@ -48,6 +49,13 @@ function Rules() {
 
   const fetchRules = async () => {
     try {
+      // Fetch all rules first for counting
+      const allParams = { limit: 1000 };
+      const allResponse = await rulesService.getAllRules(allParams);
+      const allRulesData = allResponse.data || [];
+      setAllRules(allRulesData);
+      
+      // Then apply filters for display
       const params = { limit: 1000 };
       if (filter === 'active') params.isActive = 'true';
       if (filter === 'inactive') params.isActive = 'false';
@@ -103,6 +111,24 @@ function Rules() {
     try {
       setCreatingRule(true);
       const targetDevice = devices.find((d) => d.deviceId === selectedDeviceForCreate);
+      
+      let createdByObjectId = null;
+      try {
+        const token = localStorage.getItem('admin_auth_token');
+        if (token) {
+          // Decode JWT token to get id (ObjectId)
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+          const decoded = JSON.parse(jsonPayload);
+          createdByObjectId = decoded.id;
+        }
+      } catch (e) {
+        console.error('Error decoding JWT token:', e);
+      }
+      
       const payload = {
         name: selectedTemplate.name,
         description: selectedTemplate.description,
@@ -113,9 +139,16 @@ function Rules() {
         cooldownPeriod: selectedTemplate.cooldownPeriod,
         isActive: selectedTemplate.isActive !== undefined ? selectedTemplate.isActive : true
       };
-      if (targetDevice?.ownerId) {
+      
+      if (createdByObjectId) {
+        payload.createdBy = createdByObjectId;
+      } else if (targetDevice?.ownerId) {
+        const isObjectId = /^[0-9a-fA-F]{24}$/.test(String(targetDevice.ownerId));
+        if (isObjectId) {
         payload.createdBy = targetDevice.ownerId;
+        }
       }
+      
       await rulesService.createRule(payload);
       alert(t('rules.createSuccess'));
       closeCreateModal();
@@ -191,9 +224,9 @@ function Rules() {
             onChange={(e) => setFilter(e.target.value)}
             style={styles.select}
           >
-            <option value="all">{t('common.all')} ({rules.length})</option>
-            <option value="active">{t('common.active')} ({rules.filter(r => r.isActive).length})</option>
-            <option value="inactive">{t('common.inactive')} ({rules.filter(r => !r.isActive).length})</option>
+            <option value="all">{t('common.all')} ({allRules.length})</option>
+            <option value="active">{t('common.active')} ({allRules.filter(r => r.isActive).length})</option>
+            <option value="inactive">{t('common.inactive')} ({allRules.filter(r => !r.isActive).length})</option>
           </select>
         </div>
 
@@ -249,10 +282,6 @@ function Rules() {
               <div style={styles.infoRow}>
                 <span style={styles.infoLabel}>{t('rules.deviceId')}:</span>
                 <span style={styles.infoValue}>{rule.deviceId}</span>
-              </div>
-              <div style={styles.infoRow}>
-                <span style={styles.infoLabel}>{t('rules.createdBy')}:</span>
-                <span style={styles.infoValue}>{rule.createdBy}</span>
               </div>
               <div style={styles.infoRow}>
                 <span style={styles.infoLabel}>{t('rules.triggerCount')}:</span>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
@@ -15,6 +15,20 @@ function DeviceEditor() {
   const [error, setError] = useState('');
   const [createdDevice, setCreatedDevice] = useState(null);
   const [qrCodeUrl, setQrCodeUrl] = useState(null);
+  const [existingDevices, setExistingDevices] = useState([]);
+
+  useEffect(() => {
+    // Fetch all devices to check for duplicates
+    const fetchDevices = async () => {
+      try {
+        const response = await devicesService.getAllDevices({ limit: 1000 });
+        setExistingDevices(response.data || []);
+      } catch (error) {
+        console.error('Error fetching devices:', error);
+      }
+    };
+    fetchDevices();
+  }, []);
 
   const generateDeviceId = () => {
     // Generate a unique device ID: KITCHEN-ESP32-XXXX
@@ -88,15 +102,27 @@ function DeviceEditor() {
     setLoading(true);
 
     if (!formData.deviceId.trim()) {
-      setError(t('deviceEditor.deviceIdRequired'));
+      setError('Vui lòng nhập Device ID');
+      setLoading(false);
+      return;
+    }
+
+    // Check if deviceId already exists
+    const trimmedDeviceId = formData.deviceId.trim();
+    const existingDevice = existingDevices.find(
+      device => device.deviceId && device.deviceId.toUpperCase() === trimmedDeviceId.toUpperCase()
+    );
+
+    if (existingDevice) {
+      setError(t('deviceEditor.deviceIdExists'));
       setLoading(false);
       return;
     }
 
     try {
       const payload = {
-        deviceId: formData.deviceId.trim(),
-        name: (formData.name || formData.deviceId).trim()
+        deviceId: trimmedDeviceId,
+        name: (formData.name || trimmedDeviceId).trim()
       };
 
       const response = await devicesService.createDevice(payload);
@@ -112,10 +138,28 @@ function DeviceEditor() {
       }
     } catch (err) {
       console.error('Error creating device:', err);
-      if (err.response?.status === 400) {
-        setError(err.response?.data?.message || t('deviceEditor.deviceExists'));
+      // Format server error message
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+      if (errorMsg.includes('already exists') || errorMsg.includes('đã tồn tại')) {
+        setError(t('deviceEditor.deviceIdExists'));
+      } else if (errorMsg.includes('status code')) {
+        const statusMatch = errorMsg.match(/status code (\d+)/);
+        if (statusMatch) {
+          const statusCode = statusMatch[1];
+          if (statusCode === '504') {
+            setError(t('deviceEditor.serverTimeout'));
+          } else if (statusCode === '500') {
+            setError(t('deviceEditor.serverError'));
+          } else if (statusCode === '400') {
+            setError(t('deviceEditor.invalidData'));
+          } else {
+            setError(`${t('deviceEditor.connectionError')} (${statusCode})`);
+          }
+        } else {
+          setError(errorMsg.replace(/^Request failed with /, ''));
+        }
       } else {
-        setError(err.response?.data?.message || t('deviceEditor.createError'));
+        setError(errorMsg);
       }
     } finally {
       setLoading(false);

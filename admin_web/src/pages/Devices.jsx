@@ -16,7 +16,8 @@ import devicesService from '../services/devicesService';
 
 function Devices() {
   const { t } = useTranslation();
-  const [devices, setDevices] = useState([]);
+  const [allDevices, setAllDevices] = useState([]); // All devices for counting
+  const [devices, setDevices] = useState([]); // Filtered devices for display
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [filter, setFilter] = useState('all'); // all, online, offline
@@ -53,16 +54,20 @@ function Devices() {
   const fetchDevices = async () => {
     try {
       const response = await devicesService.getAllDevices({ limit: 1000 });
-      let devices = response.data || [];
+      const allDevicesData = response.data || [];
+      
+      // Store all devices for counting
+      setAllDevices(allDevicesData);
       
       // Apply client-side filtering based on online status
+      let filteredDevices = allDevicesData;
       if (filter === 'online') {
-        devices = devices.filter(d => isDeviceOnline(d));
+        filteredDevices = allDevicesData.filter(d => isDeviceOnline(d));
       } else if (filter === 'offline') {
-        devices = devices.filter(d => !isDeviceOnline(d));
+        filteredDevices = allDevicesData.filter(d => !isDeviceOnline(d));
       }
       
-      setDevices(devices);
+      setDevices(filteredDevices);
     } catch (error) {
       console.error('Error fetching devices:', error);
     } finally {
@@ -204,19 +209,19 @@ function Devices() {
             onClick={() => setFilter('all')}
             style={{...styles.filterButton, ...(filter === 'all' && styles.filterButtonActive)}}
           >
-            {t('devices.all')} ({devices.length})
+            {t('devices.all')} ({allDevices.length})
           </button>
           <button
             onClick={() => setFilter('online')}
             style={{...styles.filterButton, ...(filter === 'online' && styles.filterButtonActive)}}
           >
-            {t('devices.online')} ({devices.filter(d => isDeviceOnline(d)).length})
+            {t('devices.online')} ({allDevices.filter(d => isDeviceOnline(d)).length})
           </button>
           <button
             onClick={() => setFilter('offline')}
             style={{...styles.filterButton, ...(filter === 'offline' && styles.filterButtonActive)}}
           >
-            {t('devices.offline')} ({devices.filter(d => !isDeviceOnline(d)).length})
+            {t('devices.offline')} ({allDevices.filter(d => !isDeviceOnline(d)).length})
           </button>
           </div>
         </div>

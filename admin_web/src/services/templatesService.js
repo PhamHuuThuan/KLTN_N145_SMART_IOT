@@ -47,10 +47,10 @@ class TemplatesService {
     }
   }
 
-  // Delete template (hard delete)
+  // Delete template (soft delete)
   async deleteTemplate(templateKey, language) {
     try {
-      const response = await api.delete(`/api/admin/templates/${templateKey}/hard`, {
+      const response = await api.delete(`/api/admin/templates/${templateKey}`, {
         params: { language }
       });
       return response.data;

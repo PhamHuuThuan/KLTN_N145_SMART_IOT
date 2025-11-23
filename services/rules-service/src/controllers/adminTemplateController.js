@@ -6,7 +6,7 @@ export const getAllTemplatesAdmin = async (req, res) => {
   try {
     const { language, priority, isActive, limit = 100, page = 1 } = req.query;
     
-    const query = {};
+    const query = { deletedAt: null };
     // Only filter by language if provided and not 'all'
     if (language && language !== 'all') {
       query.language = language;
@@ -47,7 +47,7 @@ export const getTemplateByIdAdmin = async (req, res) => {
     const { templateKey } = req.params;
     const { language = 'vi' } = req.query;
     
-    const template = await RuleTemplate.findOne({ templateKey, language });
+    const template = await RuleTemplate.findOne({ templateKey, language, deletedAt: null });
     
     if (!template) {
       return res.status(404).json({
@@ -88,16 +88,16 @@ export const createTemplateAdmin = async (req, res) => {
     if (!templateKey || !name || !conditions?.length || !actions?.length) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: templateKey, name, conditions, actions'
+        message: 'Thiếu các trường bắt buộc: templateKey, name, conditions, actions'
       });
     }
     
-    // Check if template with same key and language already exists
-    const existing = await RuleTemplate.findOne({ templateKey, language });
+    // Check if template with same key and language already exists (not deleted)
+    const existing = await RuleTemplate.findOne({ templateKey, language, deletedAt: null });
     if (existing) {
       return res.status(400).json({
         success: false,
-        message: `Template with key "${templateKey}" and language "${language}" already exists`
+        message: `Mẫu quy tắc với key "${templateKey}" và ngôn ngữ "${language}" đã tồn tại`
       });
     }
     
@@ -149,7 +149,7 @@ export const updateTemplateAdmin = async (req, res) => {
     
     logger.debug('Updating template:', { templateKey, language, updateData });
     
-    const template = await RuleTemplate.findOne({ templateKey, language });
+    const template = await RuleTemplate.findOne({ templateKey, language, deletedAt: null });
     if (!template) {
       logger.warn('Template not found:', { templateKey, language });
       return res.status(404).json({
@@ -209,13 +209,13 @@ export const updateTemplateAdmin = async (req, res) => {
   }
 };
 
-// Delete template (admin) - soft delete by setting isActive to false
+// Delete template (admin) - soft delete by setting deletedAt
 export const deleteTemplateAdmin = async (req, res) => {
   try {
     const { templateKey } = req.params;
     const { language = 'vi' } = req.query;
     
-    const template = await RuleTemplate.findOne({ templateKey, language });
+    const template = await RuleTemplate.findOne({ templateKey, language, deletedAt: null });
     if (!template) {
       return res.status(404).json({
         success: false,
@@ -223,10 +223,8 @@ export const deleteTemplateAdmin = async (req, res) => {
       });
     }
     
-    // Soft delete by setting isActive to false
-    template.isActive = false;
-    template.updatedBy = req.user.userId || req.user.sub;
-    await template.save();
+    // Soft delete by setting deletedAt
+    await template.softDelete();
     
     logger.info('Template deleted by admin:', { 
       templateKey, 

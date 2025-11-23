@@ -11,6 +11,7 @@ function RuleEditor() {
   const isEdit = !!ruleId;
 
   const [loading, setLoading] = useState(isEdit);
+  const [error, setError] = useState('');
   const [devices, setDevices] = useState([]);
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState({
@@ -66,17 +67,18 @@ function RuleEditor() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(''); // Clear previous error
     
     // Validate
     if (!formData.name || !formData.deviceId || !formData.conditions.length || !formData.actions.length) {
-      alert(t('ruleEditor.validation.required'));
+      setError(t('ruleEditor.validation.required'));
       return;
     }
 
     // Validate conditions
     for (const condition of formData.conditions) {
       if (!condition.sensor || !condition.operator || condition.value === '') {
-        alert(t('ruleEditor.validation.conditionsRequired'));
+        setError(t('ruleEditor.validation.conditionsRequired'));
         return;
       }
     }
@@ -92,7 +94,27 @@ function RuleEditor() {
       navigate('/rules');
     } catch (error) {
       console.error('Error saving rule:', error);
-      alert(t('ruleEditor.saveError') + ': ' + (error.response?.data?.message || error.message));
+      // Format server error message
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message;
+      if (errorMsg.includes('status code')) {
+        const statusMatch = errorMsg.match(/status code (\d+)/);
+        if (statusMatch) {
+          const statusCode = statusMatch[1];
+          if (statusCode === '504') {
+            setError(t('ruleEditor.serverTimeout'));
+          } else if (statusCode === '500') {
+            setError(t('ruleEditor.serverError'));
+          } else if (statusCode === '400') {
+            setError(t('ruleEditor.invalidData'));
+          } else {
+            setError(`${t('ruleEditor.connectionError')} (${statusCode})`);
+          }
+        } else {
+          setError(errorMsg.replace(/^Request failed with /, ''));
+        }
+      } else {
+        setError(errorMsg);
+      }
     }
   };
 
@@ -395,6 +417,12 @@ function RuleEditor() {
           ))}
         </div>
 
+        {error && (
+          <div style={styles.errorMessage}>
+            {error}
+          </div>
+        )}
+
         <div style={styles.formActions}>
           <button type="button" onClick={() => navigate('/rules')} style={styles.cancelButton}>
             {t('ruleEditor.cancel')}
@@ -551,6 +579,15 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '14px'
+  },
+  errorMessage: {
+    padding: '12px 16px',
+    backgroundColor: '#fee',
+    color: '#c33',
+    borderRadius: '6px',
+    fontSize: '14px',
+    marginBottom: '16px',
+    border: '1px solid #fcc'
   },
   formActions: {
     display: 'flex',
