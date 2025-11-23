@@ -218,11 +218,10 @@ export const NotificationProvider = ({ children }) => {
     const connectSocket = () => {
       try {
         const gatewayUrl = ENV.getApiUrl('GATEWAY');
-        log.info('[NotifContext] Connecting WebSocket to:', gatewayUrl);
         
         socket = io(gatewayUrl, {
           path: '/ws/notifications',
-          auth: user?.id ? { userId: user.id } : undefined,
+          auth: user?.userId ? { userId: user.userId } : undefined,
           transports: ['websocket', 'polling'],
           reconnection: true,
           reconnectionAttempts: Infinity,
@@ -237,11 +236,11 @@ export const NotificationProvider = ({ children }) => {
           log.debug('Socket ID', socket.id);
           // Send authentication once userId is available
           if (user?.id) {
-            socket.emit('authenticate', { userId: user.id });
+            socket.emit('authenticate', { userId: user.userId });
           } else {
             setTimeout(() => {
               if (user?.id && socket?.connected) {
-                socket.emit('authenticate', { userId: user.id });
+                socket.emit('authenticate', { userId: user.userId });
               }
             }, 1000);
           }
@@ -250,7 +249,7 @@ export const NotificationProvider = ({ children }) => {
         // Also authenticate after any reconnect
         socket.on('reconnect', () => {
           if (user?.id && socket?.connected) {
-            socket.emit('authenticate', { userId: user.id });
+            socket.emit('authenticate', { userId:userId });
           }
         });
 
@@ -512,7 +511,7 @@ export const NotificationProvider = ({ children }) => {
       }
 
       const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
-      const res = await notificationService.addFCMToken(user.id, rawToken, platform);
+      const res = await notificationService.addFCMToken(user.userId, rawToken, platform);
       log.info('Registered push token with backend', res?.success ?? true);
     } catch (error) {
       log.warn('Failed to register FCM token', error?.message || String(error));
@@ -545,7 +544,7 @@ export const NotificationProvider = ({ children }) => {
 
     try {
       dispatch({ type: NOTIFICATION_ACTIONS.SET_LOADING, payload: true });
-      const response = await notificationService.getNotifications(user.id, page, limit);
+      const response = await notificationService.getNotifications(user.userId, page, limit);
       
       if (response.success) {
         // Pass the entire response.data object to the reducer
@@ -611,7 +610,7 @@ export const NotificationProvider = ({ children }) => {
         }
       }
 
-      const response = await notificationService.getNotifications(user.id, nextPage, 20);
+      const response = await notificationService.getNotifications(user.userId, nextPage, 20);
       
       if (response.success && response.data) {
         dispatch({
@@ -641,7 +640,7 @@ export const NotificationProvider = ({ children }) => {
     }
 
     try {
-      const response = await notificationService.markAsRead(notificationId, user.id);
+      const response = await notificationService.markAsRead(notificationId, user.userId);
       
       if (response.success) {
         dispatch({
@@ -663,7 +662,7 @@ export const NotificationProvider = ({ children }) => {
     }
 
     try {
-      const response = await notificationService.markAllAsRead(user.id);
+      const response = await notificationService.markAllAsRead(user.userId);
       
       if (response.success) {
         dispatch({ type: NOTIFICATION_ACTIONS.MARK_ALL_AS_READ });
@@ -685,7 +684,7 @@ export const NotificationProvider = ({ children }) => {
     }
 
     try {
-      const response = await notificationService.deleteNotification(notificationId, user.id);
+      const response = await notificationService.deleteNotification(notificationId, user.userId);
       
       if (response.success) {
         dispatch({
@@ -713,7 +712,7 @@ export const NotificationProvider = ({ children }) => {
     }
 
     try {
-      const response = await notificationService.getNotificationStats(user.id);
+      const response = await notificationService.getNotificationStats(user.userId);
       return response.data;
     } catch (error) {
       log.error('Error getting notification stats', error?.message || error);

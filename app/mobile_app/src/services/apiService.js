@@ -6,22 +6,18 @@ import { handleUnauthorized } from '../utils/authHandler';
 
 const log = createLogger('API');
 
-// Create axios instance with base configuration
+
 const apiClient = axios.create({
   baseURL: environment.API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
-  // Add these for web compatibility
   withCredentials: false,
-  // For development, allow self-signed certificates
   ...(environment.IS_WEB && {
-    // Add any web-specific configurations here
   }),
 });
 
-// Auth token management
 let authToken = null;
 
 export const setAuthToken = (token) => {
@@ -38,7 +34,6 @@ export const clearAuthToken = () => {
   delete apiClient.defaults.headers.common['Authorization'];
 };
 
-// Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
     log.info(`${(config.method || 'GET').toUpperCase()} ${environment.API_BASE_URL}${config.url}`);
@@ -50,10 +45,9 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor
+
 apiClient.interceptors.response.use(
   (response) => {
-    // Keep response log concise at info level
     log.info(`${response.status} ${response.config.url}`);
     return response;
   },
@@ -62,7 +56,6 @@ apiClient.interceptors.response.use(
     const url = error?.config?.url;
     log.error('Response error', status ? `${status} ${url}` : error?.message || String(error));
     
-    // Handle 401 Unauthorized - trigger logout
     if (status === 401) {
       await handleUnauthorized();
     }
@@ -71,9 +64,7 @@ apiClient.interceptors.response.use(
   }
 );
 
-// API Service class
 class ApiService {
-  // Generic HTTP methods
   async get(url, config = {}) {
     try {
       const response = await apiClient.get(url, config);
@@ -119,7 +110,6 @@ class ApiService {
     }
   }
 
-  // Get all devices with pagination
   async getDevices(page = 1, limit = 20) {
     try {
       const params = new URLSearchParams({
@@ -133,7 +123,6 @@ class ApiService {
     }
   }
 
-  // Get general status
   async getStatus() {
     try {
       const response = await apiClient.get(CONFIG.ENDPOINTS.STATUS);
@@ -143,7 +132,6 @@ class ApiService {
     }
   }
 
-  // Get device status
   async getDeviceStatus(deviceId) {
     try {
       const url = CONFIG.ENDPOINTS.DEVICE_STATUS.replace(':deviceId', deviceId);
@@ -154,7 +142,6 @@ class ApiService {
     }
   }
 
-  // Get full device details
   async getDeviceDetail(deviceId) {
     try {
       const url = CONFIG.ENDPOINTS.DEVICE_DETAIL.replace(':deviceId', deviceId);
@@ -165,13 +152,11 @@ class ApiService {
     }
   }
 
-  // Toggle outlet
   async toggleOutlet(deviceId, outletId = 'o1') {
     try {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
-      log.debug('toggleOutlet', url);
       const response = await apiClient.put(url);
       return response.data;
     } catch (error) {
@@ -180,13 +165,11 @@ class ApiService {
     }
   }
 
-  // Turn outlet ON
   async turnOnOutlet(deviceId, outletId = 'o1') {
     try {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
-      log.debug('turnOnOutlet', url);
       const response = await apiClient.put(url, { status: true });
       return response.data;
     } catch (error) {
@@ -195,13 +178,11 @@ class ApiService {
     }
   }
 
-  // Turn outlet OFF
   async turnOffOutlet(deviceId, outletId = 'o1') {
     try {
       const url = CONFIG.ENDPOINTS.OUTLET_TOGGLE
         .replace(':deviceId', deviceId)
         .replace(':outletId', outletId);
-      log.debug('turnOffOutlet', url);
       const response = await apiClient.put(url, { status: false });
       return response.data;
     } catch (error) {
@@ -210,11 +191,9 @@ class ApiService {
     }
   }
 
-  // Remove device ownership (unassign device from user)
   async removeDeviceOwnership(deviceId) {
     try {
       const url = `/api/devices/${deviceId}/ownership`;
-      log.debug('removeDeviceOwnership', url);
       const response = await apiClient.delete(url);
       return response.data;
     } catch (error) {
@@ -223,7 +202,6 @@ class ApiService {
     }
   }
 
-  // Update outlet settings
   async updateOutletSettings(deviceId, outletId, settings) {
     try {
       const url = CONFIG.ENDPOINTS.OUTLET_UPDATE
@@ -236,7 +214,6 @@ class ApiService {
     }
   }
 
-  // Enter emergency mode on a device
   async enterEmergencyMode(deviceId) {
     try {
       const url = CONFIG.ENDPOINTS.EMERGENCY_ENTER.replace(':deviceId', deviceId);
@@ -247,7 +224,6 @@ class ApiService {
     }
   }
 
-  // Exit emergency mode on a device
   async exitEmergencyMode(deviceId) {
     try {
       const url = CONFIG.ENDPOINTS.EMERGENCY_EXIT.replace(':deviceId', deviceId);
@@ -268,7 +244,6 @@ class ApiService {
     }
   }
 
-  // Get telemetry history for a device
   async getTelemetryHistory(deviceId, hours = 24) {
     try {
       const url = `/api/logs/${deviceId}/history?hours=${hours}`;
@@ -281,7 +256,6 @@ class ApiService {
   }
 
 }
-// Export singleton instance
 const apiService = new ApiService();
 export { apiService };
 export default apiService;

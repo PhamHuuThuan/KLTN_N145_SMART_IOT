@@ -206,11 +206,14 @@ services:
       - MQTT_HOST=host.docker.internal
       - MQTT_PORT=1883
       - MQTT_WS_PORT=9001
+      - MQTT_USERNAME=${MQTT_USERNAME:-}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
       - TOPIC_PREFIX=iot
       - KAFKA_BROKERS=smart-iot-kafka:29092
       - REDIS_HOST=host.docker.internal
       - REDIS_PORT=6379
       - DEVICE_SERVICE_URL=http://devices-service:3001
+      - DEVICE_SERVICE_TOKEN=${DEVICE_SERVICE_TOKEN:-}
       - DEVICE_VALIDATION_ENABLED=false
       - ALLOW_ANONYMOUS=true
       - LOG_LEVEL=info

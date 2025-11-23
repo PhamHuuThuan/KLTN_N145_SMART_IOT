@@ -5,7 +5,6 @@ import { createLogger } from '../utils/logger';
 import { handleUnauthorized } from '../utils/authHandler';
 
 const authClient = axios.create({
-  // Route auth via API Gateway as well
   baseURL: environment.getApiUrl('GATEWAY') || 'http://127.0.0.1:3000',
   timeout: 10000,
   headers: {

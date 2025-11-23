@@ -41,6 +41,7 @@ services:
       - ML_SUPPORT_ENABLED=true
       - ML_SUPPORT_THRESHOLD=0.8
       - ML_SUPPORT_TIMEOUT_MS=1500
+      - ML_ALERT_COOLDOWN_MS=300000
       - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
     extra_hosts:
       - "kafka:34.59.250.63"

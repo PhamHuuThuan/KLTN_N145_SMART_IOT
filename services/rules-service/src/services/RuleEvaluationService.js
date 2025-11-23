@@ -30,9 +30,10 @@ class RuleEvaluationService {
     this.mlSupportThreshold = Number(process.env.ML_SUPPORT_THRESHOLD || '0.8');
     this.mlServiceUrl = process.env.ML_SERVICE_URL || 'http://localhost:3007';
     this.mlRequestTimeoutMs = Number(process.env.ML_SUPPORT_TIMEOUT_MS || '1500');
+    this.mlAlertCooldown = Number(process.env.ML_ALERT_COOLDOWN_MS || '300000');
     
-    // Log ML configuration for debugging
-    logger.info(`ML Support Configuration: enabled=${this.mlSupportEnabled}, url=${this.mlServiceUrl}, threshold=${this.mlSupportThreshold}`);
+    this.lastMlAlertTime = new Map();
+    
   }
 
   // Extract sensor info from rule + sensorData
@@ -832,6 +833,13 @@ class RuleEvaluationService {
     }
 
     try {
+      const now = Date.now();
+      const lastAlertTime = this.lastMlAlertTime.get(deviceId);
+      if (lastAlertTime && (now - lastAlertTime) < this.mlAlertCooldown) {
+        logger.debug(`ML anomaly alert for ${deviceId} skipped (cooldown: ${Math.round((this.mlAlertCooldown - (now - lastAlertTime)) / 1000)}s remaining)`);
+        return;
+      }
+
       const mlResult = await this.fetchMlSupport(deviceId, sensorData);
       if (!mlResult || !mlResult.predictions) {
         return;
@@ -894,7 +902,7 @@ class RuleEvaluationService {
       const isCritical = deviceAlertLevel === 'critical' || 
                         (maxSensor === 'gas_ppm' && maxSensorValue > 1000) ||
                         (maxSensor === 'flame' && maxSensorValue) ||
-                        (maxSensor === 'smoke' && maxSensorValue > 500);
+                        (maxSensor === 'smoke' && maxSensorValue > 1.5);
 
       const title = isCritical 
         ? `🚨 CẢNH BÁO KHẨN CẤP: Phát hiện bất thường từ hệ thống nhận diện thông minh`
@@ -925,7 +933,7 @@ class RuleEvaluationService {
         priority: isCritical ? 'urgent' : 'high',
         metadata: {
           deviceId: deviceId,
-          deviceName: sensorData.deviceName || `Device ${deviceId}`,
+          deviceName: `Device ${deviceId}`,
           source: 'ml_anomaly_detection',
           mlData: {
             overallScore: deviceScore,
@@ -942,6 +950,9 @@ class RuleEvaluationService {
       };
 
       await this.sendToAlertsService(alertMessage);
+      
+      this.lastMlAlertTime.set(deviceId, now);
+      
       logger.info(`ML anomaly alert sent for ${deviceId}: score=${deviceScore}, level=${deviceAlertLevel}, sensor=${maxSensor}`);
 
     } catch (error) {

@@ -50,39 +50,15 @@ const NotificationSettingsScreen = ({ navigation }) => {
   });
 
   const handleFCMToggle = async (enabled) => {
-    log.debug('handleFCMToggle', enabled, 'prefs.fcm', prefs.fcm, 'userId', user?.id);
     
     setPrefs({ ...prefs, fcm: { enabled } });
     
-    if (enabled && user?.id) {
-      try {
-        log.info('Registering FCM token for user', user.id);
-        await registerFCMToken(user.id);
-        log.info('FCM token registered after enabling push notifications');
-        
-        setFeedback({ visible: true, type: 'success', message: t('settings.pushNotificationsEnabled') });
-      } catch (error) {
-        log.error('Failed to register FCM token', error?.message || error);
-        setPrefs({ ...prefs, fcm: { enabled: false } });
-        let errorMessage = t('settings.pushTokenError');
-        if (error.response?.data?.message) {
-          errorMessage = error.response.data.message;
-        }
-        setFeedback({ visible: true, type: 'error', message: errorMessage });
-      }
-    } else {
-      log.debug('FCM toggle to disabled or no user ID, skipping token registration');
-      if (user?.id) {
-        log.info('Saving preferences to database...');
-        await save();
-      }
-    }
   };
 
   const load = async () => {
     if (!user?.id) return;
     try {
-      const res = await notificationService.getPreferences(user.id);
+      const res = await notificationService.getPreferences(user.userId);
       if (res.success && res.data?.data) {
         const data = res.data.data;
         
@@ -196,7 +172,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
         quietHours: prefs.quietHours
       };
       
-      const res = await notificationService.updatePreferences(user.id, payload);
+      const res = await notificationService.updatePreferences(user.userId, payload);
       if (res.success) {
         setFeedback({ visible: true, type: 'success', message: t('settings.preferencesSaved') });
       } else {

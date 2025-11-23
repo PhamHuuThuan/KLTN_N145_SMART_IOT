@@ -15,14 +15,11 @@ class NotificationService {
     log.info('Initialized', this.baseUrl);
   }
 
-  // Set auth token
   setAuthToken(token) {
     this.authToken = token;
     this.client = null;
-    log.debug('Auth token set');
   }
 
-  // Clear auth token
   clearAuthToken() {
     this.authToken = null;
     this.client = null;
@@ -43,10 +40,8 @@ class NotificationService {
       },
     });
 
-    // Add request interceptor for logging
     this.client.interceptors.request.use(
       (config) => {
-        log.info(`${(config.method || 'GET').toUpperCase()} ${config.baseURL}${config.url}`);
         return config;
       },
       (error) => {
@@ -55,10 +50,8 @@ class NotificationService {
       }
     );
 
-    // Add response interceptor for logging
     this.client.interceptors.response.use(
       (response) => {
-        log.info(`${response.status} ${response.config.url}`);
         return response;
       },
       async (error) => {
@@ -66,7 +59,6 @@ class NotificationService {
         const url = error?.config?.url;
         log.error('Response error', status ? `${status} ${url}` : error?.message || String(error));
         
-        // Handle 401 Unauthorized - trigger logout
         if (status === 401) {
           await handleUnauthorized();
         }
@@ -88,7 +80,6 @@ class NotificationService {
         return window.authToken;
       }
       
-      // Check localStorage for web
       if (typeof localStorage !== 'undefined') {
         return localStorage.getItem('authToken');
       }
@@ -100,7 +91,6 @@ class NotificationService {
     }
   }
 
-  // Get user notifications with pagination
   async getNotifications(userId, page = 1, limit = 20, filters = {}) {
     try {
       const params = new URLSearchParams({

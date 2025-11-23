@@ -56,16 +56,19 @@ export const register = async (req, res) => {
         });
         
         // Try to create default preferences
-        const response = await client.put(`/user/${user._id.toString()}/preferences`, {
+        const response = await client.put(`/user/${user.userId.toString()}/preferences`, {
           email: { 
             enabled: true, 
-            address: email,
-            verified: false
+            addresses: [{
+              name: user.name,
+              address: email,
+              isDefault: true,
+              addedAt: new Date()
+            }],
           },
           sms: { 
             enabled: false, 
             phoneNumber: '',
-            verified: false
           },
           fcm: { 
             enabled: true,
@@ -87,7 +90,6 @@ export const register = async (req, res) => {
           }
         });
         
-        logger.info('✅ UserNotificationPreferences created for user:', user._id.toString());
       } catch (e) {
         // Log only, do not block registration
         logger.warn('❌ Failed to initialize notification preferences:', e?.message || e);
@@ -98,6 +100,7 @@ export const register = async (req, res) => {
       token,
       user: {
         id: user._id,
+        userId: user.userId,
         email: user.email,
         name: user.name,
         phone: user.phone,
@@ -131,7 +134,7 @@ export const login = async (req, res) => {
 
     const token = signToken({ 
       sub: user.userId, 
-      id: user._id.toString(), // Add MongoDB ObjectId for compatibility
+      id: user._id.toString(),
       email 
     });
 
@@ -139,6 +142,7 @@ export const login = async (req, res) => {
       token,
       user: {
         id: user._id,
+        userId: user.userId,
         email: user.email,
         name: user.name,
         phone: user.phone,
@@ -171,6 +175,7 @@ export const me = async (req, res) => {
     res.json({
       user: {
         id: user._id,
+        userId: user.userId,
         email: user.email,
         name: user.name,
         phone: user.phone,
@@ -211,10 +216,80 @@ export const updateProfile = async (req, res) => {
       return res.status(404).json({ error: 'user_not_found' });
     }
 
+    (async () => {
+      try {
+        const alertsBaseUrl = process.env.ALERTS_SERVICE_URL || 'http://localhost:3004';
+        
+        const serviceToken = signToken({ 
+          sub: user.userId, 
+          email: user.email,
+          role: 'service',
+          service: 'auth-service'
+        });
+        
+        const client = axios.create({
+          baseURL: `${alertsBaseUrl}/api/notifications`,
+          timeout: 10000,
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceToken}`
+          }
+        });
+
+        const currentPrefsResponse = await client.get(`/user/${user.userId.toString()}/preferences`);
+        const currentPrefs = currentPrefsResponse.data?.data || {};
+        const preferencesUpdate = {};
+        
+        if (currentPrefs.email && currentPrefs.email.addresses && currentPrefs.email.addresses.length > 0) {
+
+          const defaultEmailIndex = currentPrefs.email.addresses.findIndex(addr => addr.isDefault);
+          if (defaultEmailIndex >= 0) {
+            preferencesUpdate.email = {
+              ...currentPrefs.email,
+              addresses: currentPrefs.email.addresses.map((addr, idx) => 
+                idx === defaultEmailIndex 
+                  ? { ...addr, address: user.email, name: user.name }
+                  : addr
+              )
+            };
+          } else {
+            preferencesUpdate.email = {
+              ...currentPrefs.email,
+              addresses: [{
+                name: user.name,
+                address: user.email,
+                isDefault: true,
+                addedAt: new Date()
+              }]
+            };
+          }
+        }
+
+        if (phone !== undefined && phone) {
+          preferencesUpdate.sms = {
+            ...currentPrefs.sms,
+            phoneNumbers: phone ? [{
+              name: user.name,
+              phoneNumber: phone,
+              isDefault: true,
+              addedAt: new Date()
+            }] : []
+          };
+        }
+
+        if (Object.keys(preferencesUpdate).length > 0) {
+          await client.put(`/user/${user.userId.toString()}/preferences`, preferencesUpdate);
+        }
+      } catch (e) {
+        logger.warn(`Failed to update notification preferences: ${e?.message || e}`);
+      }
+    })();
+
     res.json({
       message: 'Profile updated successfully',
       user: {
         id: user._id,
+        userId: user.userId,
         email: user.email,
         name: user.name,
         phone: user.phone,

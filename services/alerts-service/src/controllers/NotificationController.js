@@ -24,11 +24,6 @@ class NotificationController {
 
       const notification = await this.notificationService.sendNotification(notificationData);
       
-      logger.info(`Notification sent successfully`, { 
-        notificationId: notification.notificationId, 
-        userId: notificationData.userId 
-      });
-      
       res.status(201).json({
         success: true,
         message: 'Notification sent successfully',
@@ -271,94 +266,6 @@ class NotificationController {
   }
 
   /**
-   * Update user notification preferences
-   */
-  async updateUserPreferences(req, res) {
-    try {
-      const { userId } = req.params;
-      const updates = req.body;
-      
-      const preferences = await UserNotificationPreferences.findOneAndUpdate(
-        { userId },
-        { $set: updates },
-        { new: true, upsert: true }
-      );
-      
-      res.status(200).json({
-        success: true,
-        message: 'Preferences updated successfully',
-        data: preferences
-      });
-    } catch (error) {
-      logger.error('Error in updateUserPreferences controller:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
-
-  /**
-   * Add FCM token
-   */
-  async addFCMToken(req, res) {
-    try {
-      const { userId } = req.params;
-      const { token, platform } = req.body;
-      
-      logger.info(`FCM token request for user ${userId}:`, { token: token?.substring(0, 20) + '...', platform });
-      logger.info('Request user from JWT:', req.user);
-      
-      if (!token || !platform) {
-        return res.status(400).json({
-          success: false,
-          message: 'Token and platform are required'
-        });
-      }
-      
-      let preferences = await UserNotificationPreferences.findOne({ userId });
-      
-      if (!preferences) {
-        logger.info(`Creating default preferences for user ${userId}`);
-        preferences = new UserNotificationPreferences({
-          userId,
-          email: { enabled: true, addresses: [] },
-          sms: { enabled: false, phoneNumbers: [] },
-          fcm: { enabled: true, tokens: [] },
-          inApp: { enabled: true },
-          quietHours: {
-            enabled: false,
-            startTime: '22:00',
-            endTime: '08:00',
-            timezone: 'UTC',
-            exceptions: [
-              { type: 'urgent', enabled: true },
-              { type: 'security', enabled: true },
-              { type: 'system', enabled: true }
-            ]
-          }
-        });
-        await preferences.save();
-      }
-      
-      await preferences.addFCMToken(token, platform);
-      
-      res.status(200).json({
-        success: true,
-        message: 'FCM token added successfully'
-      });
-    } catch (error) {
-      logger.error('Error in addFCMToken controller:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
-
-  /**
    * Remove FCM token
    */
   async removeFCMToken(req, res) {
@@ -403,13 +310,8 @@ class NotificationController {
     try {
       const { userId } = req.params;
       const { token, platform } = req.body;
-      
-      logger.info(`🔧 FCM token request for user ${userId}:`, { token: token?.substring(0, 20) + '...', platform });
-      logger.info('🔧 Request user from JWT:', req.user);
-      logger.info('🔧 Request body:', req.body);
 
       if (!token || !platform) {
-        logger.error('❌ Missing token or platform:', { token: !!token, platform });
         return res.status(400).json({
           success: false,
           message: 'Token and platform are required'
@@ -418,11 +320,7 @@ class NotificationController {
 
       // Get or create user preferences
       let preferences = await UserNotificationPreferences.findOne({ userId });
-      logger.info(`🔧 Found preferences:`, !!preferences);
-      
-      // Create default preferences if not found
       if (!preferences) {
-        logger.info(`🔧 Creating default preferences for user ${userId}`);
         preferences = new UserNotificationPreferences({
           userId,
           email: { enabled: true, addresses: [] },
@@ -442,22 +340,11 @@ class NotificationController {
           }
         });
         await preferences.save();
-        logger.info(`🔧 Created new preferences for user ${userId}`);
-      } else {
-        logger.info(`🔧 Current FCM tokens count: ${preferences.fcm.tokens.length}`);
       }
 
-      // Check if token already exists
       const existingTokenIndex = preferences.fcm.tokens.findIndex(t => t.token === token);
-      logger.info(`🔧 Token exists check: index ${existingTokenIndex}`);
-      
-      // Remove any Expo push tokens (they start with "ExponentPushToken[")
       const originalTokenCount = preferences.fcm.tokens.length;
       preferences.fcm.tokens = preferences.fcm.tokens.filter(t => !t.token.startsWith('ExponentPushToken['));
-      const removedCount = originalTokenCount - preferences.fcm.tokens.length;
-      if (removedCount > 0) {
-        logger.info(`🔧 Removed ${removedCount} Expo push tokens for user ${userId}`);
-      }
       
       if (existingTokenIndex >= 0) {
         // Update existing token
@@ -466,9 +353,7 @@ class NotificationController {
           platform,
           lastUsed: new Date()
         };
-        logger.info(`🔧 Updated existing FCM token for user ${userId}`);
       } else {
-        // Add new token
         const newToken = {
           token,
           platform,
@@ -476,12 +361,9 @@ class NotificationController {
           lastUsed: new Date()
         };
         preferences.fcm.tokens.push(newToken);
-        logger.info(`🔧 Added new FCM token for user ${userId}:`, newToken);
       }
 
-      logger.info(`🔧 Before save - FCM tokens count: ${preferences.fcm.tokens.length}`);
       await preferences.save();
-      logger.info(`🔧 After save - FCM tokens count: ${preferences.fcm.tokens.length}`);
 
       res.status(200).json({
         success: true,
@@ -507,14 +389,10 @@ class NotificationController {
     try {
       const { userId } = req.params;
       const preferencesData = req.body;
-      
-      logger.info(`🔧 Update preferences request for user ${userId}:`, preferencesData);
 
-      // Get or create user preferences
-      let preferences = await UserNotificationPreferences.findOne({ userId });
+      let preferences = await UserNotificationPreferences.findOne({ userId: userId });
       
       if (!preferences) {
-        logger.info(`🔧 Creating default preferences for user ${userId}`);
         preferences = new UserNotificationPreferences({
           userId,
           email: { enabled: true, addresses: [] },
@@ -535,9 +413,7 @@ class NotificationController {
         });
       }
 
-      // Update preferences without overwriting FCM tokens
       if (preferencesData.email) {
-        // Only allow enabled + addresses array
         const { enabled, addresses } = preferencesData.email;
         preferences.email.enabled = enabled !== undefined ? enabled : preferences.email.enabled;
         if (Array.isArray(addresses)) {
@@ -552,7 +428,6 @@ class NotificationController {
         }
       }
       if (preferencesData.fcm) {
-        // Only update fcm.enabled, preserve existing tokens
         preferences.fcm = { 
           ...preferences.fcm, 
           enabled: preferencesData.fcm.enabled 
@@ -566,7 +441,6 @@ class NotificationController {
       }
 
       await preferences.save();
-      logger.info(`🔧 Updated preferences for user ${userId}`);
 
       res.status(200).json({
         success: true,
@@ -575,53 +449,6 @@ class NotificationController {
       });
     } catch (error) {
       logger.error('Error in updateUserPreferences controller:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
-
-  /**
-   * Remove FCM token for user
-   */
-  async removeFCMToken(req, res) {
-    try {
-      const { userId } = req.params;
-      const { token } = req.body;
-      
-      if (!token) {
-        return res.status(400).json({
-          success: false,
-          message: 'Token is required'
-        });
-      }
-
-      const preferences = await UserNotificationPreferences.findOne({ userId });
-      
-      if (!preferences) {
-        return res.status(404).json({
-          success: false,
-          message: 'User preferences not found'
-        });
-      }
-
-      // Remove token from array
-      preferences.fcm.tokens = preferences.fcm.tokens.filter(t => t.token !== token);
-      await preferences.save();
-
-      logger.info(`Removed FCM token for user ${userId}`);
-
-      res.status(200).json({
-        success: true,
-        message: 'FCM token removed successfully',
-        data: {
-          tokenCount: preferences.fcm.tokens.length
-        }
-      });
-    } catch (error) {
-      logger.error('Error in removeFCMToken controller:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

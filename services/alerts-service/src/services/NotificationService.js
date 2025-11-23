@@ -259,7 +259,7 @@ class NotificationService {
   async getUserNotifications(userId, options = {}) {
     try {
       const notifications = await Notification.getUserNotifications(userId, options);
-      const total = await Notification.countDocuments({ userId });
+      const total = await Notification.countDocuments({ userId: userId });
       
       return {
         notifications,
@@ -278,7 +278,7 @@ class NotificationService {
     try {
       const notification = await Notification.findOne({
         notificationId: notificationId,
-        userId
+        userId: userId
       });
 
       if (!notification) {
@@ -296,7 +296,7 @@ class NotificationService {
   async markAllAsRead(userId) {
     try {
       const result = await Notification.updateMany(
-        { userId, isRead: false },
+        { userId: userId, isRead: false },
         { isRead: true, readAt: new Date() }
       );
       
@@ -316,14 +316,13 @@ class NotificationService {
     try {
       const notification = await Notification.findOneAndDelete({
         notificationId: notificationId,
-        userId
+        userId: userId
       });
 
       if (!notification) {
         throw new Error('Notification not found');
       }
 
-      logger.info(`Notification deleted: ${notificationId} for user: ${userId}`);
       return notification;
     } catch (error) {
       logger.error('Error deleting notification:', error);
