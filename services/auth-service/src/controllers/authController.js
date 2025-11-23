@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import axios from 'axios';
 import User from '../models/User.js';
 import EmailService from '../services/EmailService.js';
 import logger from '../utils/logger.js';
