@@ -8,7 +8,7 @@ const PADDING_X = 50;
 const PADDING_Y = 40; 
 const PADDING_BOTTOM = 20;
 const PADDING_LEFT = 10;
-const MAX_POINTS = 500;
+const MAX_POINTS = 800; // Increased for better detail on longer time ranges
 const MIN_HEIGHT = 120;
 const TOUCH_TOLERANCE = 30;
 const Y_AXIS_LABELS = 5;
@@ -87,20 +87,26 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       let ts = timestamps;
       let gapPoints = isGapPoints;
       if (numeric.length > MAX_POINTS) {
-        const step = Math.ceil(numeric.length / MAX_POINTS);
+        // Use simple step sampling for all cases (faster performance)
+        const targetPoints = MAX_POINTS;
+        const step = Math.ceil(numeric.length / targetPoints);
         const tmp = [];
         const tmpTs = [];
         const tmpGaps = [];
+        
         for (let i = 0; i < numeric.length; i += step) {
           tmp.push(numeric[i]);
           tmpTs.push(timestamps[i]);
           tmpGaps.push(isGapPoints[i]);
         }
+        
+        // Always include last point
         if (tmp[tmp.length - 1] !== numeric[numeric.length - 1]) {
           tmp.push(numeric[numeric.length - 1]);
           tmpTs.push(timestamps[timestamps.length - 1]);
           tmpGaps.push(isGapPoints[isGapPoints.length - 1]);
         }
+        
         values = tmp;
         ts = tmpTs;
         gapPoints = tmpGaps;
@@ -164,20 +170,26 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       let finalTimestamps = timestamps;
       let finalIsGapPoints = isGapPoints || [];
       if (values.length > maxPointsForWidth) {
-        const step = Math.ceil(values.length / maxPointsForWidth);
+        // Use simple step sampling for all cases (faster performance)
+        const targetPoints = maxPointsForWidth;
+        const step = Math.ceil(values.length / targetPoints);
         const tmp = [];
         const tmpTs = [];
         const tmpGaps = [];
+        
         for (let i = 0; i < values.length; i += step) {
           tmp.push(values[i]);
           tmpTs.push(timestamps[i]);
           tmpGaps.push(isGapPoints[i] || false);
         }
+        
+        // Always include last point
         if (tmp[tmp.length - 1] !== values[values.length - 1]) {
           tmp.push(values[values.length - 1]);
           tmpTs.push(timestamps[timestamps.length - 1]);
           tmpGaps.push(isGapPoints[isGapPoints.length - 1] || false);
         }
+        
         finalValues = tmp;
         finalTimestamps = tmpTs;
         finalIsGapPoints = tmpGaps;
