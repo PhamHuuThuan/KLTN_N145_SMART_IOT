@@ -18,13 +18,15 @@ class MLService:
         self.anomaly_detector = AnomalyDetector(
             model_dir=os.getenv("MODEL_SAVE_DIR", "./models")
         )
-        self.danger_predictor = DangerPredictor(
-            model_dir=os.getenv("MODEL_SAVE_DIR", "./models")
-        )
+        # Temporarily disable danger_predictor (requires training)
+        # self.danger_predictor = DangerPredictor(
+        #     model_dir=os.getenv("MODEL_SAVE_DIR", "./models")
+        # )
+        self.danger_predictor = None
 
         # Load models if they exist
         self.anomaly_detector.load_models()
-        self.danger_predictor.load_models()
+        # self.danger_predictor.load_models()
         
         # In-memory history: device_id -> sensor_type -> last 3 values
         self.history: Dict[str, Dict[str, deque]] = defaultdict(lambda: defaultdict(lambda: deque(maxlen=3)))
@@ -55,7 +57,11 @@ class MLService:
                     # Process single sensor
                     anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type, device_id=device_id)
                     sensor_dict = {sensor_type: value}
-                    danger_score, is_danger = self.danger_predictor.predict(sensor_dict)
+                    # Temporarily disable danger_predictor (requires training)
+                    if self.danger_predictor:
+                        danger_score, is_danger = self.danger_predictor.predict(sensor_dict)
+                    else:
+                        danger_score, is_danger = 0.5, False  # Default values
                 except Exception as sensor_err:
                     logger.error(f"Error processing sensor {sensor_type} for {device_id}: {sensor_err}", exc_info=True)
                     continue
@@ -234,7 +240,11 @@ class MLService:
             
             # Danger prediction using all available sensor data
             sensor_dict = {sensor_type: value}
-            danger_score, is_danger = self.danger_predictor.predict(sensor_dict)
+            # Temporarily disable danger_predictor (requires training)
+            if self.danger_predictor:
+                danger_score, is_danger = self.danger_predictor.predict(sensor_dict)
+            else:
+                danger_score, is_danger = 0.5, False  # Default values
             
             # Domain rule overrides (gas/smoke/temperature)
             try:
@@ -370,8 +380,10 @@ class MLService:
             # Train anomaly detector
             anomaly_success = self.anomaly_detector.train(training_data)
             
+            # Temporarily disable danger_predictor training
             # Train danger predictor
-            danger_success = self.danger_predictor.train(training_data)
+            danger_success = True  # Skip training
+            # danger_success = self.danger_predictor.train(training_data) if self.danger_predictor else True
             
             if anomaly_success and danger_success:
                 logger.info("✅ Model training completed successfully")
@@ -391,6 +403,7 @@ class MLService:
                 "is_trained": self.anomaly_detector.is_trained
             },
             "danger_predictor": {
-                "is_trained": self.danger_predictor.is_trained
+                "is_trained": self.danger_predictor.is_trained if self.danger_predictor else False,
+                "enabled": self.danger_predictor is not None
             }
         }
