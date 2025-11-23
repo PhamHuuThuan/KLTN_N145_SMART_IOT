@@ -80,12 +80,20 @@ services:
       # Email (optional - set nếu có)
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-Smart IoT Kitchen <noreply@smartiotkitchen.com>}
+      # SMS (optional - set nếu có)
+      - SPEEDSMS_API_KEY=${SPEEDSMS_API_KEY:-}
+      - SPEEDSMS_DEVICE_ID=${SPEEDSMS_DEVICE_ID:-}
+      - SPEEDSMS_API_URL=${SPEEDSMS_API_URL:-https://api.speedsms.vn/index.php/sms/send}
       # FCM (optional - set nếu có)
       - FCM_PROJECT_ID=${FCM_PROJECT_ID:-}
+      - FCM_PRIVATE_KEY_ID=${FCM_PRIVATE_KEY_ID:-}
       - FCM_PRIVATE_KEY=${FCM_PRIVATE_KEY:-}
       - FCM_CLIENT_EMAIL=${FCM_CLIENT_EMAIL:-}
+      - FCM_CLIENT_ID=${FCM_CLIENT_ID:-}
     extra_hosts:
       - "kafka:34.59.250.63"
     networks:
