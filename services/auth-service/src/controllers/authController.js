@@ -162,7 +162,7 @@ export const me = async (req, res) => {
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(payload.sub).select('-passwordHash');
+    const user = await User.findOne({ userId: payload.sub }).select('-passwordHash');
     
     if (!user) {
       return res.status(404).json({ error: 'user_not_found' });

@@ -76,7 +76,7 @@ export const checkResourceAccess = (resourceParam = 'userId') => {
 
     const userId = req.params[resourceParam];
     const currentUserId = req.user.sub;
-    const currentUserObjectId = req.user._id;
+    const currentUserObjectId = req.user.id;
 
     // Admin can access all resources
     if (req.user.role === 'admin') {
