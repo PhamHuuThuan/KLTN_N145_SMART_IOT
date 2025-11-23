@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   cameraWrapper: {
-    height: 360,
+    height: 400,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     overflow: 'hidden',
   },
@@ -242,6 +242,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: 50,
   },
   scanFrame: {
     width: '70%',
