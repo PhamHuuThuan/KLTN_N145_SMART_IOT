@@ -27,7 +27,9 @@ const computeOnlineState = (device) => {
 
 export const useRulesData = () => {
   const { token } = useAuth();
-  const { language } = useLanguage();
+  const { currentLanguage } = useLanguage();
+  // Normalize language code (e.g., 'en-US' -> 'en', 'vi-VN' -> 'vi')
+  const language = currentLanguage?.split('-')[0] || 'vi';
   const [rules, setRules] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [devices, setDevices] = useState([]);
@@ -81,17 +83,42 @@ export const useRulesData = () => {
 
   const loadTemplates = async () => {
     try {
-      log.info('Loading rule templates from frontend...');
-      const templatesData = getRuleTemplates(language);
-      const templatesArray = Object.entries(templatesData).map(([key, template]) => ({
-        ...template,
-        key // Add key for reference
-      }));
-      setTemplates(templatesArray);
-      log.info('Templates loaded successfully:', templatesArray.length, 'templates');
+      log.info('Loading rule templates from API...');
+      const response = await rulesService.getTemplates(language);
+      
+      if (response.success && response.data) {
+        // Convert object to array format
+        const templatesArray = Object.entries(response.data).map(([key, template]) => ({
+          ...template,
+          key,
+          id: template.id || key
+        }));
+        setTemplates(templatesArray);
+        log.info('Templates loaded successfully from API:', templatesArray.length, 'templates');
+      } else {
+        log.warn('API templates failed, falling back to hardcoded templates');
+        const templatesData = getRuleTemplates(language);
+        const templatesArray = Object.entries(templatesData).map(([key, template]) => ({
+          ...template,
+          key
+        }));
+        setTemplates(templatesArray);
+        log.info('Templates loaded from fallback:', templatesArray.length, 'templates');
+      }
     } catch (error) {
-      log.error('Error loading templates:', error);
-      setTemplates([]);
+      log.error('Error loading templates from API, using fallback:', error);
+      try {
+        const templatesData = getRuleTemplates(language);
+        const templatesArray = Object.entries(templatesData).map(([key, template]) => ({
+          ...template,
+          key
+        }));
+        setTemplates(templatesArray);
+        log.info('Templates loaded from fallback:', templatesArray.length, 'templates');
+      } catch (fallbackError) {
+        log.error('Error loading fallback templates:', fallbackError);
+        setTemplates([]);
+      }
     }
   };
 

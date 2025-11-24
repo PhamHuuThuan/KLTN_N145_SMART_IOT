@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 60, // Show at top of screen instead of bottom
     alignItems: 'center',
-    zIndex: 9999, // Ensure it's above other content
+    zIndex: 1000, // Ensure it's above other content
   },
   card: {
     flexDirection: 'row',
@@ -83,13 +83,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    marginHorizontal: 20,
-    maxWidth: '90%',
   },
   text: {
     color: '#1F2937',
     fontWeight: '600',
-    flex: 1,
   }
 });
 

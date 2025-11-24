@@ -71,6 +71,10 @@ const ruleSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  lastTriggeredAt: {
+    type: Date,
+    default: null
+  },
   deletedAt: {
     type: Date,
     default: null
@@ -144,7 +148,15 @@ ruleSchema.statics.findByCreator = async function (createdBy, options = {}) {
 
 // Methods
 ruleSchema.methods.isInCooldown = function() {
-  return false;
+  if (!this.cooldownPeriod || this.cooldownPeriod <= 0) {
+    return false;
+  }
+  if (!this.lastTriggeredAt) {
+    return false;
+  }
+
+  const elapsed = Date.now() - new Date(this.lastTriggeredAt).getTime();
+  return elapsed < this.cooldownPeriod;
 };
 
 // Check if rule should escalate
@@ -179,6 +191,7 @@ ruleSchema.methods.shouldEscalate = function(currentValue, sensorType) {
 // Increment trigger count
 ruleSchema.methods.incrementTriggerCount = function() {
   this.triggerCount++;
+  this.lastTriggeredAt = new Date();
   return this.save();
 };
 

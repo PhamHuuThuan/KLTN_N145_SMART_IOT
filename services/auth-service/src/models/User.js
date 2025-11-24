@@ -48,12 +48,6 @@ const userSchema = new mongoose.Schema({
     enum: ['active', 'inactive'],
     default: 'active'
   },
-  firebaseUid: {
-    type: String,
-    unique: true,
-    sparse: true,
-    trim: true
-  },
   resetCode: {
     type: String,
     default: null
@@ -74,7 +68,6 @@ userSchema.index({ userId: 1 });
 userSchema.index({ email: 1 });
 userSchema.index({ status: 1 });
 userSchema.index({ role: 1 });
-userSchema.index({ firebaseUid: 1 });
 
 userSchema.virtual('password')
   .set(function(password) {
