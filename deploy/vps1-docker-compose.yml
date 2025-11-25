@@ -10,7 +10,7 @@ services:
     image: mongo:7
     container_name: smart-iot-mongodb-devices
     ports:
-      - "27017:27017"
+      - "27022:27017"
     environment:
       - MONGO_INITDB_DATABASE=smart_iot_devices
     volumes:
