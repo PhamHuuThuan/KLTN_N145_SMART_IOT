@@ -26,6 +26,7 @@
     "devices": "Thiết bị",
     "rules": "Quy tắc",
     "templates": "Mẫu quy tắc",
+    "support": "Hỗ trợ",
     "logout": "Đăng xuất"
   },
   "login": {
@@ -337,6 +338,35 @@
       "high": "Cao",
       "urgent": "Khẩn cấp"
     }
+  },
+  "support": {
+    "title": "Trung tâm hỗ trợ",
+    "statusFilter": "Trạng thái",
+    "all": "Tất cả",
+    "open": "Đang mở",
+    "pending": "Đang chờ",
+    "closed": "Đã đóng",
+    "assign": "Nhận xử lý",
+    "close": "Đóng cuộc trò chuyện",
+    "reopen": "Mở lại",
+    "send": "Gửi",
+    "messagePlaceholder": "Nhập tin nhắn...",
+    "noConversation": "Chọn một cuộc trò chuyện để bắt đầu trao đổi",
+    "loadError": "Lỗi khi tải cuộc trò chuyện",
+    "empty": "Không có cuộc trò chuyện nào",
+    "user": "Người dùng",
+    "admin": "Quản trị viên",
+    "unassigned": "Chưa có người xử lý",
+    "lastMessage": "Tin nhắn cuối",
+    "updatedAt": "Cập nhật lúc",
+    "unread": "Chưa đọc",
+    "markRead": "Đánh dấu đã đọc",
+    "typeLabel": "Cuộc trò chuyện",
+    "openNew": "Người dùng hãy mở ticket hỗ trợ từ mobile để trao đổi ở đây.",
+    "handlerLabel": "Người xử lý",
+    "delete": "Xóa cuộc trò chuyện",
+    "deleteConfirm": "Bạn có chắc muốn xóa cuộc trò chuyện này không? Không thể hoàn tác.",
+    "assignRequired": "Vui lòng nhấn \"Nhận xử lý\" trước khi trả lời để đảm bảo bạn chịu trách nhiệm cuộc trò chuyện này.",
+    "assignedToOther": "Cuộc trò chuyện đang được một quản trị viên khác xử lý."
   }
 }
-
