@@ -7,6 +7,8 @@ import ruleRoutes from './routes/ruleRoutes.js';
 import adminRuleRoutes from './routes/adminRuleRoutes.js';
 import adminTemplateRoutes from './routes/adminTemplateRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
+import supportRoutes from './routes/supportRoutes.js';
+import adminSupportRoutes from './routes/adminSupportRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import RuleConsumer from './consumers/RuleConsumer.js';
 import logger from './utils/logger.js';
@@ -27,6 +29,8 @@ function createServer() {
   app.use('/api/templates', templateRoutes);
   app.use('/api/admin/rules', adminRuleRoutes);
   app.use('/api/admin/templates', adminTemplateRoutes);
+  app.use('/api/support', supportRoutes);
+  app.use('/api/admin/support', adminSupportRoutes);
   app.get('/', (_req, res) => res.json({ service: 'rules-service' }));
 
   app.use(notFound);
