@@ -31,7 +31,8 @@ export const register = async (req, res) => {
       sub: user.userId,
       id: user._id.toString(),
       email: user.email,
-      role: user.role || 'user'
+      role: user.role || 'user',
+      name: user.name || ''
     });
 
     // Fire-and-forget: initialize notification preferences in alerts-service
@@ -137,7 +138,8 @@ export const login = async (req, res) => {
       sub: user.userId, 
       id: user._id.toString(),
       email: user.email,
-      role: user.role || 'user'
+      role: user.role || 'user',
+      name: user.name || ''
     });
 
     res.json({
