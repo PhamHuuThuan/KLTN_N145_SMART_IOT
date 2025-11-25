@@ -16,6 +16,8 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import RulesScreen from './src/screens/RulesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import SupportChatScreen from './src/screens/SupportChatScreen';
+import UserGuideScreen from './src/screens/UserGuideScreen';
 import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import NotificationScreen from './src/screens/NotificationScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
@@ -109,7 +111,22 @@ function AppContent() {
     }
 
     // Reset to Main screen and Home tab when authenticated (fix for registration/login redirect issue)
-    if (currentScreen !== 'Main' && !['Notifications', 'NotificationSettingsFromNotifications', 'NotificationSettingsFromSettings', 'Profile', 'ChangePassword', 'ForgotPassword', 'VerifyResetCode', 'ResetPassword', 'SensorChart'].includes(currentScreen)) {
+    if (
+      currentScreen !== 'Main' &&
+      ![
+        'Notifications',
+        'NotificationSettingsFromNotifications',
+        'NotificationSettingsFromSettings',
+        'Profile',
+        'ChangePassword',
+        'ForgotPassword',
+        'VerifyResetCode',
+        'ResetPassword',
+        'SensorChart',
+        'SupportChat',
+        'UserGuide'
+      ].includes(currentScreen)
+    ) {
       setCurrentScreen('Main');
       setActiveTab('Home'); // Always go to Home tab after login
     }
@@ -155,6 +172,24 @@ function AppContent() {
           }}
           route={{ params: navigationParams }}
         />;
+      case 'SupportChat':
+        return (
+          <SupportChatScreen
+            navigation={{
+              navigate: setCurrentScreen,
+              goBack: () => setCurrentScreen('Settings')
+            }}
+          />
+        );
+      case 'UserGuide':
+        return (
+          <UserGuideScreen
+            navigation={{
+              navigate: setCurrentScreen,
+              goBack: () => setCurrentScreen('Settings')
+            }}
+          />
+        );
       default:
         return <HomeScreen />;
     }

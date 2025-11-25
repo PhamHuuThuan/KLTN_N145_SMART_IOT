@@ -374,6 +374,8 @@
     "darkMode": "Dark Mode",
     "system": "System",
     "support": "Support",
+    "userGuide": "User Guide",
+    "userGuideDescription": "Quick reference for operating the app",
     "helpSupport": "Help & Support",
     "helpDescription": "Get help and contact support",
     "aboutDescription": "Smart IoT Kitchen v1.0.0\nBuilt with React Native & Expo",
@@ -562,5 +564,80 @@
     "permissionDenied": "Microphone permission denied",
     "permissionDeniedMessage": "Please allow microphone access in Settings > Apps > Smart IoT Kitchen > Permissions.",
     "openSettings": "Open Settings"
+  },
+  "support": {
+    "helpSupport": "Help & Support",
+    "title": "Support chat",
+    "messagePlaceholder": "Describe the issue...",
+    "send": "Send",
+    "chatError": "Unable to load support chat. Please try again.",
+    "empty": "No messages yet. Start by describing your issue.",
+    "adminLabel": "Admin",
+    "userLabel": "You"
+  },
+  "userGuide": {
+    "title": "Mobile User Guide",
+    "intro": "Use this page as a quick checklist to get the most out of Smart IoT Kitchen on mobile.",
+    "updatedAt": "Last updated: {{date}}",
+    "ctaTitle": "Need more help?",
+    "ctaButton": "Open support chat",
+    "sections": {
+      "quickStart": {
+        "title": "1. Quick start",
+        "items": [
+          "Sign in with the account provided by your administrator or self-register and verify your email.",
+          "Add your first device from the home screen using the Device ID or by scanning the QR code.",
+          "Grant camera, microphone and notification permissions (including lock-screen/overlay) so emergency alerts can break through."
+        ]
+      },
+      "homeDevices": {
+        "title": "2. Home & devices",
+        "items": [
+          "Monitor online/offline status and last update time inside the Connected Devices card.",
+          "Tap “View details” to open sensor data, outlet control and device information.",
+          "Pull down to refresh the device list and sync the latest telemetry."
+        ]
+      },
+      "sensorsCharts": {
+        "title": "3. Sensor charts",
+        "items": [
+          "From any sensor widget, choose “Chart” to open historical data for the current device.",
+          "Pick the sensor type, preset range (12h → 30d) or select a custom date window.",
+          "Tap any point to inspect its timestamp/value and spot gaps when data was missing."
+        ]
+      },
+      "outletsVoice": {
+        "title": "4. Outlets & voice control",
+        "items": [
+          "Use the Outlet card to toggle outlets instantly, or tap an outlet to rename and regroup it.",
+          "Successful actions automatically refresh the device state so you can confirm the result.",
+          "Inside the Chat tab select a device, then send text or voice commands such as “Turn on outlet 1” or “Turn off all outlets”."
+        ]
+      },
+      "rules": {
+        "title": "5. Automation rules",
+        "items": [
+          "Open the Rules tab and select a device to filter the rule list.",
+          "Start from the curated templates (Gas, Smoke, Temperature, …) and customize name, description and priority before saving.",
+          "Within rule details you can enable/disable, adjust conditions and cooldown without leaving the screen."
+        ]
+      },
+      "notificationsEmergency": {
+        "title": "6. Notifications & emergency",
+        "items": [
+          "Use the Notifications screen to review history, mark items as read and refresh the feed.",
+          "Visit Settings → Notifications to enable push, email, SMS plus quiet hours or exceptions.",
+          "When the emergency overlay appears, review the sensor details and tap “Enable emergency mode” to shut down kitchen devices while powering safety devices."
+        ]
+      },
+      "support": {
+        "title": "7. Support & troubleshooting",
+        "items": [
+          "Go to Settings → Support → Help & Support to start a conversation with the operations team.",
+          "Always include your Device ID, time of incident and screenshots when possible for faster resolution.",
+          "If chat cannot be opened, check your network, re-login, or contact your administrator directly via email."
+        ]
+      }
+    }
   }
 }
