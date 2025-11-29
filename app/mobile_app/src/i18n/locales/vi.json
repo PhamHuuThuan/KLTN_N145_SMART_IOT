@@ -375,6 +375,8 @@
     "darkMode": "Chế độ tối",
     "system": "Hệ thống",
     "support": "Hỗ trợ",
+    "userGuide": "Hướng dẫn sử dụng",
+    "userGuideDescription": "Tóm tắt các bước vận hành ứng dụng",
     "helpSupport": "Trợ giúp & Hỗ trợ",
     "helpDescription": "Nhận trợ giúp và liên hệ hỗ trợ",
     "aboutDescription": "Smart IoT Kitchen v1.0.0\nĐược xây dựng với React Native & Expo",
@@ -564,5 +566,80 @@
     "permissionDenied": "Quyền truy cập microphone bị từ chối",
     "permissionDeniedMessage": "Vui lòng cho phép quyền truy cập microphone trong Cài đặt > Ứng dụng > Smart IoT Kitchen > Quyền.",
     "openSettings": "Mở Cài đặt"
+  },
+  "support": {
+    "helpSupport": "Trợ giúp & Hỗ trợ",
+    "title": "Trò chuyện hỗ trợ",
+    "messagePlaceholder": "Mô tả vấn đề bạn gặp phải...",
+    "send": "Gửi",
+    "chatError": "Không thể tải cuộc trò chuyện hỗ trợ. Vui lòng thử lại.",
+    "empty": "Chưa có tin nhắn nào. Hãy bắt đầu bằng việc mô tả vấn đề.",
+    "adminLabel": "Quản trị viên",
+    "userLabel": "Bạn"
+  },
+  "userGuide": {
+    "title": "Hướng dẫn sử dụng",
+    "intro": "Trang này giúp bạn nắm nhanh các bước quan trọng để khai thác Smart IoT Kitchen trên di động.",
+    "updatedAt": "Cập nhật lần cuối: {{date}}",
+    "ctaTitle": "Cần thêm trợ giúp?",
+    "ctaButton": "Mở trò chuyện hỗ trợ",
+    "sections": {
+      "quickStart": {
+        "title": "1. Bắt đầu nhanh",
+        "items": [
+          "Đăng nhập bằng tài khoản được quản trị viên cấp hoặc tự đăng ký rồi xác thực email.",
+          "Thêm thiết bị đầu tiên bằng mã Device ID hoặc quét QR ngay trên trang chủ.",
+          "Cấp quyền camera, microphone và thông báo (bao gồm hiển thị ngoài màn hình khóa) để nhận cảnh báo đầy đủ."
+        ]
+      },
+      "homeDevices": {
+        "title": "2. Trang chủ & thiết bị",
+        "items": [
+          "Theo dõi trạng thái online/offline và lần cập nhật cuối trong thẻ Thiết bị đã kết nối.",
+          "Nhấn \"Xem chi tiết\" để mở dữ liệu cảm biến, ổ cắm và thông tin thiết bị.",
+          "Kéo xuống để làm mới danh sách thiết bị cũng như dữ liệu mới nhất."
+        ]
+      },
+      "sensorsCharts": {
+        "title": "3. Biểu đồ cảm biến",
+        "items": [
+          "Từ widget cảm biến, chọn \"Biểu đồ\" để mở lịch sử theo thiết bị.",
+          "Chọn cảm biến, khoảng thời gian 12h → 30 ngày hoặc phạm vi tùy chỉnh.",
+          "Chạm từng điểm dữ liệu để xem thời gian, giá trị chính xác và nhận cảnh báo khi dữ liệu bị gián đoạn."
+        ]
+      },
+      "outletsVoice": {
+        "title": "4. Điều khiển ổ cắm & giọng nói",
+        "items": [
+          "Dùng thẻ Outlet để bật/tắt nhanh, hoặc chạm vào ổ cắm để đổi tên và nhóm.",
+          "Sau khi điều khiển thành công, ứng dụng sẽ tự làm mới trạng thái ổ cắm.",
+          "Ở tab Chat, chọn thiết bị rồi dùng văn bản/giọng nói với các lệnh như “Bật ổ cắm 1” hoặc “Tắt tất cả ổ cắm”."
+        ]
+      },
+      "rules": {
+        "title": "5. Quy tắc tự động",
+        "items": [
+          "Vào tab Quy tắc, chọn thiết bị để xem và lọc các quy tắc hiện có.",
+          "Sử dụng thư viện mẫu ưu tiên (Khí gas, Khói, Nhiệt độ...) để tạo nhanh rồi tùy chỉnh tên, mô tả, độ ưu tiên.",
+          "Trong chi tiết quy tắc, bạn có thể bật/tắt, sửa điều kiện và thời gian chờ mà không cần rời màn hình."
+        ]
+      },
+      "notificationsEmergency": {
+        "title": "6. Thông báo & khẩn cấp",
+        "items": [
+          "Mở màn hình Thông báo để xem lịch sử, đánh dấu đã đọc hoặc làm mới dữ liệu.",
+          "Vào Cài đặt → Thông báo để bật push, email, SMS và cấu hình giờ im lặng hoặc ngoại lệ.",
+          "Khi xuất hiện overlay khẩn cấp, kiểm tra cảm biến, dùng “Bật chế độ khẩn cấp” để tắt thiết bị bếp và bật thiết bị an toàn."
+        ]
+      },
+      "support": {
+        "title": "7. Trợ giúp & xử lý sự cố",
+        "items": [
+          "Truy cập Cài đặt → Hỗ trợ → Trợ giúp & Hỗ trợ để mở khung chat với đội ngũ vận hành.",
+          "Luôn kèm Device ID, thời điểm xảy ra vấn đề và ảnh chụp màn hình (nếu có) để được xử lý nhanh hơn.",
+          "Nếu không mở được chat, kiểm tra kết nối mạng, đăng xuất/đăng nhập lại hoặc gửi email trực tiếp cho quản trị viên."
+        ]
+      }
+    }
   }
 }

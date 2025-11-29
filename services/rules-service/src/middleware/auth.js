@@ -19,8 +19,8 @@ export const authenticateToken = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-strong-secret');
     req.user = {
       ...decoded,
-      userId: decoded.userId || decoded.sub,
-      id: decoded.sub || decoded.userId
+      userId: decoded.userId || decoded.sub || decoded.id || decoded._id,
+      id: decoded.id || decoded._id || decoded.sub || decoded.userId
     };
     next();
   } catch (error) {

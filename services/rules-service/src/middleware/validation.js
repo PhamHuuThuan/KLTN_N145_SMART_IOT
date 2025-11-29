@@ -1,14 +1,19 @@
 
 export const validateRuleUpdate = (req, res, next) => {
-  const { name, deviceId, conditions, actions, priority, cooldownPeriod } = req.body || {};
+  const { name, deviceId, conditions, actions, priority, cooldownPeriod, isActive } = req.body || {};
   
   // Check if any valid fields are provided
   if (
     name === undefined && deviceId === undefined &&
     conditions === undefined && actions === undefined && priority === undefined && 
-    cooldownPeriod === undefined
+    cooldownPeriod === undefined && isActive === undefined
   ) {
     return res.status(400).json({ success: false, message: 'No valid fields provided for update' });
+  }
+
+  // Validate isActive if provided
+  if (isActive !== undefined && typeof isActive !== 'boolean') {
+    return res.status(400).json({ success: false, message: 'isActive must be a boolean value' });
   }
   
   // Validate cooldownPeriod if provided

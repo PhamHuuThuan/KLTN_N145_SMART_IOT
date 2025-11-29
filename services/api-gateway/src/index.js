@@ -198,6 +198,19 @@ app.use('/api/logs', ...optionalAuthProxy(DEVICES_SERVICE_URL));
 // Rules service (preserve '/api/rules')
 app.use('/api/rules', ...secureProxy(RULES_SERVICE_URL));
 
+// Templates service (public endpoint, optional auth - forward if present)
+app.use('/api/templates', ...optionalAuthProxy(RULES_SERVICE_URL));
+
+// Admin rules routes (preserve '/api/admin/rules')
+app.use('/api/admin/rules', ...secureProxy(RULES_SERVICE_URL));
+
+// Admin templates routes (preserve '/api/admin/templates')
+app.use('/api/admin/templates', ...secureProxy(RULES_SERVICE_URL));
+
+// Support chat routes (user & admin)
+app.use('/api/support', ...secureProxy(RULES_SERVICE_URL));
+app.use('/api/admin/support', ...secureProxy(RULES_SERVICE_URL));
+
 // Alerts/notifications service (preserve '/api/notifications')
 app.use('/api/notifications', ...secureProxy(ALERTS_SERVICE_URL));
 
@@ -243,5 +256,3 @@ server.on('upgrade', (req, socket, head) => {
     try { socket.destroy(); } catch (_) {}
   }
 });
-
-
