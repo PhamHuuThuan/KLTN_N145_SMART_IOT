@@ -45,6 +45,12 @@ function Layout({ children, user, onLogout }) {
             >
               {t('nav.templates')}
             </Link>
+            <Link 
+              to="/support" 
+              style={{...styles.navLink, ...(isActive('/support') && styles.navLinkActive)}}
+            >
+              {t('nav.support')}
+            </Link>
           </div>
           
           <div style={styles.userSection}>

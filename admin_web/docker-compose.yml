@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  admin-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://34.59.250.63:3000}
+    image: deploy-admin-web
+    container_name: smart-iot-admin-web
+    ports:
+      - "${ADMIN_WEB_PORT:-8081}:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

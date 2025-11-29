@@ -102,7 +102,13 @@ const SettingsScreen = ({ navigation }) => {
             'help-circle-outline',
             t('settings.helpSupport'),
             t('settings.helpDescription'),
-            () => Alert.alert(t('common.comingSoon'), t('settings.comingSoon'))
+            () => navigation.navigate('SupportChat')
+          )}
+          {renderSettingItem(
+            'book-outline',
+            t('settings.userGuide'),
+            t('settings.userGuideDescription'),
+            () => navigation.navigate('UserGuide')
           )}
           {renderSettingItem(
             'information-circle-outline',

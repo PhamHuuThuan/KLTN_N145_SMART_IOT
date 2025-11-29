@@ -8,6 +8,7 @@ import RuleEditor from './pages/RuleEditor';
 import Templates from './pages/Templates';
 import TemplateEditor from './pages/TemplateEditor';
 import DeviceEditor from './pages/DeviceEditor';
+import Support from './pages/Support';
 import Layout from './components/Layout';
 import { getAuthToken, setAuthToken, removeAuthToken } from './utils/auth';
 import api from './utils/api';
@@ -186,6 +187,18 @@ function App() {
           isAuthenticated ? (
             <Layout user={user} onLogout={handleLogout}>
               <TemplateEditor />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/support"
+        element={
+          isAuthenticated ? (
+            <Layout user={user} onLogout={handleLogout}>
+              <Support currentUser={user} />
             </Layout>
           ) : (
             <Navigate to="/login" replace />
