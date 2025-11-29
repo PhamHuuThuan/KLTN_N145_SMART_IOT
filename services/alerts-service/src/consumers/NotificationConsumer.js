@@ -24,18 +24,6 @@ class NotificationConsumer {
         });
         return;
       }
-
-      // Validate userId format (MongoDB ObjectId)
-      if (!mongoose.Types.ObjectId.isValid(userId)) {
-        logger.warn('Device alert message has invalid userId format, skipping notification', {
-          deviceId,
-          alertType,
-          sensorType,
-          userId,
-          message
-        });
-        return;
-      }
       
       // Determine effective category/priority (prefer message overrides)
       const effectiveCategory = message.category || (['gas_ppm', 'smoke'].includes(sensorType) ? 'security' : 'sensor');
