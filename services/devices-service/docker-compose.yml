@@ -27,6 +27,7 @@ services:
 
       # Tùy chọn dev: auto-create topic & retention
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CREATE_TOPICS=iot.devices.events:1:1,iot.telemetry.logs:1:1,iot.alerts.ml:1:1,notification-requests:1:1,user-actions:1:1,outlet.toggled:1:1,iot.telemetry.logs:1:1
       - KAFKA_CFG_LOG_RETENTION_HOURS=168
       - KAFKA_CFG_NUM_PARTITIONS=1
     volumes:
