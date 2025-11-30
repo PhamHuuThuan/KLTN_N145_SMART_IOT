@@ -8,7 +8,6 @@ import { NotificationProvider } from './src/contexts/NotificationContext';
 import { useNotificationContext } from './src/contexts/NotificationContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import './src/i18n'; // Initialize i18n
-import EmergencyScreen from './src/screens/EmergencyScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -295,17 +294,6 @@ function AppContent() {
             icon="cog"
             isActive={activeTab === 'Settings'}
             onPress={() => setActiveTab('Settings')}
-          />
-        </View>
-      )}
-
-      {isAuthenticated && emergency && (
-        <View style={styles.overlay}>
-          <EmergencyScreen
-            emergency={emergency}
-            onCheckNow={handleCheckNow}
-            onActivateEmergency={handleActivateEmergency}
-            onDismiss={handleDismissEmergency}
           />
         </View>
       )}

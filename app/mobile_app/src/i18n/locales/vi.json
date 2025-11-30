@@ -492,7 +492,7 @@
     "contactEmergency": "Liên hệ dịch vụ khẩn cấp",
     "emergencyNumber": "Khẩn cấp: 911",
     "exitEmergencyMode": "Thoát chế độ khẩn cấp",
-    "emergencyInstructions": "Trong trường hợp khẩn cấp, tất cả thiết bị thông minh sẽ được tắt tự động. Hãy liên hệ dịch vụ khẩn cấp ngay lập tức."
+    "exitEmergencyModeFailed": "Không thể thoát chế độ khẩn cấp"
   },
   "errors": {
     "networkError": "Lỗi kết nối mạng",

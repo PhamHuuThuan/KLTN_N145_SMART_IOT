@@ -11,8 +11,10 @@ import logger from './utils/logger.js';
 const PORT = process.env.PORT || 3001;
 const OFFLINE_THRESHOLD_MS = Number(process.env.DEVICE_OFFLINE_THRESHOLD_MS || 5 * 60 * 1000);
 const WATCHDOG_INTERVAL_MS = Number(process.env.DEVICE_WATCHDOG_INTERVAL_MS || 60 * 1000);
+const EMERGENCY_AUTO_DISABLE_MS = Number(process.env.EMERGENCY_AUTO_DISABLE_MS || 60 * 60 * 1000);
 
 let watchdogTimer = null;
+let emergencyWatchdogTimer = null;
 
 connectDB();
 
@@ -43,6 +45,45 @@ async function startDeviceWatchdog() {
   watchdogTimer = setInterval(runOnce, WATCHDOG_INTERVAL_MS);
 }
 
+async function startEmergencyWatchdog() {
+  async function runOnce() {
+    try {
+      const cutoff = new Date(Date.now() - EMERGENCY_AUTO_DISABLE_MS);
+      const devices = await Device.find({
+        emergencyMode: true,
+        lastEmergencyAt: { $lte: cutoff }
+      });
+
+      for (const device of devices) {
+        device.exitEmergencyMode();
+        await device.save();
+        
+        producer.send({
+          topic: 'user-actions',
+          messages: [{
+            key: device.deviceId,
+            value: JSON.stringify({
+              userId: device.ownerId,
+              deviceId: device.deviceId,
+              deviceName: device.name,
+              action: 'emergency_mode_auto_disabled',
+              result: 'success',
+              timestamp: new Date()
+            })
+          }]
+        }).catch((kafkaError) => {
+          logger.error('Failed to publish emergency auto-disable event to Kafka:', kafkaError);
+        });
+      }
+    } catch (err) {
+      logger.error('Emergency watchdog error:', err.message);
+    }
+  }
+
+  await runOnce();
+  emergencyWatchdogTimer = setInterval(runOnce, WATCHDOG_INTERVAL_MS);
+}
+
 const startServer = async () => {
   try {
     await startKafka();
@@ -54,6 +95,7 @@ const startServer = async () => {
     });
 
     await startDeviceWatchdog();
+    await startEmergencyWatchdog();
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
@@ -65,6 +107,7 @@ process.on('SIGTERM', async () => {
     await stopLogConsumer();
     await producer.disconnect();
     if (watchdogTimer) clearInterval(watchdogTimer);
+    if (emergencyWatchdogTimer) clearInterval(emergencyWatchdogTimer);
     process.exit(0);
   } catch (error) {
     logger.error('Error during shutdown:', error);
@@ -77,6 +120,7 @@ process.on('SIGINT', async () => {
     await stopLogConsumer();
     await producer.disconnect();
     if (watchdogTimer) clearInterval(watchdogTimer);
+    if (emergencyWatchdogTimer) clearInterval(emergencyWatchdogTimer);
     process.exit(0);
   } catch (error) {
     logger.error('Error during shutdown:', error);

@@ -491,7 +491,7 @@
     "contactEmergency": "Contact Emergency Services",
     "emergencyNumber": "Emergency: 911",
     "exitEmergencyMode": "Exit Emergency Mode",
-    "emergencyInstructions": "In case of emergency, all smart devices will be turned off automatically. Contact emergency services immediately."
+    "exitEmergencyModeFailed": "Failed to exit emergency mode"
   },
   "errors": {
     "networkError": "Network connection error",
