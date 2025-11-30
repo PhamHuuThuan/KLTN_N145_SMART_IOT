@@ -639,16 +639,6 @@ class RuleEvaluationService {
     }
   }
 
-  /**
-   * Thay thế các placeholder trong message với giá trị thực tế
-   * @param {string} message - Message template
-   * @param {Object} sensorData - Sensor data
-   * @param {string} sensorType - Type of sensor
-   * @param {number} sensorValue - Current sensor value
-   * @param {number} threshold - Threshold value
-   * @param {string} operator - Comparison operator
-   * @returns {string}
-   */
   replacePlaceholders(message, sensorData, sensorType, sensorValue, threshold, operator) {
     if (!message) return message;
 
@@ -660,7 +650,6 @@ class RuleEvaluationService {
     const flameValue = sensorData.flame !== undefined && sensorData.flame !== null ? Number(sensorData.flame) : null;
     const flameDisplay = flameValue !== null && !Number.isNaN(flameValue) ? flameValue : 'N/A';
 
-    // Thay thế các placeholder chung
     let result = message
       .replace(/\{temperature\}/g, temp)
       .replace(/\{humidity\}/g, humid)
@@ -674,7 +663,6 @@ class RuleEvaluationService {
       .replace(/\{deviceId\}/g, sensorData.deviceId || 'Unknown Device')
       .replace(/\{deviceName\}/g, sensorData.deviceName || (sensorData.deviceId ? `Device ${sensorData.deviceId}` : 'Unknown Device'));
 
-    // Replace sensor-specific placeholders
     switch (sensorType) {
       case 'temperature':
         result = result.replace(/\{temp\}/g, temp);
@@ -705,13 +693,11 @@ class RuleEvaluationService {
     const keys = ['temp', 'humid', 'smoke', 'gas_ppm', 'gas'];
     for (const key of keys) {
       const value = sensorData[key];
-      // Chỉ thêm giá trị nếu là số hợp lệ (không phải null, undefined, NaN)
       if (value !== undefined && value !== null && !isNaN(value) && typeof value === 'number') {
         payload[key] = value;
       }
     }
     if (Object.keys(payload).length === 0) {
-      logger.debug(`No valid sensor values for ML payload: deviceId=${deviceId}, sensorData keys=${Object.keys(sensorData).join(',')}`);
       return null;
     }
     return {
@@ -740,7 +726,6 @@ class RuleEvaluationService {
 
     const url = `${this.mlServiceUrl}/api/ml/predict/event/aggregate?compact=true&include_details=true`;
     
-    // Retry logic for connection issues
     let lastError = null;
     const maxRetries = 2;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -749,10 +734,7 @@ class RuleEvaluationService {
 
       try {
         if (attempt > 0) {
-          logger.debug(`ML request retry ${attempt}/${maxRetries} to ${url}`);
-          await new Promise(resolve => setTimeout(resolve, 500 * attempt)); // Exponential backoff
-        } else {
-          logger.debug(`ML request to ${url}: payload=${JSON.stringify(body)}`);
+          await new Promise(resolve => setTimeout(resolve, 500 * attempt));
         }
         
         const response = await fetch(url, {
@@ -765,7 +747,6 @@ class RuleEvaluationService {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          // Try to get error details from response
           let errorDetail = `ML service ${response.status}`;
           try {
             const errorBody = await response.text();
@@ -773,7 +754,7 @@ class RuleEvaluationService {
               errorDetail += `: ${errorBody}`;
             }
           } catch (e) {
-            // Ignore error reading response body
+
           }
           throw new Error(errorDetail);
         }
@@ -789,21 +770,18 @@ class RuleEvaluationService {
         clearTimeout(timeoutId);
         lastError = error;
         
-        // Retry on connection errors
         if (attempt < maxRetries && (
           error.message.includes('ECONNREFUSED') ||
           error.message.includes('fetch failed') ||
           error.name === 'AbortError'
         )) {
-          continue; // Retry
+          continue;
         }
         
-        // Don't retry on other errors
         throw error;
       }
     }
     
-    // If we get here, all retries failed
     if (lastError) {
       if (lastError.name === 'AbortError') {
         logger.warn(`ML support timeout for ${deviceId}`);
@@ -836,7 +814,6 @@ class RuleEvaluationService {
       const now = Date.now();
       const lastAlertTime = this.lastMlAlertTime.get(deviceId);
       if (lastAlertTime && (now - lastAlertTime) < this.mlAlertCooldown) {
-        logger.debug(`ML anomaly alert for ${deviceId} skipped (cooldown: ${Math.round((this.mlAlertCooldown - (now - lastAlertTime)) / 1000)}s remaining)`);
         return;
       }
 
@@ -848,17 +825,13 @@ class RuleEvaluationService {
       const deviceScore = mlResult.device?.overall_score;
       const deviceAlertLevel = mlResult.device?.alert_level;
       
-      // Chỉ gửi cảnh báo nếu ML phát hiện anomaly nghiêm trọng
-      // (score >= threshold và alert_level là 'high' hoặc 'critical')
       const shouldAlert = deviceScore >= this.mlSupportThreshold && 
                          (deviceAlertLevel === 'high' || deviceAlertLevel === 'critical');
 
       if (!shouldAlert) {
-        logger.debug(`ML anomaly detected but below alert threshold for ${deviceId}: score=${deviceScore}, level=${deviceAlertLevel}`);
         return;
       }
 
-      // Tìm sensor có anomaly score cao nhất
       let maxScore = 0;
       let maxSensor = null;
       let maxSensorValue = null;
@@ -868,7 +841,6 @@ class RuleEvaluationService {
         if (score > maxScore) {
           maxScore = score;
           maxSensor = sensor;
-          // Lấy giá trị sensor tương ứng
           switch (sensor) {
             case 'temperature':
               maxSensorValue = sensorData.temp;
@@ -891,14 +863,12 @@ class RuleEvaluationService {
         }
       }
 
-      // Lấy ownerId từ sensorData hoặc skip nếu không có
       const ownerId = sensorData.ownerId;
       if (!ownerId) {
         logger.warn(`ML anomaly detected for ${deviceId} but no ownerId available, skipping alert`);
         return;
       }
 
-      // Xác định mức độ nghiêm trọng
       const isCritical = deviceAlertLevel === 'critical' || 
                         (maxSensor === 'gas_ppm' && maxSensorValue > 1000) ||
                         (maxSensor === 'flame' && maxSensorValue) ||
@@ -953,8 +923,6 @@ class RuleEvaluationService {
       
       this.lastMlAlertTime.set(deviceId, now);
       
-      logger.info(`ML anomaly alert sent for ${deviceId}: score=${deviceScore}, level=${deviceAlertLevel}, sensor=${maxSensor}`);
-
     } catch (error) {
       logger.warn(`ML anomaly evaluation failed for ${deviceId}: ${error.message}`);
     }
