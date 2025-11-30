@@ -82,36 +82,30 @@ const notificationSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Indexes for better performance
 notificationSchema.index({ userId: 1, isRead: 1 });
 notificationSchema.index({ userId: 1, createdAt: -1 });
 notificationSchema.index({ type: 1, priority: 1 });
 
-// Virtual for notification age
 notificationSchema.virtual('age').get(function() {
   return Date.now() - this.createdAt.getTime();
 });
 
-// Method to mark as read
 notificationSchema.methods.markAsRead = function() {
   this.isRead = true;
   this.readAt = new Date();
   return this.save();
 };
 
-// Method to mark as unread
 notificationSchema.methods.markAsUnread = function() {
   this.isRead = false;
   this.readAt = null;
   return this.save();
 };
 
-// Static method to get unread count for user
 notificationSchema.statics.getUnreadCount = function(userId) {
   return this.countDocuments({ userId, isRead: false });
 };
 
-// Static method to get notifications for user with pagination
 notificationSchema.statics.getUserNotifications = function(userId, options = {}) {
   const {
     page = 1,
@@ -135,8 +129,7 @@ notificationSchema.statics.getUserNotifications = function(userId, options = {})
   return this.find(query)
     .sort(sort)
     .limit(limit * 1)
-    .skip((page - 1) * limit)
-    // .populate('userId', 'name email phone');
+    .skip((page - 1) * limit);
 };
 
 export default mongoose.model('Notification', notificationSchema);

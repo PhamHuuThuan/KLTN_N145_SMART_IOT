@@ -38,12 +38,10 @@ const logger = pino({
   }
 });
 
-// Add custom methods for structured logging
 logger.notification = (message, data = {}) => {
   logger.info({ type: 'notification', ...data }, message);
 };
 
-// Custom error logging method
 const logError = (message, error = {}) => {
   if (error instanceof Error) {
     logger.info({
@@ -57,7 +55,6 @@ const logError = (message, error = {}) => {
   }
 };
 
-// Override the error method
 logger.error = logError;
 
 logger.performance = (operation, duration, data = {}) => {

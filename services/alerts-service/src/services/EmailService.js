@@ -13,9 +13,6 @@ class EmailService {
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
         this.transporter = this._createTransporter();
         this.initialized = true;
-        logger.info('📧 Email service initialized successfully');
-      } else {
-        logger.info('📧 Email service disabled - SMTP credentials not provided');
       }
     } catch (error) {
       logger.error('Failed to initialize email service:', error);
@@ -36,13 +33,6 @@ class EmailService {
     return nodemailer.createTransport(config);
   }
 
-  /**
-   * Send email notification
-   * @param {string} to - Recipient email
-   * @param {string} subject - Email subject
-   * @param {string} message - Email message
-   * @param {Object} metadata - Additional metadata
-   */
   async send(to, subject, message, metadata = {}) {
     try {
       if (!this.initialized || !this.transporter) {
@@ -61,12 +51,6 @@ class EmailService {
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      logger.info('Email sent successfully', { 
-        messageId: result.messageId, 
-        to, 
-        subject 
-      });
-      
       return result;
     } catch (error) {
       logger.error('Error sending email:', error);
@@ -74,10 +58,6 @@ class EmailService {
     }
   }
 
-  /**
-   * Send bulk emails
-   * @param {Array} emails - Array of email data
-   */
   async sendBulk(emails) {
     const results = [];
     
@@ -99,10 +79,6 @@ class EmailService {
     return results;
   }
 
-  /**
-   * Generate HTML email template
-   * @private
-   */
   _generateEmailHTML(subject, message, metadata) {
     const { deviceName, sensorType, sensorValue, threshold, action } = metadata;
     const createdAt = metadata.timestamp ? new Date(metadata.timestamp) : new Date();
@@ -258,19 +234,6 @@ class EmailService {
     `;
   }
 
-  /**
-   * Verify email configuration
-   */
-  async verifyConnection() {
-    try {
-      await this.transporter.verify();
-      logger.info('Email service connection verified');
-      return true;
-    } catch (error) {
-      logger.error('Email service connection failed:', error);
-      return false;
-    }
-  }
 }
 
 export default EmailService;

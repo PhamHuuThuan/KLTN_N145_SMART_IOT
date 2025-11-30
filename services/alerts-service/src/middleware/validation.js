@@ -1,7 +1,6 @@
 import Joi from 'joi';
 import mongoose from 'mongoose';
 
-// Notification validation schema
 const notificationSchema = Joi.object({
   userId: Joi.string().required().custom((value, helpers) => {
     if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -27,10 +26,9 @@ const notificationSchema = Joi.object({
     source: Joi.string(),
     responseType: Joi.string(),
     responseTime: Joi.number()
-  }).default({})
+  }).default({  })
 });
 
-// User preferences validation schema (updated to support multiple emails/phones)
 const preferencesSchema = Joi.object({
   email: Joi.object({
     enabled: Joi.boolean(),
@@ -82,13 +80,6 @@ const preferencesSchema = Joi.object({
   })
 });
 
-// FCM token validation schema
-const fcmTokenSchema = Joi.object({
-  token: Joi.string().required(),
-  platform: Joi.string().valid('android', 'ios', 'web').required()
-});
-
-// Validation middleware
 export const validateNotification = (req, res, next) => {
   const { error, value } = notificationSchema.validate(req.body, { abortEarly: false });
   
@@ -115,7 +106,6 @@ export const validatePreferences = (req, res, next) => {
   });
   
   if (error) {
-    console.error('Validation error:', error.details);
     return res.status(400).json({
       success: false,
       message: 'Validation error',
@@ -127,60 +117,5 @@ export const validatePreferences = (req, res, next) => {
   }
   
   req.body = value;
-  next();
-};
-
-export const validateFCMToken = (req, res, next) => {
-  const { error, value } = fcmTokenSchema.validate(req.body, { abortEarly: false });
-  
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation error',
-      errors: error.details.map(detail => ({
-        field: detail.path.join('.'),
-        message: detail.message
-      }))
-    });
-  }
-  
-  req.body = value;
-  next();
-};
-
-// Bulk notification validation
-export const validateBulkNotifications = (req, res, next) => {
-  const { notifications } = req.body;
-  
-  if (!Array.isArray(notifications)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Notifications must be an array'
-    });
-  }
-  
-  const errors = [];
-  
-  notifications.forEach((notification, index) => {
-    const { error } = notificationSchema.validate(notification, { abortEarly: false });
-    if (error) {
-      errors.push({
-        index,
-        errors: error.details.map(detail => ({
-          field: detail.path.join('.'),
-          message: detail.message
-        }))
-      });
-    }
-  });
-  
-  if (errors.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation errors in bulk notifications',
-      errors
-    });
-  }
-  
   next();
 };

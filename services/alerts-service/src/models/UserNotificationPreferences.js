@@ -49,10 +49,9 @@ const userNotificationPreferencesSchema = new mongoose.Schema({
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  toObject: { virtuals: true   }
 });
 
-// check if notification should be sent via specific method
 userNotificationPreferencesSchema.methods.shouldSendNotification = function(method, priority = 'medium') {
   if (method === 'email' && !this.email.enabled) {
     return false;
@@ -67,12 +66,10 @@ userNotificationPreferencesSchema.methods.shouldSendNotification = function(meth
     return false;
   }
 
-  // urgent bypass tất cả, còn lại theo quiet hours
   if (priority === 'urgent') {
     return true;
   }
 
-  // Check quiet hours
   if (this.quietHours.enabled && priority !== 'urgent') {
     const now = new Date();
     const currentTime = now.toTimeString().slice(0, 5);
@@ -93,7 +90,6 @@ userNotificationPreferencesSchema.methods.shouldSendNotification = function(meth
   return true;
 };
 
-// add FCM token
 userNotificationPreferencesSchema.methods.addFCMToken = function(token, platform) {
   this.fcm.tokens = this.fcm.tokens.filter(t => t.token !== token);
   
@@ -107,13 +103,11 @@ userNotificationPreferencesSchema.methods.addFCMToken = function(token, platform
   return this.save();
 };
 
-// remove FCM token
 userNotificationPreferencesSchema.methods.removeFCMToken = function(token) {
   this.fcm.tokens = this.fcm.tokens.filter(t => t.token !== token);
   return this.save();
 };
 
-// update last used time for FCM token
 userNotificationPreferencesSchema.methods.updateFCMTokenUsage = function(token) {
   const tokenObj = this.fcm.tokens.find(t => t.token === token);
   if (tokenObj) {
@@ -123,12 +117,10 @@ userNotificationPreferencesSchema.methods.updateFCMTokenUsage = function(token) 
   return Promise.resolve(this);
 };
 
-// get preferences for user
 userNotificationPreferencesSchema.statics.getUserPreferences = function(userId) {
   return this.findOne({ userId: userId });
 };
 
-// create default preferences for new user
 userNotificationPreferencesSchema.statics.createDefaultPreferences = function(userId, email, phoneNumber = null) {
   return this.create({
     userId: userId,
@@ -160,7 +152,6 @@ userNotificationPreferencesSchema.statics.createDefaultPreferences = function(us
   });
 };
 
-// Ensure default preferences exist for a user; create if missing
 userNotificationPreferencesSchema.statics.ensureDefaultPreferences = async function(userId, email, phoneNumber = null) {
   const existing = await this.findOne({ userId: userId });
   if (existing) return existing;

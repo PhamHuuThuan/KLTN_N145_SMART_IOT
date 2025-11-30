@@ -7,14 +7,10 @@ class NotificationConsumer {
     this.notificationService = new NotificationService();
   }
 
-  /**
-   * Handle device alert messages
-   */
   async handleDeviceAlert(topic, message) {
     try {
       const { deviceId, deviceName, sensorType, sensorValue, threshold, alertType, userId } = message;
       
-      // Validate required userId
       if (!userId) {
         logger.warn('Device alert message missing userId, skipping notification', {
           deviceId,
@@ -25,7 +21,6 @@ class NotificationConsumer {
         return;
       }
       
-      // Determine effective category/priority (prefer message overrides)
       const effectiveCategory = message.category || (['gas_ppm', 'smoke'].includes(sensorType) ? 'security' : 'sensor');
       const effectivePriority = message.priority || this._getAlertPriority(alertType, sensorType, sensorValue, threshold);
 
@@ -46,30 +41,16 @@ class NotificationConsumer {
         }
       };
 
-      logger.info(`Device alert notification data:`, notificationData);
-      logger.info(`Emergency check: category=${effectiveCategory}, priority=${effectivePriority}, type=${effectiveCategory === 'security' ? 'security_alert' : 'device_alert'}`);
-      
       await this.notificationService.sendNotification(notificationData);
-      
-      logger.notification('Device alert notification sent', {
-        deviceId,
-        userId,
-        alertType,
-        sensorType
-      });
     } catch (error) {
       logger.error('Error handling device alert:', error);
     }
   }
 
-  /**
-   * Handle notification request messages
-   */
   async handleNotificationRequest(topic, message) {
     try {
       const { userId, title, message: notificationMessage, type, category, priority, metadata } = message;
       
-      // Validate required userId
       if (!userId) {
         logger.warn('Notification request message missing userId, skipping notification', {
           title,
@@ -80,12 +61,8 @@ class NotificationConsumer {
         return;
       }
 
-      // Validate userId format (MongoDB ObjectId)
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         logger.warn('Notification request message has invalid userId format, skipping notification', {
-          title,
-          type,
-          category,
           userId,
           message
         });
@@ -103,23 +80,13 @@ class NotificationConsumer {
       };
 
       await this.notificationService.sendNotification(notificationData);
-      
-      logger.notification('Notification request processed', {
-        userId,
-        type,
-        category
-      });
     } catch (error) {
       logger.error('Error handling notification request:', error);
     }
   }
 
-  /**
-   * Handle user action messages
-   */
   async handleUserAction(topic, message) {
     try {
-      // Validate message structure
       if (!message || typeof message !== 'object') {
         logger.warn('Invalid message format in handleUserAction', { topic, message });
         return;
@@ -127,7 +94,6 @@ class NotificationConsumer {
 
       const { userId, action, deviceId, deviceName, result, outletId, outletName, status } = message;
       
-      // Validate required userId
       if (!userId) {
         logger.warn('User action message missing userId, skipping notification', {
           action,
@@ -137,11 +103,8 @@ class NotificationConsumer {
         return;
       }
 
-      // Validate userId format (MongoDB ObjectId)
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         logger.warn('User action message has invalid userId format, skipping notification', {
-          action,
-          deviceId,
           userId,
           message
         });
@@ -214,56 +177,8 @@ class NotificationConsumer {
       }
   
       await this.notificationService.sendNotification(notificationData);
-      
-      logger.notification('User action notification sent', {
-        userId,
-        action,
-        deviceId
-      });
     } catch (error) {
       logger.error('Error handling user action:', error);
-    }
-  }
-
-  async handleSystemEvent(topic, message) {
-    try {
-      const { eventType, message: eventMessage, affectedUsers, metadata } = message;
-      
-      if (affectedUsers && affectedUsers.length > 0) {
-        const validUserIds = affectedUsers.filter(userId => 
-          userId && mongoose.Types.ObjectId.isValid(userId)
-        );
-
-        if (validUserIds.length === 0) {
-          logger.warn('System event has no valid userIds, skipping notifications', {
-            eventType,
-            originalCount: affectedUsers.length,
-            message
-          });
-          return;
-        }
-
-        const notifications = validUserIds.map(userId => ({
-          userId,
-          title: this._getSystemEventTitle(eventType),
-          message: eventMessage,
-          type: 'system_notification',
-          category: 'system',
-          priority: this._getSystemEventPriority(eventType),
-          metadata: metadata || {}
-        }));
-
-        await this.notificationService.sendBulkNotifications(notifications);
-        
-        logger.notification('System event notifications sent', {
-          eventType,
-          userCount: validUserIds.length,
-          originalCount: affectedUsers.length,
-          filteredCount: affectedUsers.length - validUserIds.length
-        });
-      }
-    } catch (error) {
-      logger.error('Error handling system event:', error);
     }
   }
 
@@ -318,7 +233,6 @@ class NotificationConsumer {
   }
 
   _getAlertPriority(alertType, sensorType, sensorValue, threshold) {
-    // Elevate to urgent for dangerous sensors or severe breaches
     if (alertType === 'threshold_exceeded') {
       if (sensorType === 'smoke' || sensorType === 'gas_ppm') {
         return 'urgent';
@@ -358,32 +272,6 @@ class NotificationConsumer {
   }
 
 
-  _getSystemEventTitle(eventType) {
-    const eventTitles = {
-      maintenance: 'Bảo trì hệ thống',
-      update: 'Cập nhật hệ thống',
-      security: 'Cảnh báo bảo mật',
-      outage: 'Sự cố hệ thống',
-      recovery: 'Khôi phục hệ thống'
-    };
-
-    return eventTitles[eventType] || 'Sự kiện hệ thống';
-  }
-
-  _getSystemEventPriority(eventType) {
-    switch (eventType) {
-      case 'security':
-      case 'outage':
-        return 'urgent';
-      case 'maintenance':
-      case 'update':
-        return 'medium';
-      case 'recovery':
-        return 'low';
-      default:
-        return 'medium';
-    }
-  }
 }
 
 export default NotificationConsumer;
