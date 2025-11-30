@@ -156,7 +156,16 @@
     "sendingCommand": "Sending command...",
     "deviceInformation": "Device Information",
     "updateOutletSettingsFailed": "Failed to update outlet settings",
-    "lastUpdate": "Last update"
+    "lastUpdate": "Last update",
+    "buzzerControl": "Buzzer Control",
+    "turnOnBuzzer": "Turn On Buzzer",
+    "turnOffBuzzer": "Turn Off Buzzer",
+    "buzzerTurnedOn": "Buzzer turned on",
+    "buzzerTurnedOff": "Buzzer turned off",
+    "buzzerControlFailed": "Failed to control buzzer",
+    "testBuzzer": "Test Buzzer",
+    "buzzerTested": "Buzzer tested",
+    "buzzerTestFailed": "Failed to test buzzer"
   },
   "rules": {
     "title": "Automation Rules",

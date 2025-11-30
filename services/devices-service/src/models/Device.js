@@ -101,7 +101,12 @@ deviceSchema.methods.enterEmergencyMode = function() {
     const outletType = (outlet.type || '').toLowerCase();
     const inferredSafety = !outletType && outlet.id === 'o4';
     const isSafety = outletType === 'safety' || inferredSafety;
-    outlet.status = isSafety;
+    
+    if (outlet.id === 'o5') {
+      outlet.status = true;
+    } else {
+      outlet.status = isSafety;
+    }
     outlet.lastToggleAt = new Date();
   });
 
