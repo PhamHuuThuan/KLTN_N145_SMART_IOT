@@ -10,7 +10,11 @@ import {
   enterEmergencyMode,
   exitEmergencyMode,
   getDeviceStatus,
-  removeDeviceOwnership
+  removeDeviceOwnership,
+  toggleBuzzer,
+  turnOnBuzzer,
+  turnOffBuzzer,
+  testBuzzer
 } from '../controllers/deviceController.js';
 import { authenticateToken, checkDeviceOwnership } from '../middleware/auth.js';
 
@@ -25,6 +29,10 @@ router.delete('/:deviceId', authenticateToken, checkDeviceOwnership, deleteDevic
 router.get('/:deviceId/status', authenticateToken, checkDeviceOwnership, getDeviceStatus);
 router.put('/:deviceId/outlets/:outletId/toggle', authenticateToken, checkDeviceOwnership, toggleOutlet);
 router.put('/:deviceId/outlets/:outletId', authenticateToken, checkDeviceOwnership, updateOutletSettings);
+router.put('/:deviceId/buzzer/toggle', authenticateToken, checkDeviceOwnership, toggleBuzzer);
+router.put('/:deviceId/buzzer/on', authenticateToken, checkDeviceOwnership, turnOnBuzzer);
+router.put('/:deviceId/buzzer/off', authenticateToken, checkDeviceOwnership, turnOffBuzzer);
+router.put('/:deviceId/buzzer/test', authenticateToken, checkDeviceOwnership, testBuzzer);
 router.put('/:deviceId/emergency/enter', authenticateToken, checkDeviceOwnership, enterEmergencyMode);
 router.put('/:deviceId/emergency/exit', authenticateToken, checkDeviceOwnership, exitEmergencyMode);
 router.delete('/:deviceId/ownership', authenticateToken, removeDeviceOwnership);

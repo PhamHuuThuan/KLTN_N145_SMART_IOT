@@ -392,6 +392,26 @@ export const exitEmergencyMode = async (req, res) => {
     await device.save();
     
     producer.send({
+      topic: 'outlet.toggled',
+      messages: [{
+        key: deviceId,
+        value: JSON.stringify({
+          userId: device.ownerId,
+          deviceId,
+          deviceName: device.name,
+          outletId: BUZZER_OUTLET_ID,
+          outletName: 'Buzzer',
+          status: false,
+          action: 'outlet_toggled',
+          result: 'success',
+          timestamp: new Date()
+        })
+      }]
+    }).catch((kafkaError) => {
+      logger.error('Failed to publish buzzer off event to Kafka:', kafkaError);
+    });
+    
+    producer.send({
       topic: 'user-actions',
       messages: [{
         key: deviceId,
@@ -418,6 +438,174 @@ export const exitEmergencyMode = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deactivating emergency mode',
+      error: error.message
+    });
+  }
+};
+
+const BUZZER_OUTLET_ID = 'o5';
+
+const sendBuzzerCommand = async (deviceId, userId, isAdmin, targetStatus) => {
+  const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+  if (!ownershipCheck.success) {
+    throw new Error(ownershipCheck.message);
+  }
+  
+  const device = ownershipCheck.device;
+  
+  producer.send({
+    topic: 'outlet.toggled',
+    messages: [{
+      key: deviceId,
+      value: JSON.stringify({
+        userId: device.ownerId,
+        deviceId,
+        deviceName: device.name,
+        outletId: BUZZER_OUTLET_ID,
+        outletName: 'Buzzer',
+        status: targetStatus,
+        action: 'outlet_toggled',
+        result: 'success',
+        timestamp: new Date()
+      })
+    }]
+  }).catch((kafkaError) => {
+    logger.error('Failed to publish buzzer command to Kafka:', kafkaError);
+  });
+  
+  return device;
+};
+
+export const toggleBuzzer = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
+    
+    const device = await sendBuzzerCommand(deviceId, userId, isAdmin, true);
+    
+    res.json({
+      success: true,
+      data: device,
+      message: 'Buzzer command sent successfully'
+    });
+  } catch (error) {
+    logger.error('Error toggling buzzer:', error);
+    const statusCode = error.message.includes('not found') ? 404 
+      : error.message.includes('Access denied') ? 403 
+      : 500;
+    res.status(statusCode).json({
+      success: false,
+      message: 'Error toggling buzzer',
+      error: error.message
+    });
+  }
+};
+
+export const turnOnBuzzer = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
+    
+    const device = await sendBuzzerCommand(deviceId, userId, isAdmin, true);
+    
+    res.json({
+      success: true,
+      data: device,
+      message: 'Buzzer turned on successfully'
+    });
+  } catch (error) {
+    logger.error('Error turning on buzzer:', error);
+    const statusCode = error.message.includes('not found') ? 404 
+      : error.message.includes('Access denied') ? 403 
+      : 500;
+    res.status(statusCode).json({
+      success: false,
+      message: 'Error turning on buzzer',
+      error: error.message
+    });
+  }
+};
+
+export const turnOffBuzzer = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
+    
+    const device = await sendBuzzerCommand(deviceId, userId, isAdmin, false);
+    
+    res.json({
+      success: true,
+      data: device,
+      message: 'Buzzer turned off successfully'
+    });
+  } catch (error) {
+    logger.error('Error turning off buzzer:', error);
+    const statusCode = error.message.includes('not found') ? 404 
+      : error.message.includes('Access denied') ? 403 
+      : 500;
+    res.status(statusCode).json({
+      success: false,
+      message: 'Error turning off buzzer',
+      error: error.message
+    });
+  }
+};
+
+export const testBuzzer = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.sub;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
+    
+    const device = await sendBuzzerCommand(deviceId, userId, isAdmin, true);
+    
+    setTimeout(async () => {
+      try {
+        const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
+        if (ownershipCheck.success) {
+          const updatedDevice = ownershipCheck.device;
+          
+          producer.send({
+            topic: 'outlet.toggled',
+            messages: [{
+              key: deviceId,
+              value: JSON.stringify({
+                userId: updatedDevice.ownerId,
+                deviceId,
+                deviceName: updatedDevice.name,
+                outletId: BUZZER_OUTLET_ID,
+                outletName: 'Buzzer',
+                status: false,
+                action: 'outlet_toggled',
+                result: 'success',
+                timestamp: new Date()
+              })
+            }]
+          }).catch((kafkaError) => {
+            logger.error('Failed to publish buzzer test off event to Kafka:', kafkaError);
+          });
+        }
+      } catch (error) {
+        logger.error('Error turning off buzzer after test:', error);
+      }
+    }, 5000);
+    
+    res.json({
+      success: true,
+      data: device,
+      message: 'Buzzer test initiated (will turn off after 5 seconds)'
+    });
+  } catch (error) {
+    logger.error('Error testing buzzer:', error);
+    const statusCode = error.message.includes('not found') ? 404 
+      : error.message.includes('Access denied') ? 403 
+      : 500;
+    res.status(statusCode).json({
+      success: false,
+      message: 'Error testing buzzer',
       error: error.message
     });
   }

@@ -158,58 +158,21 @@ const HomeScreen = ({ navigation }) => {
     if (!selectedDevice) return;
     
     try {
-      const currentStatus = getBuzzerStatus();
-      const isEmergency = deviceData?.emergencyMode;
-      
-      if (isEmergency) {
-        // In emergency mode: toggle on/off
-        const action = currentStatus ? 'off' : 'on';
-        const success = await controlOutlet(action, selectedDevice, 'o5');
-        
-        if (success) {
-          setFeedback({
-            visible: true,
-            type: 'success',
-            message: currentStatus 
-              ? t('devices.buzzerTurnedOff', 'Buzzer turned off')
-              : t('devices.buzzerTurnedOn', 'Buzzer turned on')
-          });
-          await fetchDeviceStatus(selectedDevice);
-        } else {
-          setFeedback({
-            visible: true,
-            type: 'error',
-            message: t('devices.buzzerControlFailed', 'Failed to control buzzer')
-          });
-        }
-      } else {
-        // Normal mode: test buzzer (turn on then off after 1 second)
-        const success = await controlOutlet('on', selectedDevice, 'o5');
-        if (success) {
-          setFeedback({
-            visible: true,
-            type: 'success',
-            message: t('devices.buzzerTested', 'Buzzer tested')
-          });
-          // Turn off after 1 second
-          setTimeout(async () => {
-            await controlOutlet('off', selectedDevice, 'o5');
-            await fetchDeviceStatus(selectedDevice);
-          }, 1000);
-        } else {
-          setFeedback({
-            visible: true,
-            type: 'error',
-            message: t('devices.buzzerTestFailed', 'Failed to test buzzer')
-          });
-        }
-      }
+      await apiService.testBuzzer(selectedDevice);
+      setFeedback({
+        visible: true,
+        type: 'success',
+        message: t('devices.buzzerTested', 'Buzzer tested')
+      });
+      setTimeout(async () => {
+        await fetchDeviceStatus(selectedDevice);
+      }, 5500);
     } catch (error) {
-      log.error('Error controlling buzzer', error?.message || error);
+      log.error('Error testing buzzer', error?.message || error);
       setFeedback({
         visible: true,
         type: 'error',
-        message: error.message || t('devices.buzzerControlFailed', 'Failed to control buzzer')
+        message: error.message || t('devices.buzzerTestFailed', 'Failed to test buzzer')
       });
     }
   };
@@ -217,9 +180,9 @@ const HomeScreen = ({ navigation }) => {
   // Auto turn on buzzer when entering emergency mode
   useEffect(() => {
     const turnOnBuzzerInEmergency = async () => {
-      if (deviceData?.emergencyMode && selectedDevice && !getBuzzerStatus()) {
+      if (deviceData?.emergencyMode && selectedDevice) {
         try {
-          await controlOutlet('on', selectedDevice, 'o5');
+          await apiService.turnOnBuzzer(selectedDevice);
           log.info('Buzzer auto-turned on in emergency mode');
         } catch (error) {
           log.error('Failed to auto-turn on buzzer in emergency', error);
@@ -362,7 +325,7 @@ const HomeScreen = ({ navigation }) => {
           onRefreshDeviceData={() => fetchDeviceStatus(selectedDevice)}
         />
 
-        {selectedDevice && (
+        {selectedDevice && !deviceData?.emergencyMode && (
           <View style={[
             styles.buzzerCard,
             { backgroundColor: colors.surface }
@@ -371,9 +334,7 @@ const HomeScreen = ({ navigation }) => {
               style={[
                 styles.buzzerButton,
                 {
-                  backgroundColor: deviceData?.emergencyMode 
-                    ? (getBuzzerStatus() ? colors.danger : colors.success)
-                    : colors.primary,
+                  backgroundColor: colors.primary,
                   opacity: controlLoading ? 0.6 : 1,
                 }
               ]}
@@ -382,20 +343,12 @@ const HomeScreen = ({ navigation }) => {
               activeOpacity={0.8}
             >
               <MaterialCommunityIcons
-                name={deviceData?.emergencyMode 
-                  ? (getBuzzerStatus() ? 'bell-off' : 'bell-ring')
-                  : 'bell-ring-outline'
-                }
+                name="bell-ring-outline"
                 size={20}
                 color="#fff"
               />
               <Text style={styles.buzzerButtonText}>
-                {deviceData?.emergencyMode
-                  ? (getBuzzerStatus() 
-                      ? t('devices.turnOffBuzzer', 'Turn Off Buzzer')
-                      : t('devices.turnOnBuzzer', 'Turn On Buzzer'))
-                  : t('devices.testBuzzer', 'Kiểm tra còi')
-                }
+                {t('devices.testBuzzer', 'Kiểm tra còi')}
               </Text>
             </TouchableOpacity>
           </View>
