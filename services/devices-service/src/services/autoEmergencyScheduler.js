@@ -126,41 +126,41 @@ export async function activateEmergencyMode(device, options = {}) {
   return device;
 }
 
-async function triggerAutoEmergency(deviceId) {
-  const pendingEntry = pendingAutoEmergencies.get(deviceId);
-  pendingAutoEmergencies.delete(deviceId);
+// async function triggerAutoEmergency(deviceId) {
+//   const pendingEntry = pendingAutoEmergencies.get(deviceId);
+//   pendingAutoEmergencies.delete(deviceId);
 
-  const context = pendingEntry?.context || {};
+//   const context = pendingEntry?.context || {};
 
-  try {
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      logger.warn('Auto emergency skipped: device not found', { deviceId, context });
-      return;
-    }
+//   try {
+//     const device = await Device.findOne({ deviceId });
+//     if (!device) {
+//       logger.warn('Auto emergency skipped: device not found', { deviceId, context });
+//       return;
+//     }
 
-    if (device.emergencyMode) {
-      return;
-    }
+//     if (device.emergencyMode) {
+//       return;
+//     }
 
-    await activateEmergencyMode(device, {
-      reason: context.reason || 'auto_timeout',
-      triggeredBy: context.triggeredBy || 'auto_timeout',
-      initiatedBy: context.initiatedBy || 'system:auto_timeout',
-      metadata: context.metadata || {},
-      userId: context.userId || device.ownerId || null
-    });
+//     await activateEmergencyMode(device, {
+//       reason: context.reason || 'auto_timeout',
+//       triggeredBy: context.triggeredBy || 'auto_timeout',
+//       initiatedBy: context.initiatedBy || 'system:auto_timeout',
+//       metadata: context.metadata || {},
+//       userId: context.userId || device.ownerId || null
+//     });
 
-    logger.warn('Auto emergency activated after timeout', {
-      deviceId,
-      delayMs: context.delayMs || AUTO_EMERGENCY_DELAY_MS,
-      source: context.source || 'unknown',
-      reason: context.reason || 'auto_timeout'
-    });
-  } catch (error) {
-    logger.error('Auto emergency activation failed:', error);
-  }
-}
+//     logger.warn('Auto emergency activated after timeout', {
+//       deviceId,
+//       delayMs: context.delayMs || AUTO_EMERGENCY_DELAY_MS,
+//       source: context.source || 'unknown',
+//       reason: context.reason || 'auto_timeout'
+//     });
+//   } catch (error) {
+//     logger.error('Auto emergency activation failed:', error);
+//   }
+// }
 
 export function cancelAutoEmergency(deviceId, cancelReason = 'manual_intervention') {
   const entry = pendingAutoEmergencies.get(deviceId);
@@ -173,46 +173,46 @@ export function cancelAutoEmergency(deviceId, cancelReason = 'manual_interventio
   return true;
 }
 
-export function scheduleAutoEmergency(context = {}) {
-  const deviceId = context.deviceId || context.device_id;
-  if (!deviceId) {
-    logger.warn('scheduleAutoEmergency skipped: missing deviceId', { context });
-    return;
-  }
+// export function scheduleAutoEmergency(context = {}) {
+//   const deviceId = context.deviceId || context.device_id;
+//   if (!deviceId) {
+//     logger.warn('scheduleAutoEmergency skipped: missing deviceId', { context });
+//     return;
+//   }
 
-  const delayMs = Number(context.delayMs) || AUTO_EMERGENCY_DELAY_MS;
+//   const delayMs = AUTO_EMERGENCY_DELAY_MS;
 
-  if (pendingAutoEmergencies.has(deviceId)) {
-    clearTimeout(pendingAutoEmergencies.get(deviceId).timer);
-    pendingAutoEmergencies.delete(deviceId);
-  }
+//   if (pendingAutoEmergencies.has(deviceId)) {
+//     clearTimeout(pendingAutoEmergencies.get(deviceId).timer);
+//     pendingAutoEmergencies.delete(deviceId);
+//   }
 
-  const timer = setTimeout(() => {
-    triggerAutoEmergency(deviceId).catch((error) => {
-      logger.error('Auto emergency trigger error:', error);
-    });
-  }, delayMs);
+//   const timer = setTimeout(() => {
+//     triggerAutoEmergency(deviceId).catch((error) => {
+//       logger.error('Auto emergency trigger error:', error);
+//     });
+//   }, delayMs);
 
-  if (typeof timer.unref === 'function') {
-    timer.unref();
-  }
+//   if (typeof timer.unref === 'function') {
+//     timer.unref();
+//   }
 
-  pendingAutoEmergencies.set(deviceId, {
-    timer,
-    context: {
-      ...context,
-      deviceId,
-      delayMs,
-      scheduledAt: new Date()
-    },
-    expiresAt: new Date(Date.now() + delayMs)
-  });
+//   pendingAutoEmergencies.set(deviceId, {
+//     timer,
+//     context: {
+//       ...context,
+//       deviceId,
+//       delayMs,
+//       scheduledAt: new Date()
+//     },
+//     expiresAt: new Date(Date.now() + delayMs)
+//   });
 
-  logger.warn('Auto emergency scheduled', {
-    deviceId,
-    delayMs,
-    reason: context.reason || 'auto_timeout',
-    source: context.source || 'unknown'
-  });
-}
+//   logger.warn('Auto emergency scheduled', {
+//     deviceId,
+//     delayMs,
+//     reason: context.reason || 'auto_timeout',
+//     source: context.source || 'unknown'
+//   });
+// }
 

@@ -1,7 +1,7 @@
 import { Kafka } from 'kafkajs';
 import Device from '../models/Device.js';
 import logger from '../utils/logger.js';
-import { scheduleAutoEmergency } from '../services/autoEmergencyScheduler.js';
+import { activateEmergencyMode } from '../services/autoEmergencyScheduler.js';
 
 const kafka = new Kafka({
   clientId: 'devices-status-consumer',
@@ -19,7 +19,7 @@ const consumer = kafka.consumer({
   heartbeatInterval: 3000
 });
 
-const TEMP_EMERGENCY_THRESHOLD = Number(process.env.EMERGENCY_AUTO_TEMP_THRESHOLD || 80);
+const TEMP_EMERGENCY_THRESHOLD = Number(process.env.EMERGENCY_AUTO_TEMP_THRESHOLD || 60);
 const EMERGENCY_SENSOR_TYPES = new Set(['gas_ppm', 'gas', 'smoke', 'flame']);
 const AUTO_EMERGENCY_TOPICS = ['device-alerts', 'iot.alerts.ml'];
 const LEGACY_TOPICS = ['device.status.updated', 'outlet.toggled'];
@@ -165,7 +165,6 @@ function isEmergencyAlert(message) {
 async function handleDeviceAlert(message) {
   try {
     if (!message?.deviceId) {
-      logger.warn('Device alert missing deviceId, skipping auto emergency scheduling', { message });
       return;
     }
 
@@ -173,12 +172,16 @@ async function handleDeviceAlert(message) {
       return;
     }
 
-    scheduleAutoEmergency({
-      deviceId: message.deviceId,
-      userId: message.userId,
+    const device = await Device.findOne({ deviceId: message.deviceId });
+    if (!device || device.emergencyMode) {
+      return;
+    }
+
+    await activateEmergencyMode(device, {
       reason: `alert_${message.sensorType || 'security'}`,
       triggeredBy: 'rule_alert',
-      source: 'device-alerts',
+      initiatedBy: 'system:rule_alert',
+      userId: message.userId || device.ownerId || null,
       metadata: {
         ruleId: message.ruleId,
         ruleName: message.ruleName,
@@ -199,7 +202,6 @@ async function handleMlAlert(message) {
   try {
     const deviceId = message?.device_id || message?.deviceId;
     if (!deviceId) {
-      logger.warn('ML alert missing deviceId, skipping', { message });
       return;
     }
 
@@ -208,12 +210,16 @@ async function handleMlAlert(message) {
       return;
     }
 
-    scheduleAutoEmergency({
-      deviceId,
-      userId: message.userId,
+    const device = await Device.findOne({ deviceId });
+    if (!device || device.emergencyMode) {
+      return;
+    }
+
+    await activateEmergencyMode(device, {
       reason: `ml_${alertLevel}`,
       triggeredBy: 'ml_alert',
-      source: 'iot.alerts.ml',
+      initiatedBy: 'system:ml_alert',
+      userId: message.userId || device.ownerId || null,
       metadata: message
     });
   } catch (error) {
