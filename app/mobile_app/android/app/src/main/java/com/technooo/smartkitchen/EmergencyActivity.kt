@@ -171,6 +171,11 @@ class EmergencyActivity : Activity() {
       textSize = 14f
       setPadding(30, 15, 30, 15)
       setOnClickListener {
+        try { 
+          stopService(Intent(this@EmergencyActivity, EmergencySoundService::class.java)) 
+        } catch (_: Exception) {
+          
+        }
         finish()
       }
     }
@@ -185,7 +190,7 @@ class EmergencyActivity : Activity() {
     }
 
     buttonLayout.addView(checkButton, btnParams)
-    buttonLayout.addView(activateButton, btnParams)
+    //buttonLayout.addView(activateButton, btnParams)
     buttonLayout.addView(dismissButton, btnParams)
 
     card.addView(deviceText)
