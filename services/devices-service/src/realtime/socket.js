@@ -15,10 +15,6 @@ export function setupSocket(server) {
   return ioInstance;
 }
 
-export function getIo() {
-  return ioInstance;
-}
-
 export function emitDeviceTelemetry(deviceId, telemetryPayload) {
   if (!ioInstance) return;
   ioInstance.emit('device.telemetry', {
@@ -26,14 +22,3 @@ export function emitDeviceTelemetry(deviceId, telemetryPayload) {
     payload: telemetryPayload,
   });
 }
-
-export function emitDeviceOutletUpdate(deviceId, outletId, status) {
-  if (!ioInstance) return;
-  ioInstance.emit('device.outlet', {
-    deviceId,
-    outletId,
-    status,
-  });
-}
-
-

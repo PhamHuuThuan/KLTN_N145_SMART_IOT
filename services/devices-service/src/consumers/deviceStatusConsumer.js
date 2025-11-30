@@ -41,13 +41,10 @@ async function startDeviceStatusConsumer() {
       autoCommitInterval: 5000,
       eachMessage: async ({ topic, partition, message }) => {
         try {
-          logger.info(`DeviceStatusConsumer received message from topic: ${topic}`);
           const messageData = JSON.parse(message.value.toString());
-          logger.info(`Message data`);
 
           switch (topic) {
             case 'device.status.updated':
-              logger.info(`Handling device status update`);
               await handleDeviceStatusUpdate(messageData);
               break;
             case 'outlet.toggled':
@@ -59,8 +56,6 @@ async function startDeviceStatusConsumer() {
             case 'iot.alerts.ml':
               await handleMlAlert(messageData);
               break;
-            default:
-              logger.info(`Unknown topic: ${topic}`);
           }
         } catch (error) {
           logger.error('Error processing device status message:', error);
@@ -71,8 +66,6 @@ async function startDeviceStatusConsumer() {
             partition,
             messageValue: message.value.toString()
           });
-          
-          logger.info(`Continuing to process next message...`);
           
           try {
             await consumer.commitOffsets([{
@@ -86,8 +79,6 @@ async function startDeviceStatusConsumer() {
         }
       },
     });
-
-    // Device status consumer started successfully
   } catch (error) {
     logger.error('Error starting device status consumer:', error);
   }
@@ -96,8 +87,6 @@ async function startDeviceStatusConsumer() {
 async function handleDeviceStatusUpdate(data) {
   try {
     const { deviceId, outletId, status, action } = data;
-    
-    logger.info(`Processing device status update: ${deviceId}/${outletId} -> ${status}`);
 
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -107,7 +96,6 @@ async function handleDeviceStatusUpdate(data) {
 
     const outlet = device.outlets.find(o => o.id === outletId);
     if (outlet) {
-      const oldStatus = outlet.status;
       outlet.status = status;
       outlet.lastToggleAt = new Date();
       await device.save();
@@ -127,8 +115,6 @@ async function handleDeviceStatusUpdate(data) {
 async function handleOutletToggle(data) {
   try {
     const { deviceId, outletId, status } = data;
-    
-    logger.info(`Processing outlet toggle: ${deviceId}/${outletId} -> ${status}`);
 
     const device = await Device.findOne({ deviceId });
     if (!device) {
@@ -136,14 +122,11 @@ async function handleOutletToggle(data) {
       return;
     }
 
-    // Update outlet status
     const outlet = device.outlets.find(o => o.id === outletId);
     if (outlet) {
-      const oldStatus = outlet.status;
       outlet.status = status;
       outlet.lastToggleAt = new Date();
       await device.save();
-      logger.info(`Outlet toggle processed: ${outletId} ${oldStatus} -> ${status}`);
     } else {
       logger.error(`Outlet not found: ${outletId}`);
     }
@@ -187,12 +170,6 @@ async function handleDeviceAlert(message) {
     }
 
     if (!isEmergencyAlert(message)) {
-      logger.debug('Device alert is not emergency-grade, skipping auto schedule', {
-        deviceId: message.deviceId,
-        priority: message.priority,
-        category: message.category,
-        sensorType: message.sensorType
-      });
       return;
     }
 
@@ -228,7 +205,6 @@ async function handleMlAlert(message) {
 
     const alertLevel = String(message.alert_level || '').toLowerCase();
     if (!['critical', 'high'].includes(alertLevel)) {
-      logger.debug('ML alert level below emergency threshold', { deviceId, alertLevel });
       return;
     }
 

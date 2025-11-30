@@ -140,7 +140,6 @@ async function triggerAutoEmergency(deviceId) {
     }
 
     if (device.emergencyMode) {
-      logger.info('Auto emergency skipped: device already in emergency mode', { deviceId });
       return;
     }
 
@@ -171,8 +170,6 @@ export function cancelAutoEmergency(deviceId, cancelReason = 'manual_interventio
 
   clearTimeout(entry.timer);
   pendingAutoEmergencies.delete(deviceId);
-
-  logger.info('Pending auto emergency canceled', { deviceId, cancelReason });
   return true;
 }
 
@@ -188,7 +185,6 @@ export function scheduleAutoEmergency(context = {}) {
   if (pendingAutoEmergencies.has(deviceId)) {
     clearTimeout(pendingAutoEmergencies.get(deviceId).timer);
     pendingAutoEmergencies.delete(deviceId);
-    logger.info('Existing auto emergency rescheduled', { deviceId });
   }
 
   const timer = setTimeout(() => {

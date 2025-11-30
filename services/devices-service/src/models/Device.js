@@ -28,7 +28,6 @@ const outletSchema = new mongoose.Schema({
   }
 });
 
-
 const deviceSchema = new mongoose.Schema({
   deviceId: {
     type: String,
@@ -77,19 +76,16 @@ const deviceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for better query performance
 deviceSchema.index({ deviceId: 1 });
 deviceSchema.index({ ownerId: 1 });
 deviceSchema.index({ status: 1 });
 deviceSchema.index({ lastSeenAt: 1 });
 
-// Method to check if device is online (seen within last 5 minutes)
 deviceSchema.methods.isOnline = function() {
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   return this.lastSeenAt > fiveMinutesAgo;
 };
 
-// Method to toggle outlet
 deviceSchema.methods.toggleOutlet = function(outletId, status) {
   const outlet = this.outlets.find(o => o.id === outletId);
   if (outlet) {
@@ -100,36 +96,21 @@ deviceSchema.methods.toggleOutlet = function(outletId, status) {
   return false;
 };
 
-// Method to enter emergency mode
 deviceSchema.methods.enterEmergencyMode = function() {
-  // Emergency rule: kitchen -> OFF, safety -> ON
   this.outlets.forEach(outlet => {
     const outletType = (outlet.type || '').toLowerCase();
-    // Backward compatibility: infer safety by id if type missing (only o4 is safety now)
     const inferredSafety = !outletType && outlet.id === 'o4';
     const isSafety = outletType === 'safety' || inferredSafety;
-    outlet.status = isSafety; // safety ON, kitchen OFF
+    outlet.status = isSafety;
     outlet.lastToggleAt = new Date();
   });
 
   return this;
 };
 
-// Method to exit emergency mode
 deviceSchema.methods.exitEmergencyMode = function() {
   this.emergencyMode = false;
   return this;
-};
-
-// Static method to find devices by owner
-deviceSchema.statics.findByOwner = function(ownerId) {
-  return this.find({ ownerId });
-};
-
-// Static method to find online devices
-deviceSchema.statics.findOnline = function() {
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-  return this.find({ lastSeenAt: { $gt: fiveMinutesAgo } });
 };
 
 const Device = mongoose.model('Device', deviceSchema);

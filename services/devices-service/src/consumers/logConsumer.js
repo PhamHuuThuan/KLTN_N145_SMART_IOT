@@ -36,7 +36,6 @@ async function swallowError(label, fn, fallback = null) {
   }
 }
 
-// Update device status from telemetry or event data
 async function updateDeviceStatus(data) {
   try {
     const { deviceId, payload, type } = data;
@@ -46,9 +45,7 @@ async function updateDeviceStatus(data) {
       return;
     }
     
-    // Skip device update for ACK events (they don't have sensor data)
     if (type === 'event' && payload.ack) {
-      logger.debug(`ACK event - skipping device update`);
       return;
     }
     
@@ -58,12 +55,10 @@ async function updateDeviceStatus(data) {
       return;
     }
 
-    // Update device online status
-  device.lastSeenAt = new Date();
-  device.status = DEVICE_STATUS.ONLINE;
-  device.lastUpdate = new Date();
+    device.lastSeenAt = new Date();
+    device.status = DEVICE_STATUS.ONLINE;
+    device.lastUpdate = new Date();
     
-    // Update outlet statuses if provided
     if (payload.o && typeof payload.o === 'object') {
       Object.keys(payload.o).forEach(outletId => {
         const outlet = device.outlets.find(o => o.id === outletId);
@@ -85,7 +80,6 @@ async function updateDeviceStatus(data) {
     
     let shouldPersist = true;
 
-    // Update latest telemetry (only set provided fields; do not default to 0)
     if (hasValue(payload.temp) || hasValue(payload.humid) || hasValue(payload.smoke) || hasValue(payload.gas_ppm) || hasValue(payload.flame) || payload.o) {
       const prev = device.latestTelemetry || { ts: Date.now(), o: {}, flame: false };
       device.latestTelemetry = {
@@ -97,7 +91,6 @@ async function updateDeviceStatus(data) {
         flame: hasValue(payload.flame) ? payload.flame : prev.flame,
         o: (payload.o || payload.outlets || prev.o || {})
       };
-      logger.info(`Emitting telemetry to socket for ${deviceId}`, device.latestTelemetry);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else if (type === 'event' && payload.o) {
       if (!device.latestTelemetry) {
@@ -105,7 +98,6 @@ async function updateDeviceStatus(data) {
       }
       device.latestTelemetry.o = payload.o || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();
-      logger.info(`Emitting event telemetry to socket for ${deviceId}`, device.latestTelemetry);
       emitDeviceTelemetry(deviceId, device.latestTelemetry);
     } else {
       logger.error(`No sensor data found in ${type} log, keeping existing telemetry`);
@@ -129,14 +121,10 @@ async function updateDeviceStatus(data) {
 async function startLogConsumer() {
   try {
     await consumer.connect();
-    logger.info('Kafka consumer connected');
-
     await consumer.subscribe({ 
       topics: ['iot.telemetry.logs', 'iot.events.logs'],
       fromBeginning: false 
     });
-    
-    logger.info('Subscribed to topics: iot.telemetry.logs, iot.events.logs');
 
     const withTimeout = async (promise, ms, label) => {
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${label} after ${ms}ms`)), ms));
@@ -151,8 +139,6 @@ async function startLogConsumer() {
       eachMessage: async ({ topic, partition, message }) => {
         const processMessage = async () => {
           try {
-            logger.info(`LogConsumer received message from topic: ${topic}, partition: ${partition}`);
-            
             let logData;
             try {
               logData = JSON.parse(message.value.toString());
@@ -160,7 +146,6 @@ async function startLogConsumer() {
               logger.error(`Invalid JSON message, skipping: ${parseErr.message}`);
               return;
             }
-            logger.info(`Processing ${logData.type} from ${logData.deviceId}`);
 
             try {
               const date = new Date().toISOString().slice(0, 10);
@@ -178,16 +163,11 @@ async function startLogConsumer() {
                 const topicDoc = await swallowError('MessageCount topic read', () =>
                   MessageCount.findOne({ key: topicKey }).lean()
                 );
-                const topicCount = topicDoc ? topicDoc.count : 0;
-                logger.info(`MessageCount topic=${topic} date=${date} => ${topicCount}`);
-
                 if (logData.deviceId) {
                   const deviceKey = [ 'device', logData.deviceId, date ].join('|');
-                  const deviceDoc = await swallowError('MessageCount device read', () =>
+                  await swallowError('MessageCount device read', () =>
                     MessageCount.findOne({ key: deviceKey }).lean()
                   );
-                  const deviceCount = deviceDoc ? deviceDoc.count : 0;
-                  logger.info(`MessageCount device=${logData.deviceId} date=${date} => ${deviceCount}`);
                 }
               } catch (readErr) {
                 logger.warn(`Could not read message counters after increment: ${readErr.message}`);
@@ -253,9 +233,7 @@ async function startLogConsumer() {
             let savedLog = null;
             try {
               const save = await shouldSaveLog(logData);
-              if (!save) {
-                logger.debug(`Skipping log save for ${logData.deviceId} - changes too small`);
-              } else {
+              if (save) {
                 let logToSave = logData;
                 if (logData.type === 'event' && logData.payload?.ack === true) {
                   const ackOutlets = logData.payload.o || logData.metadata?.ackData?.o || {};
@@ -304,9 +282,7 @@ async function startLogConsumer() {
             
             if ((logData.type === 'telemetry' || (logData.type === 'event' && !logData.payload?.ack)) && logData.deviceId) {
               try {
-                logger.info(`Updating device status for ${logData.deviceId}`);
                 await withTimeout(updateDeviceStatus(logData), 1500, 'updating device status');
-                logger.info(`Device status updated for ${logData.deviceId}`);
               } catch (updErr) {
                 logger.error(`Update device status failed (skipped): ${updErr.message}`);
               }
@@ -345,7 +321,6 @@ async function startLogConsumer() {
 async function stopLogConsumer() {
   try {
     await consumer.disconnect();
-    logger.info('Kafka consumer disconnected');
   } catch (error) {
     logger.error('Error disconnecting Kafka consumer:', error.message);
   }

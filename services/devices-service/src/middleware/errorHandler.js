@@ -1,8 +1,8 @@
-// Error handling middleware
+import logger from '../utils/logger.js';
+
 export const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
+  logger.error('Error:', err);
   
-  // MongoDB duplicate key error
   if (err.code === 11000) {
     return res.status(400).json({
       success: false,
@@ -11,7 +11,6 @@ export const errorHandler = (err, req, res, next) => {
     });
   }
   
-  // MongoDB validation error
   if (err.name === 'ValidationError') {
     const errors = Object.values(err.errors).map(error => error.message);
     return res.status(400).json({
@@ -21,7 +20,6 @@ export const errorHandler = (err, req, res, next) => {
     });
   }
   
-  // MongoDB cast error (invalid ObjectId)
   if (err.name === 'CastError') {
     return res.status(400).json({
       success: false,
@@ -30,7 +28,6 @@ export const errorHandler = (err, req, res, next) => {
     });
   }
   
-  // Default error
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal server error',
@@ -38,7 +35,6 @@ export const errorHandler = (err, req, res, next) => {
   });
 };
 
-// Not found middleware
 export const notFound = (req, res) => {
   res.status(404).json({
     success: false,
@@ -47,7 +43,6 @@ export const notFound = (req, res) => {
   });
 };
 
-// Async error wrapper
 export const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };

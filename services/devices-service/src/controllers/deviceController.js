@@ -1,11 +1,9 @@
 import Device from '../models/Device.js';
 import { OUTLET_TYPES } from '../constants/outletTypes.js';
-import DeviceLog from '../models/DeviceLog.js';
 import { producer } from '../config/kafka.js';
 import logger from '../utils/logger.js';
 import { activateEmergencyMode, cancelAutoEmergency } from '../services/autoEmergencyScheduler.js';
 
-// Check device ownership
 const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
   const device = await Device.findOne({ deviceId });
   if (!device) {
@@ -19,13 +17,10 @@ const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
   return { success: true, device };
 };
 
-// Get all devices
 export const getAllDevices = async (req, res) => {
   try {
     const userId = req.user.sub;
     const { status, limit = 50, page = 1 } = req.query;
-    
-    logger.info(`Getting devices for user ${userId}`);
     
     let query = {};
     if (req.user.role !== 'admin' && req.user.role !== 'service') {
@@ -42,8 +37,6 @@ export const getAllDevices = async (req, res) => {
       .sort({ createdAt: -1 });
     
     const total = await Device.countDocuments(query);
-    
-    logger.info(`Found ${devices.length} devices for user ${userId}`);
     
     res.json({
       success: true,
@@ -65,14 +58,11 @@ export const getAllDevices = async (req, res) => {
   }
 };
 
-// Get device by ID
 export const getDeviceById = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const userId = req.user.sub;
     const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
-    
-    logger.info(`Getting device ${deviceId} for user ${userId}`);
     
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
     if (!ownershipCheck.success) {
@@ -81,8 +71,6 @@ export const getDeviceById = async (req, res) => {
         message: ownershipCheck.message
       });
     }
-    
-    logger.info(`Device ${deviceId} access granted for user ${userId}`);
     
     res.json({
       success: true,
@@ -98,7 +86,6 @@ export const getDeviceById = async (req, res) => {
   }
 };
 
-// Create new device
 export const createDevice = async (req, res) => {
   try {
     const userId = req.user.sub;
@@ -108,8 +95,6 @@ export const createDevice = async (req, res) => {
       name,
       outlets
     } = req.body;
-    
-    logger.info(`Creating device ${deviceId} for user ${userId} (role: ${userRole})`);
     
     const existingDevice = await Device.findOne({ deviceId });
     if (existingDevice) {
@@ -133,7 +118,6 @@ export const createDevice = async (req, res) => {
       });
     }
     
-    // Create default outlets (use centralized OUTLET_TYPES)
     const defaultOutlets = outlets || [
       { id: 'o1', type: OUTLET_TYPES.KITCHEN, name: 'Kitchen Outlet 1' },
       { id: 'o2', type: OUTLET_TYPES.KITCHEN, name: 'Kitchen Outlet 2' },
@@ -165,15 +149,12 @@ export const createDevice = async (req, res) => {
   }
 };
 
-// Update device
 export const updateDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const userId = req.user.sub;
     const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
     const updateData = req.body;
-    
-    logger.info(`Updating device ${deviceId} for user ${userId}`);
     
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
     if (!ownershipCheck.success) {
@@ -204,14 +185,11 @@ export const updateDevice = async (req, res) => {
   }
 };
 
-// Delete device
 export const deleteDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const userId = req.user.sub;
     const isAdmin = req.user.role === 'admin';
-    
-    logger.info(`Deleting device ${deviceId} for user ${userId}`);
     
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
     if (!ownershipCheck.success) {
@@ -242,7 +220,6 @@ export const deleteDevice = async (req, res) => {
   }
 };
 
-// Toggle outlet
 export const toggleOutlet = async (req, res) => {
   try {
     const { deviceId, outletId } = req.params;
@@ -253,8 +230,6 @@ export const toggleOutlet = async (req, res) => {
     if (typeof status === 'string') {
       status = status.toLowerCase() === 'true' || status.toLowerCase() === 'on' || status === '1';
     }
-    
-    logger.info(`Toggling outlet ${outletId} on device ${deviceId} for user ${userId}`);
     
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
     if (!ownershipCheck.success) {
@@ -354,14 +329,11 @@ export const toggleOutlet = async (req, res) => {
   }
 };
 
-// Enter emergency mode
 export const enterEmergencyMode = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const userId = req.user.sub;
     const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
-    
-    logger.info(`Entering emergency mode for device ${deviceId} by user ${userId}`);
     
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
     if (!ownershipCheck.success) {
@@ -400,14 +372,11 @@ export const enterEmergencyMode = async (req, res) => {
   }
 };
 
-// Exit emergency mode
 export const exitEmergencyMode = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const userId = req.user.sub;
     const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
-    
-    logger.info(`Exiting emergency mode for device ${deviceId} by user ${userId}`);
     
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
     if (!ownershipCheck.success) {
@@ -454,14 +423,11 @@ export const exitEmergencyMode = async (req, res) => {
   }
 };
 
-// Get device status
 export const getDeviceStatus = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const userId = req.user.sub;
     const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
-    
-    logger.info(`Getting device status for ${deviceId} by user ${userId}`);
     
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
     if (!ownershipCheck.success) {
@@ -488,13 +454,10 @@ export const getDeviceStatus = async (req, res) => {
   }
 };
 
-// Remove device ownership 
 export const removeDeviceOwnership = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const userId = req.user.sub;
-    
-    logger.info(`Removing ownership of device ${deviceId} from user ${userId}`);
     
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId);
     if (!ownershipCheck.success) {
@@ -508,8 +471,6 @@ export const removeDeviceOwnership = async (req, res) => {
     
     device.ownerId = null;
     await device.save();
-    
-    logger.info(`Device ${deviceId} ownership removed from user ${userId}`);
     
     res.json({
       success: true,
@@ -530,16 +491,12 @@ export const removeDeviceOwnership = async (req, res) => {
   }
 };
 
-// Update outlet settings
 export const updateOutletSettings = async (req, res) => {
   try {
     const { deviceId, outletId } = req.params;
     const userId = req.user.sub;
     const isAdmin = req.user.role === 'admin' || req.user.role === 'service';
-    const { name } = req.body;
-    const { type } = req.body;
-    
-    logger.info(`Updating outlet settings for ${outletId} on device ${deviceId} by user ${userId}`);
+    const { name, type } = req.body;
     
     const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
     if (!ownershipCheck.success) {

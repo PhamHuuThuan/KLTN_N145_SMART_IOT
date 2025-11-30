@@ -2,7 +2,6 @@ import DeviceLog from '../models/DeviceLog.js';
 import Device from '../models/Device.js';
 import logger from '../utils/logger.js';
 
-// Check device ownership for logs
 const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
   const device = await Device.findOne({ deviceId });
   if (!device) {
@@ -16,7 +15,6 @@ const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
   return { success: true, device };
 };
 
-// Create new device log (telemetry data)
 export const createDeviceLog = async (req, res) => {
   try {
     const {
@@ -62,7 +60,6 @@ export const createDeviceLog = async (req, res) => {
     let savedSuccessfully = true;
     try {
       await deviceLog.save();
-      logger.info(`Device log created for device ${deviceId}`, { type, severity });
     } catch (saveErr) {
       savedSuccessfully = false;
       logger.error('Device log save failed (accepted but not persisted):', saveErr);
@@ -85,7 +82,6 @@ export const createDeviceLog = async (req, res) => {
   }
 };
 
-// Get device logs
 export const getDeviceLogs = async (req, res) => {
   try {
     const userId = req.user?.sub;
@@ -146,14 +142,12 @@ export const getDeviceLogs = async (req, res) => {
   }
 };
 
-// Get latest telemetry for a device
 export const getLatestTelemetry = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const userId = req.user?.sub;
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'service';
     
-    // Check device ownership
     if (userId) {
       const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
       if (!ownershipCheck.success) {
@@ -194,7 +188,6 @@ export const getLatestTelemetry = async (req, res) => {
   }
 };
 
-// Get telemetry history for a device
 export const getTelemetryHistory = async (req, res) => {
   try {
     const { deviceId } = req.params;
@@ -202,7 +195,6 @@ export const getTelemetryHistory = async (req, res) => {
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'service';
     const { hours = 24 } = req.query;
     
-    // Check device ownership
     if (userId) {
       const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
       if (!ownershipCheck.success) {
@@ -258,7 +250,6 @@ export const getTelemetryHistory = async (req, res) => {
   }
 };
 
-// Delete old logs (cleanup)
 export const deleteOldLogs = async (req, res) => {
   try {
     const { days = 30 } = req.query;
