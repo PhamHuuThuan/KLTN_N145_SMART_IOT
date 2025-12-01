@@ -10,12 +10,9 @@ import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Specific routes first (before generic routes)
 router.get('/:deviceId/latest', optionalAuth, getLatestTelemetry);
 router.get('/:deviceId/history', optionalAuth, getTelemetryHistory);
 router.delete('/cleanup', authenticateToken, deleteOldLogs);
-
-// Generic routes last
 router.post('/', createDeviceLog);
 router.get('/', optionalAuth, getDeviceLogs);
 

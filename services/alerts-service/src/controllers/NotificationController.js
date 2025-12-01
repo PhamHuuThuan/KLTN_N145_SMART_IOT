@@ -7,14 +7,10 @@ class NotificationController {
     this.notificationService = new NotificationService();
   }
 
-  /**
-   * Send notification
-   */
   async sendNotification(req, res) {
     try {
       const notificationData = req.body;
       
-      // Validate required fields
       if (!notificationData.userId || !notificationData.title || !notificationData.message) {
         return res.status(400).json({
           success: false,
@@ -39,9 +35,6 @@ class NotificationController {
     }
   }
 
-  /**
-   * Send bulk notifications
-   */
   async sendBulkNotifications(req, res) {
     try {
       const { notifications } = req.body;
@@ -78,9 +71,6 @@ class NotificationController {
     }
   }
 
-  /**
-   * Get user notifications
-   */
   async getUserNotifications(req, res) {
     try {
       const { userId } = req.params;
@@ -111,9 +101,6 @@ class NotificationController {
     }
   }
 
-  /**
-   * Mark notification as read
-   */
   async markAsRead(req, res) {
     try {
       const { notificationId, userId } = req.params;
@@ -141,9 +128,6 @@ class NotificationController {
     }
   }
 
-  /**
-   * Mark all notifications as read
-   */
   async markAllAsRead(req, res) {
     try {
       const { userId } = req.params;
@@ -165,9 +149,6 @@ class NotificationController {
     }
   }
 
-  /**
-   * Delete notification
-   */
   async deleteNotification(req, res) {
     try {
       const { notificationId, userId } = req.params;
@@ -195,9 +176,6 @@ class NotificationController {
     }
   }
 
-  /**
-   * Get notification statistics
-   */
   async getNotificationStats(req, res) {
     try {
       const { userId } = req.params;
@@ -218,18 +196,13 @@ class NotificationController {
     }
   }
 
-  /**
-   * Get user notification preferences
-   */
   async getUserPreferences(req, res) {
     try {
       const { userId } = req.params;
       
       let preferences = await UserNotificationPreferences.getUserPreferences(userId);
       
-      // Create default preferences if not found
       if (!preferences) {
-        logger.info(`Creating default preferences for user ${userId}`);
         preferences = new UserNotificationPreferences({
           userId,
           email: { enabled: true, addresses: [] },
@@ -265,9 +238,6 @@ class NotificationController {
     }
   }
 
-  /**
-   * Remove FCM token
-   */
   async removeFCMToken(req, res) {
     try {
       const { userId } = req.params;
@@ -303,9 +273,6 @@ class NotificationController {
       });
     }
   }
-  /**
-   * Add FCM token for user
-   */
   async addFCMToken(req, res) {
     try {
       const { userId } = req.params;
@@ -318,7 +285,6 @@ class NotificationController {
         });
       }
 
-      // Get or create user preferences
       let preferences = await UserNotificationPreferences.findOne({ userId });
       if (!preferences) {
         preferences = new UserNotificationPreferences({
@@ -343,11 +309,9 @@ class NotificationController {
       }
 
       const existingTokenIndex = preferences.fcm.tokens.findIndex(t => t.token === token);
-      const originalTokenCount = preferences.fcm.tokens.length;
       preferences.fcm.tokens = preferences.fcm.tokens.filter(t => !t.token.startsWith('ExponentPushToken['));
       
       if (existingTokenIndex >= 0) {
-        // Update existing token
         preferences.fcm.tokens[existingTokenIndex] = {
           token,
           platform,
@@ -382,9 +346,6 @@ class NotificationController {
     }
   }
 
-  /**
-   * Update user notification preferences
-   */
   async updateUserPreferences(req, res) {
     try {
       const { userId } = req.params;

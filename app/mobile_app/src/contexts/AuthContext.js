@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { DeviceEventEmitter } from 'react-native';
+import { DeviceEventEmitter, Platform } from 'react-native';
 import authService from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { setAuthToken, clearAuthToken } from '../services/apiService';
@@ -253,7 +253,6 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // Prefer native device push token (FCM/APNs); avoid Expo token to prevent network dependency
       let fcmToken = null;
       let platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
 

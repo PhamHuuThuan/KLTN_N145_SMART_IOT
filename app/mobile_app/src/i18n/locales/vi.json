@@ -156,7 +156,16 @@
     "sendingCommand": "Đang gửi lệnh...",
     "deviceInformation": "Thông tin thiết bị",
     "updateOutletSettingsFailed": "Không thể cập nhật cài đặt ổ cắm",
-    "lastUpdate": "Lần cập nhật cuối"
+    "lastUpdate": "Lần cập nhật cuối",
+    "buzzerControl": "Điều khiển còi",
+    "turnOnBuzzer": "Bật còi",
+    "turnOffBuzzer": "Tắt còi",
+    "buzzerTurnedOn": "Đã bật còi",
+    "buzzerTurnedOff": "Đã tắt còi",
+    "buzzerControlFailed": "Không thể điều khiển còi",
+    "testBuzzer": "Kiểm tra còi",
+    "buzzerTested": "Đã kiểm tra còi",
+    "buzzerTestFailed": "Không thể kiểm tra còi"
   },
   "rules": {
     "title": "Quy tắc tự động",
@@ -492,7 +501,7 @@
     "contactEmergency": "Liên hệ dịch vụ khẩn cấp",
     "emergencyNumber": "Khẩn cấp: 911",
     "exitEmergencyMode": "Thoát chế độ khẩn cấp",
-    "emergencyInstructions": "Trong trường hợp khẩn cấp, tất cả thiết bị thông minh sẽ được tắt tự động. Hãy liên hệ dịch vụ khẩn cấp ngay lập tức."
+    "exitEmergencyModeFailed": "Không thể thoát chế độ khẩn cấp"
   },
   "errors": {
     "networkError": "Lỗi kết nối mạng",

@@ -156,7 +156,16 @@
     "sendingCommand": "Sending command...",
     "deviceInformation": "Device Information",
     "updateOutletSettingsFailed": "Failed to update outlet settings",
-    "lastUpdate": "Last update"
+    "lastUpdate": "Last update",
+    "buzzerControl": "Buzzer Control",
+    "turnOnBuzzer": "Turn On Buzzer",
+    "turnOffBuzzer": "Turn Off Buzzer",
+    "buzzerTurnedOn": "Buzzer turned on",
+    "buzzerTurnedOff": "Buzzer turned off",
+    "buzzerControlFailed": "Failed to control buzzer",
+    "testBuzzer": "Test Buzzer",
+    "buzzerTested": "Buzzer tested",
+    "buzzerTestFailed": "Failed to test buzzer"
   },
   "rules": {
     "title": "Automation Rules",
@@ -491,7 +500,7 @@
     "contactEmergency": "Contact Emergency Services",
     "emergencyNumber": "Emergency: 911",
     "exitEmergencyMode": "Exit Emergency Mode",
-    "emergencyInstructions": "In case of emergency, all smart devices will be turned off automatically. Contact emergency services immediately."
+    "exitEmergencyModeFailed": "Failed to exit emergency mode"
   },
   "errors": {
     "networkError": "Network connection error",

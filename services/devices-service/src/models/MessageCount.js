@@ -2,15 +2,14 @@ import mongoose from 'mongoose';
 import logger from '../utils/logger.js';
 
 const MessageCountSchema = new mongoose.Schema({
-  key: { type: String, required: true, unique: true }, // e.g. topic|2025-10-31 or device|dev-1|2025-10-31
+  key: { type: String, required: true, unique: true },
   kind: { type: String, required: true },
   topic: { type: String },
   deviceId: { type: String },
-  date: { type: String }, // YYYY-MM-DD
+  date: { type: String },
   count: { type: Number, default: 0 }
 }, { timestamps: true });
 
-// Static helper to increment counters atomically
 MessageCountSchema.statics.increment = async function ({ kind, topic, deviceId, date }) {
   try {
     const keyParts = [kind];

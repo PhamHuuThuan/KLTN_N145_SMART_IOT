@@ -1,7 +1,5 @@
-// Suppress KafkaJS partitioner warning before any imports
 process.env.KAFKAJS_NO_PARTITIONER_WARNING = '1';
 
-// Load environment variables first
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -26,17 +24,11 @@ const io = new Server(server, {
 });
 const PORT = process.env.PORT || 3004;
 
-// Middleware
 app.use(helmet());
-
-app.use(cors({
-  origin: '*'
-}));
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-
-// Health check endpoint at root (for Docker healthcheck)
 app.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -45,31 +37,19 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes
 app.use('/api/notifications', notificationRoutes);
 
-// WebSocket connection handling
 io.on('connection', (socket) => {
-  logger.info('WebSocket client connected:', socket.id);
-  
-  // Handle user authentication
   socket.on('authenticate', (data) => {
     if (data.userId) {
       socket.userId = data.userId;
       socket.join(`user_${data.userId}`);
-      logger.info(`User ${data.userId} joined WebSocket room`);
     }
-  });
-  
-  socket.on('disconnect', () => {
-    logger.info('WebSocket client disconnected:', socket.id);
   });
 });
 
-// Make io available globally for sending notifications
 global.io = io;
 
-// 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -77,7 +57,6 @@ app.use('*', (req, res) => {
   });
 });
 
-// Error handler
 app.use((error, req, res, next) => {
   logger.error('Unhandled error:', error);
   
@@ -88,20 +67,13 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Initialize services
 const initializeServices = async () => {
   try {
-    // Connect to database
     await connectDatabase();
-    
-    // Try to connect to Kafka
     const kafkaConnected = await connectKafka();
     
     if (kafkaConnected) {
-      // Initialize notification consumer
       const notificationConsumer = new NotificationConsumer();
-      
-      // Set up message handlers
       const messageHandlers = {
         [TOPICS.DEVICE_ALERTS]: (topic, message) => notificationConsumer.handleDeviceAlert(topic, message),
         [TOPICS.NOTIFICATION_REQUESTS]: (topic, message) => notificationConsumer.handleNotificationRequest(topic, message),
@@ -109,13 +81,10 @@ const initializeServices = async () => {
       };
       
       await consumeMessages((topic, message) => {
-        logger.info(`Alerts-service received message from topic: ${topic}`);
-      
         const handler = messageHandlers[topic];
         if (handler) {
           try {
             handler(topic, message);
-            logger.info(`Handler completed for topic: ${topic}`);
           } catch (error) {
             logger.error('Error in message handler:', {
               topic,
@@ -123,16 +92,11 @@ const initializeServices = async () => {
               stack: error.stack,
               message: message
             });
-            logger.error(`Error in handler for topic ${topic}:`, error.message);
           }
         } else {
           logger.warn('No handler found for topic', { topic });
         }
       });
-      
-      logger.info('Alerts-service initialized successfully with Kafka');
-    } else {
-      logger.info('Alerts-service initialized successfully (Kafka disabled)');
     }
   } catch (error) {
     logger.error('Failed to initialize services:', error);
@@ -140,18 +104,16 @@ const initializeServices = async () => {
   }
 };
 
-// Start server
 const startServer = async () => {
   try {
     await initializeServices();
     
     server.listen(PORT, () => {
-    logger.info('🎉 Alerts service started successfully', {
-      port: PORT,
-      environment: process.env.NODE_ENV || 'development',
-      nodeVersion: process.version
-    });
-    logger.info(`🔌 WebSocket server running on ws://localhost:${PORT}`);
+      logger.info('🎉 Alerts service started successfully', {
+        port: PORT,
+        environment: process.env.NODE_ENV || 'development',
+        nodeVersion: process.version
+      });
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
@@ -159,18 +121,14 @@ const startServer = async () => {
   }
 };
 
-// Handle graceful shutdown
 process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
   process.exit(0);
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
   process.exit(1);
@@ -181,5 +139,4 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-// Start the application
 startServer();

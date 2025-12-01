@@ -1,45 +1,28 @@
 import app from './app.js';
 import http from 'http';
-import { setupSocket, emitDeviceTelemetry, emitDeviceOutletUpdate } from './realtime/socket.js';
+import { setupSocket } from './realtime/socket.js';
 import connectDB from './config/database.js';
-import { producer, consumer } from './config/kafka.js';
+import { producer } from './config/kafka.js';
 import { startLogConsumer, stopLogConsumer } from './consumers/logConsumer.js';
 import { startDeviceStatusConsumer } from './consumers/deviceStatusConsumer.js';
 import Device from './models/Device.js';
 import logger from './utils/logger.js';
 
 const PORT = process.env.PORT || 3001;
-const OFFLINE_THRESHOLD_MS = Number(process.env.DEVICE_OFFLINE_THRESHOLD_MS || 5 * 60 * 1000); // 5 minutes default
-const WATCHDOG_INTERVAL_MS = Number(process.env.DEVICE_WATCHDOG_INTERVAL_MS || 60 * 1000); // run every 1 minute
+const OFFLINE_THRESHOLD_MS = Number(process.env.DEVICE_OFFLINE_THRESHOLD_MS || 5 * 60 * 1000);
+const WATCHDOG_INTERVAL_MS = Number(process.env.DEVICE_WATCHDOG_INTERVAL_MS || 60 * 1000);
+const EMERGENCY_AUTO_DISABLE_MS = Number(process.env.EMERGENCY_AUTO_DISABLE_MS || 60 * 60 * 1000);
 
 let watchdogTimer = null;
+let emergencyWatchdogTimer = null;
 
 connectDB();
 
 const startKafka = async () => {
   try {
     await producer.connect();
-    logger.info('Kafka producer connected');
-
     await startLogConsumer();
-    
     await startDeviceStatusConsumer();
-    
-    await consumer.connect();
-    await consumer.subscribe({ topic: 'device.emergency', fromBeginning: false });
-    
-    await consumer.run({
-      eachMessage: async ({ topic, partition, message }) => {
-        try {
-          const data = JSON.parse(message.value.toString());
-
-        } catch (error) {
-          logger.error('Error processing emergency message:', error);
-        }
-      }
-    });
-    
-    logger.info('Kafka consumers started');
   } catch (error) {
     logger.error('Error connecting to Kafka:', error);
   }
@@ -49,13 +32,10 @@ async function startDeviceWatchdog() {
   async function runOnce() {
     try {
       const cutoff = new Date(Date.now() - OFFLINE_THRESHOLD_MS);
-      const result = await Device.updateMany(
+      await Device.updateMany(
         { lastSeenAt: { $lte: cutoff }, status: { $ne: 'offline' } },
         { $set: { status: 'offline' } }
       );
-      if (result.modifiedCount) {
-        logger.info(`Watchdog: Marked ${result.modifiedCount} device(s) offline (cutoff ${cutoff.toISOString()})`);
-      }
     } catch (err) {
       logger.error('Watchdog error:', err.message);
     }
@@ -63,6 +43,45 @@ async function startDeviceWatchdog() {
 
   await runOnce();
   watchdogTimer = setInterval(runOnce, WATCHDOG_INTERVAL_MS);
+}
+
+async function startEmergencyWatchdog() {
+  async function runOnce() {
+    try {
+      const cutoff = new Date(Date.now() - EMERGENCY_AUTO_DISABLE_MS);
+      const devices = await Device.find({
+        emergencyMode: true,
+        lastEmergencyAt: { $lte: cutoff }
+      });
+
+      for (const device of devices) {
+        device.exitEmergencyMode();
+        await device.save();
+        
+        producer.send({
+          topic: 'user-actions',
+          messages: [{
+            key: device.deviceId,
+            value: JSON.stringify({
+              userId: device.ownerId,
+              deviceId: device.deviceId,
+              deviceName: device.name,
+              action: 'emergency_mode_auto_disabled',
+              result: 'success',
+              timestamp: new Date()
+            })
+          }]
+        }).catch((kafkaError) => {
+          logger.error('Failed to publish emergency auto-disable event to Kafka:', kafkaError);
+        });
+      }
+    } catch (err) {
+      logger.error('Emergency watchdog error:', err.message);
+    }
+  }
+
+  await runOnce();
+  emergencyWatchdogTimer = setInterval(runOnce, WATCHDOG_INTERVAL_MS);
 }
 
 const startServer = async () => {
@@ -76,6 +95,7 @@ const startServer = async () => {
     });
 
     await startDeviceWatchdog();
+    await startEmergencyWatchdog();
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
@@ -86,8 +106,8 @@ process.on('SIGTERM', async () => {
   try {
     await stopLogConsumer();
     await producer.disconnect();
-    await consumer.disconnect();
     if (watchdogTimer) clearInterval(watchdogTimer);
+    if (emergencyWatchdogTimer) clearInterval(emergencyWatchdogTimer);
     process.exit(0);
   } catch (error) {
     logger.error('Error during shutdown:', error);
@@ -96,12 +116,11 @@ process.on('SIGTERM', async () => {
 });
 
 process.on('SIGINT', async () => {
-  
   try {
     await stopLogConsumer();
     await producer.disconnect();
-    await consumer.disconnect();
     if (watchdogTimer) clearInterval(watchdogTimer);
+    if (emergencyWatchdogTimer) clearInterval(emergencyWatchdogTimer);
     process.exit(0);
   } catch (error) {
     logger.error('Error during shutdown:', error);

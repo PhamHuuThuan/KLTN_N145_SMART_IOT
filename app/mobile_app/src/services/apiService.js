@@ -191,6 +191,39 @@ class ApiService {
     }
   }
 
+  async testBuzzer(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.BUZZER_TEST.replace(':deviceId', deviceId);
+      const response = await apiClient.put(url);
+      return response.data;
+    } catch (error) {
+      log.error('testBuzzer error', error?.message || error);
+      throw new Error(`Failed to test buzzer: ${error.message}`);
+    }
+  }
+
+  async turnOnBuzzer(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.BUZZER_ON.replace(':deviceId', deviceId);
+      const response = await apiClient.put(url);
+      return response.data;
+    } catch (error) {
+      log.error('turnOnBuzzer error', error?.message || error);
+      throw new Error(`Failed to turn on buzzer: ${error.message}`);
+    }
+  }
+
+  async turnOffBuzzer(deviceId) {
+    try {
+      const url = CONFIG.ENDPOINTS.BUZZER_OFF.replace(':deviceId', deviceId);
+      const response = await apiClient.put(url);
+      return response.data;
+    } catch (error) {
+      log.error('turnOffBuzzer error', error?.message || error);
+      throw new Error(`Failed to turn off buzzer: ${error.message}`);
+    }
+  }
+
   async removeDeviceOwnership(deviceId) {
     try {
       const url = `/api/devices/${deviceId}/ownership`;

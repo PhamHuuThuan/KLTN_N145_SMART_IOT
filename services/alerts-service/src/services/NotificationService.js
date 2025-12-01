@@ -24,19 +24,6 @@ class NotificationService {
     this.inAppService = new InAppService();
   }
 
-  /**
-   * Send notification to user through all enabled channels
-   * @param {Object} notificationData - Notification data
-   * @param {string} notificationData.userId - User ID
-   * @param {string} notificationData.title - Notification title
-   * @param {string} notificationData.message - Notification message
-   * @param {string} notificationData.type - Notification type
-   * @param {string} notificationData.category - Notification category
-   * @param {string} notificationData.priority - Notification priority
-   * @param {Object} notificationData.metadata - Additional metadata
-   * @param {Date} notificationData.scheduledFor - When to send (optional)
-   * @param {Date} notificationData.expiresAt - When notification expires (optional)
-   */
   async sendNotification(notificationData) {
     try {
       const {
@@ -51,13 +38,8 @@ class NotificationService {
         expiresAt = null
       } = notificationData;
 
-      if (!userId) {
-        throw new Error('userId is required for notification');
-      }
-
-      // Validate userId format (can be ObjectId or custom string)
       if (!userId || typeof userId !== 'string') {
-        throw new Error('userId must be a valid string');
+        throw new Error('userId is required and must be a valid string');
       }
 
       const notification = new Notification({
@@ -91,13 +73,10 @@ class NotificationService {
       }
 
       if (scheduledFor && scheduledFor > new Date()) {
-        logger.info(`Notification scheduled for ${scheduledFor}`, { notificationId: notification.notificationId });
         return notification;
       }
 
-      logger.info(`Sending notification through channels for userId: ${userId}`, { notificationId: notification.notificationId });
       await this._sendThroughChannels(notification, preferences);
-      logger.info(`Notification sent through all channels for userId: ${userId}`, { notificationId: notification.notificationId });
 
       return notification;
     } catch (error) {
@@ -114,13 +93,8 @@ class NotificationService {
 
     for (const channel of allowedChannels) {
       try {
-        logger.info(`Checking channel ${channel} for category ${category}, priority ${priority}`);
         if (preferences.shouldSendNotification(channel, priority)) {
-          logger.info(`Sending notification through ${channel}`);
           await this._sendThroughChannel(notification, preferences, channel);
-          logger.info(`Notification sent through ${channel}`);
-        } else {
-          logger.info(`Skipping channel ${channel} - not enabled or not matching criteria`);
         }
       } catch (error) {
         logger.error(`Error sending notification through ${channel}:`, error);
@@ -129,7 +103,6 @@ class NotificationService {
       }
     }
 
-    // Mark all non-requested channels as skipped to avoid stale statuses
     const allChannels = ['inApp', 'email', 'sms', 'fcm'];
     for (const channel of allChannels) {
       if (!allowedChannels.includes(channel) && notification.deliveryStatus[channel]) {
@@ -162,10 +135,8 @@ class NotificationService {
           notification.category,
           notification.priority
         );
-        logger.info(`inAppService.send result:`, result);
         break;
       case 'email':
-        // Send to all enabled email addresses
         if (preferences.email.addresses && preferences.email.addresses.length > 0) {
           const emailData = preferences.email.addresses.map(emailAddr => ({
             to: emailAddr.address,
@@ -175,14 +146,12 @@ class NotificationService {
           }));
           
           result = await this.emailService.sendBulk(emailData);
-          logger.info(`Email service results:`, result);
         } else {
           logger.warn('No email addresses configured for user');
           result = null;
         }
         break;
       case 'sms':
-        // Send to all enabled phone numbers
         if (preferences.sms.phoneNumbers && preferences.sms.phoneNumbers.length > 0) {
           const smsData = preferences.sms.phoneNumbers.map(phoneNum => ({
             to: phoneNum.phoneNumber,
@@ -191,7 +160,6 @@ class NotificationService {
           }));
           
           result = await this.smsService.sendBulk(smsData);
-          logger.info(`SMS service results:`, result);
         } else {
           logger.warn('No phone numbers configured for user');
           result = null;
@@ -221,7 +189,6 @@ class NotificationService {
               metadata
             );
           }
-          logger.info(`fcmService result:`, result);
         }
         break;
     }
@@ -307,11 +274,6 @@ class NotificationService {
     }
   }
 
-  /**
-   * Delete notification
-   * @param {string} notificationId - Notification ID
-   * @param {string} userId - User ID
-   */
   async deleteNotification(notificationId, userId) {
     try {
       const notification = await Notification.findOneAndDelete({
@@ -396,40 +358,6 @@ class NotificationService {
     }
   }
 
-  async processScheduledNotifications() {
-    try {
-      const now = new Date();
-      const scheduledNotifications = await Notification.find({
-        scheduledFor: { $lte: now },
-        'deliveryStatus.inApp.sent': false
-      });
-
-      for (const notification of scheduledNotifications) {
-        const preferences = await UserNotificationPreferences.getUserPreferences(notification.userId);
-        if (preferences) {
-          await this._sendThroughChannels(notification, preferences);
-        }
-      }
-
-      logger.info(`Processed ${scheduledNotifications.length} scheduled notifications`);
-    } catch (error) {
-      logger.error('Error processing scheduled notifications:', error);
-    }
-  }
-
-  async cleanupExpiredNotifications() {
-    try {
-      const now = new Date();
-      const result = await Notification.deleteMany({
-        expiresAt: { $lte: now }
-      });
-
-      logger.info(`Cleaned up ${result.deletedCount} expired notifications`);
-      return result;
-    } catch (error) {
-      logger.error('Error cleaning up expired notifications:', error);
-    }
-  }
 }
 
 export default NotificationService;

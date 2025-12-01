@@ -9,7 +9,6 @@ class FCMService {
 
   _initializeFirebase() {
     try {
-      // Check if Firebase credentials are provided
       const hasCredentials = process.env.FCM_PROJECT_ID && 
                            process.env.FCM_PRIVATE_KEY && 
                            process.env.FCM_CLIENT_EMAIL;
@@ -35,23 +34,12 @@ class FCMService {
           });
         }
         this.initialized = true;
-        logger.info('FCM service initialized successfully');
-      } else {
-        // Only log as info, not warning, since FCM is optional
-        logger.info('FCM service disabled - Firebase credentials not provided');
       }
     } catch (error) {
       logger.error('Failed to initialize FCM service:', error);
     }
   }
 
-  /**
-   * Send FCM notification to multiple tokens
-   * @param {Array} tokens - Array of FCM tokens
-   * @param {string} title - Notification title
-   * @param {string} body - Notification body
-   * @param {Object} data - Additional data payload
-   */
   async send(tokens, title, body, data = {}) {
     try {
       if (!this.initialized) {
@@ -64,7 +52,6 @@ class FCMService {
         return null;
       }
 
-      // FCM data payload must be strings only; drop undefined and stringify others
       const sanitizedData = Object.fromEntries(
         Object.entries(data || {})
           .filter(([, v]) => v !== undefined)
@@ -122,7 +109,6 @@ class FCMService {
         }
       };
 
-      // Workaround: send individually to avoid /batch issues on some environments
       const flatTokens = tokens.map(t => t.token || t).filter(Boolean);
       let successCount = 0;
       let failureCount = 0;
@@ -136,12 +122,6 @@ class FCMService {
         }
       }
 
-      logger.info('FCM notification sent', {
-        successCount,
-        failureCount,
-        totalTokens: flatTokens.length
-      });
-
       return { successCount, failureCount, totalTokens: flatTokens.length };
     } catch (error) {
       logger.error('Error sending FCM notification:', error);
@@ -149,13 +129,6 @@ class FCMService {
     }
   }
 
-  /**
-   * Send high-priority emergency alert with full-screen notification
-   * @param {Array} tokens - FCM tokens
-   * @param {string} title - Title (for fallback)
-   * @param {string} body - Body (for fallback)
-   * @param {Object} data - Must include type/category/priority and metadata
-   */
   async sendEmergency(tokens, title, body, data = {}) {
     try {
       if (!this.initialized) {
@@ -167,7 +140,6 @@ class FCMService {
       let successCount = 0;
       let failureCount = 0;
 
-      // Normalize emergency data payload (strings only)
       const baseData = Object.fromEntries(
         Object.entries({
           type: 'security_alert',
@@ -181,7 +153,6 @@ class FCMService {
 
       for (const t of flatTokens) {
         try {
-          // Send both notification and data for better compatibility
           await admin.messaging().send({
             token: t,
             data: {
@@ -219,7 +190,6 @@ class FCMService {
         }
       }
 
-      logger.info('Emergency notification sent', { successCount, failureCount, totalTokens: flatTokens.length });
       return { successCount, failureCount, totalTokens: flatTokens.length };
     } catch (error) {
       logger.error('Error sending emergency notification:', error);
@@ -227,201 +197,6 @@ class FCMService {
     }
   }
 
-  /**
-   * Send FCM notification to topic
-   * @param {string} topic - Topic name
-   * @param {string} title - Notification title
-   * @param {string} body - Notification body
-   * @param {Object} data - Additional data payload
-   */
-  async sendToTopic(topic, title, body, data = {}) {
-    try {
-      const sanitizedData = Object.fromEntries(
-        Object.entries(data || {})
-          .filter(([, v]) => v !== undefined)
-          .map(([k, v]) => [
-            k,
-            typeof v === 'string' ? v : (typeof v === 'object' ? JSON.stringify(v) : String(v))
-          ])
-      );
-      const message = {
-        notification: {
-          title,
-          body
-        },
-        data: {
-          ...sanitizedData,
-          timestamp: Date.now().toString(),
-          type: String((data && data.type) || 'notification')
-        },
-        topic,
-        android: {
-          priority: 'high',
-          notification: {
-            icon: 'https://lh3.googleusercontent.com/pw/AP1GczM7gq9owwwcjM55gVV3gg2g0C4j4nBYCNAguAoItm5XAx4-iRXT64KLF4Gy8B8AFDlmixUuRCPRXwavig0rwsgCcNVsEqd_B-KNC5SNmbeCRFPrW3KKmxVnpp_OGewHdx9INnEiah9E_B6MNBDVYtB2=w444-h444-s-no?authuser=0',
-            color: '#2C3E50',
-            sound: 'default'
-          }
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-              badge: 1
-            }
-          }
-        }
-      };
-
-      const response = await admin.messaging().send(message);
-      
-      logger.info('FCM topic notification sent', {
-        topic,
-        messageId: response
-      });
-
-      return response;
-    } catch (error) {
-      logger.error('Error sending FCM topic notification:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Send FCM data-only message
-   * @param {Array} tokens - Array of FCM tokens
-   * @param {Object} data - Data payload
-   */
-  async sendDataMessage(tokens, data) {
-    try {
-      const sanitizedData = Object.fromEntries(
-        Object.entries(data || {})
-          .filter(([, v]) => v !== undefined)
-          .map(([k, v]) => [
-            k,
-            typeof v === 'string' ? v : (typeof v === 'object' ? JSON.stringify(v) : String(v))
-          ])
-      );
-      const message = {
-        data: {
-          ...sanitizedData,
-          timestamp: Date.now().toString()
-        },
-        android: {
-          priority: 'high'
-        },
-        apns: {
-          payload: {
-            aps: {
-              'content-available': 1
-            }
-          }
-        }
-      };
-
-      // Send individually to avoid /batch issues
-      const flatTokens = tokens.map(t => t.token || t).filter(Boolean);
-      let successCount = 0;
-      let failureCount = 0;
-      for (const t of flatTokens) {
-        try {
-          await admin.messaging().send({ token: t, ...message });
-          successCount++;
-        } catch (e) {
-          failureCount++;
-          logger.error('FCM data send failed', { token: t, error: e?.message });
-        }
-      }
-
-      logger.info('FCM data message sent', { successCount, failureCount });
-      return { successCount, failureCount, totalTokens: flatTokens.length };
-    } catch (error) {
-      logger.error('Error sending FCM data message:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Subscribe tokens to topic
-   * @param {Array} tokens - Array of FCM tokens
-   * @param {string} topic - Topic name
-   */
-  async subscribeToTopic(tokens, topic) {
-    try {
-      const response = await admin.messaging().subscribeToTopic(tokens, topic);
-      
-      logger.info('Tokens subscribed to topic', {
-        topic,
-        successCount: response.successCount,
-        failureCount: response.failureCount
-      });
-
-      return response;
-    } catch (error) {
-      logger.error('Error subscribing to topic:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Unsubscribe tokens from topic
-   * @param {Array} tokens - Array of FCM tokens
-   * @param {string} topic - Topic name
-   */
-  async unsubscribeFromTopic(tokens, topic) {
-    try {
-      const response = await admin.messaging().unsubscribeFromTopic(tokens, topic);
-      
-      logger.info('Tokens unsubscribed from topic', {
-        topic,
-        successCount: response.successCount,
-        failureCount: response.failureCount
-      });
-
-      return response;
-    } catch (error) {
-      logger.error('Error unsubscribing from topic:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Validate FCM token
-   * @param {string} token - FCM token to validate
-   */
-  async validateToken(token) {
-    try {
-      // Try to send a test message to validate the token
-      const message = {
-        token,
-        data: {
-          test: 'true',
-          timestamp: Date.now().toString()
-        }
-      };
-
-      await admin.messaging().send(message);
-      
-      logger.info('FCM token validated', { token });
-      return { valid: true };
-    } catch (error) {
-      logger.error('FCM token validation failed:', error);
-      return { 
-        valid: false, 
-        error: error.message 
-      };
-    }
-  }
-
-  /**
-   * Get FCM service info
-   */
-  getServiceInfo() {
-    return {
-      projectId: process.env.FCM_PROJECT_ID,
-      initialized: admin.apps.length > 0
-    };
-  }
 }
 
 export default FCMService;
