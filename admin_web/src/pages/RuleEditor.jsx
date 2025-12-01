@@ -310,8 +310,17 @@ function RuleEditor() {
                   <select
                     value={condition.sensor}
                     onChange={(e) => {
-                      updateCondition(index, 'sensor', e.target.value);
-                      updateCondition(index, 'unit', getSensorUnit(e.target.value));
+                      const newSensor = e.target.value;
+                      const newUnit = getSensorUnit(newSensor);
+                      // Update sensor, unit, and clear value when sensor changes
+                      const newConditions = [...formData.conditions];
+                      newConditions[index] = {
+                        ...newConditions[index],
+                        sensor: newSensor,
+                        unit: newUnit,
+                        value: '' // Clear value when sensor changes
+                      };
+                      setFormData({ ...formData, conditions: newConditions });
                     }}
                     style={styles.select}
                   >

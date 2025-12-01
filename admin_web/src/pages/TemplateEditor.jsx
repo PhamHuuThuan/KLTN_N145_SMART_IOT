@@ -24,12 +24,34 @@ function TemplateEditor() {
     conditions: [{ type: 'sensor', sensor: 'temperature', operator: '>', value: '', unit: '°C' }],
     actions: [{ type: 'send_alert', message: '' }]
   });
+  const [isTemplateKeyManuallyEdited, setIsTemplateKeyManuallyEdited] = useState(false);
+
+  // Function to generate templateKey from name
+  const generateTemplateKey = (name) => {
+    if (!name) return '';
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
+      .replace(/\s+/g, '_') // Replace spaces with underscores
+      .replace(/-+/g, '_') // Replace hyphens with underscores
+      .replace(/_+/g, '_') // Replace multiple underscores with single underscore
+      .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+  };
 
   useEffect(() => {
     if (isEdit) {
       fetchTemplate();
     }
   }, [templateKey, languageParam]);
+
+  // Auto-generate templateKey from name when creating new template
+  useEffect(() => {
+    if (!isEdit && !isTemplateKeyManuallyEdited) {
+      const generatedKey = generateTemplateKey(formData.name);
+      setFormData(prev => ({ ...prev, templateKey: generatedKey }));
+    }
+  }, [formData.name, isEdit, isTemplateKeyManuallyEdited]);
 
   const fetchTemplate = async () => {
     try {
@@ -58,8 +80,14 @@ function TemplateEditor() {
     e.preventDefault();
     setError(''); // Clear previous error
     
+    // Auto-generate templateKey if not provided when creating new template
+    let finalFormData = { ...formData };
+    if (!isEdit && !finalFormData.templateKey && finalFormData.name) {
+      finalFormData.templateKey = generateTemplateKey(finalFormData.name);
+    }
+    
     // Validate
-    if (!formData.templateKey || !formData.name || !formData.conditions.length || !formData.actions.length) {
+    if (!finalFormData.templateKey || !finalFormData.name || !finalFormData.conditions.length || !finalFormData.actions.length) {
       setError(t('templateEditor.validation.required'));
       return;
     }
@@ -82,10 +110,10 @@ function TemplateEditor() {
 
     try {
       if (isEdit) {
-        await templatesService.updateTemplate(templateKey, formData.language, formData);
+        await templatesService.updateTemplate(templateKey, finalFormData.language, finalFormData);
         alert(t('templateEditor.updateSuccess'));
       } else {
-        await templatesService.createTemplate(formData);
+        await templatesService.createTemplate(finalFormData);
         alert(t('templateEditor.createSuccess'));
       }
       navigate('/templates');
@@ -182,19 +210,24 @@ function TemplateEditor() {
           <h2 style={styles.sectionTitle}>{t('templateEditor.basicInfo', { defaultValue: 'Basic Information' })}</h2>
           
           <div style={styles.formRow}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>{t('templateEditor.templateKey')}</label>
-              <input
-                type="text"
-                value={formData.templateKey}
-                onChange={(e) => setFormData({ ...formData, templateKey: e.target.value })}
-                required
-                disabled={isEdit}
-                style={{...styles.input, ...(isEdit ? styles.disabledInput : {})}}
-                placeholder="e.g., temp_emergency"
-              />
-              {isEdit && <small style={styles.helpText}>{t('templateEditor.keyHint')}</small>}
-            </div>
+            {isEdit && (
+              <div style={styles.formGroup}>
+                <label style={styles.label}>{t('templateEditor.templateKey')}</label>
+                <input
+                  type="text"
+                  value={formData.templateKey}
+                  onChange={(e) => {
+                    setIsTemplateKeyManuallyEdited(true);
+                    setFormData({ ...formData, templateKey: e.target.value });
+                  }}
+                  required
+                  disabled={isEdit}
+                  style={{...styles.input, ...(isEdit ? styles.disabledInput : {})}}
+                  placeholder="e.g., temp_emergency"
+                />
+                <small style={styles.helpText}>{t('templateEditor.keyHint')}</small>
+              </div>
+            )}
 
             <div style={styles.formGroup}>
               <label style={styles.label}>{t('templateEditor.language')}</label>
@@ -311,8 +344,17 @@ function TemplateEditor() {
                   <select
                     value={condition.sensor}
                     onChange={(e) => {
-                      updateCondition(index, 'sensor', e.target.value);
-                      updateCondition(index, 'unit', getSensorUnit(e.target.value));
+                      const newSensor = e.target.value;
+                      const newUnit = getSensorUnit(newSensor);
+                      // Update sensor, unit, and clear value when sensor changes
+                      const newConditions = [...formData.conditions];
+                      newConditions[index] = {
+                        ...newConditions[index],
+                        sensor: newSensor,
+                        unit: newUnit,
+                        value: '' // Clear value when sensor changes
+                      };
+                      setFormData({ ...formData, conditions: newConditions });
                     }}
                     style={styles.select}
                   >
