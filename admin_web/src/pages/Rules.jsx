@@ -379,7 +379,7 @@ function Rules() {
                     backgroundColor: getPriorityColor(rule.priority)
                   }}
                 >
-                  {rule.priority}
+                  {t(`templateEditor.priorities.${rule.priority}`, { defaultValue: rule.priority })}
                 </span>
               </div>
               <div style={styles.ruleStatus}>
@@ -395,7 +395,10 @@ function Rules() {
             </div>
 
             {rule.description && (
-              <p style={styles.ruleDescription}>{rule.description}</p>
+              <div style={styles.ruleDescription}>
+                <span style={styles.descriptionLabel}>{t('rules.description', { defaultValue: 'Mô tả' })}: </span>
+                <span>{rule.description}</span>
+              </div>
             )}
 
             <div style={styles.ruleInfo}>
@@ -874,6 +877,10 @@ const styles = {
     color: '#7f8c8d',
     fontSize: '14px',
     marginBottom: '16px'
+  },
+  descriptionLabel: {
+    fontWeight: '500',
+    color: '#2C3E50'
   },
   ruleInfo: {
     marginBottom: '16px',

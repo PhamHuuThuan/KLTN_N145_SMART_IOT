@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '../hooks/useLanguage';
 import templatesService from '../services/templatesService';
 import { DEFAULT_TEMPLATES } from '../constants/defaultTemplates';
 
 function Templates() {
   const { t } = useTranslation();
+  const { currentLanguage } = useLanguage();
   const [allTemplates, setAllTemplates] = useState([]); // All templates for counting
   const [templates, setTemplates] = useState([]); // Filtered templates for display
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, active, inactive
-  const [languageFilter, setLanguageFilter] = useState('all'); // all, vi, en
   const [priorityFilter, setPriorityFilter] = useState('');
   // Bulk create state
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -20,7 +21,7 @@ function Templates() {
 
   useEffect(() => {
     fetchTemplates();
-  }, [filter, languageFilter, priorityFilter]);
+  }, [filter, currentLanguage, priorityFilter]);
 
   const fetchTemplates = async () => {
     try {
@@ -38,12 +39,9 @@ function Templates() {
       
       // Then apply filters for display
       const params = { 
-        limit: 1000 
+        limit: 1000,
+        language: currentLanguage // Always filter by current language from menu
       };
-      // Only filter by language if not 'all'
-      if (languageFilter !== 'all') {
-        params.language = languageFilter;
-      }
       if (filter === 'active') params.isActive = 'true';
       if (filter === 'inactive') params.isActive = 'false';
       if (priorityFilter) params.priority = priorityFilter;
@@ -115,7 +113,7 @@ function Templates() {
       // Select all in this language (only those that don't exist)
       const keysToAdd = allKeys.filter(key => {
         const [templateKey, lang] = key.split('::');
-        return !templates.some(t => t.templateKey === templateKey && t.language === lang);
+        return !allTemplates.some(t => t.templateKey === templateKey && t.language === lang);
       });
       setSelectedTemplates(prev => [...new Set([...prev, ...keysToAdd])]);
     }
@@ -128,8 +126,8 @@ function Templates() {
       if (languageTemplates) {
         Object.keys(languageTemplates).forEach(templateKey => {
           const key = `${templateKey}::${lang}`;
-          // Only include if template doesn't exist
-          if (!templates.some(t => t.templateKey === templateKey && t.language === lang)) {
+          // Only include if template doesn't exist (check against allTemplates)
+          if (!allTemplates.some(t => t.templateKey === templateKey && t.language === lang)) {
             allKeys.push(key);
           }
         });
@@ -159,8 +157,8 @@ function Templates() {
       
       if (!templateData) continue;
 
-      // Check if template already exists
-      const exists = templates.some(t => t.templateKey === templateKey && t.language === language);
+      // Check if template already exists (check against allTemplates)
+      const exists = allTemplates.some(t => t.templateKey === templateKey && t.language === language);
       if (!exists) {
         templatesToCreate.push({
           templateKey,
@@ -281,19 +279,6 @@ function Templates() {
 
       <div style={styles.filters}>
         <div style={styles.filterGroup}>
-          <label style={styles.filterLabel}>{t('templates.filterLanguage')}</label>
-          <select
-            value={languageFilter}
-            onChange={(e) => setLanguageFilter(e.target.value)}
-            style={styles.select}
-          >
-            <option value="all">{t('templates.allLanguages')}</option>
-            <option value="vi">{t('templates.vietnamese')}</option>
-            <option value="en">{t('templates.english')}</option>
-          </select>
-        </div>
-
-        <div style={styles.filterGroup}>
           <label style={styles.filterLabel}>{t('templates.filterStatus')}</label>
           <select
             value={filter}
@@ -302,10 +287,7 @@ function Templates() {
           >
             {(() => {
               // Filter templates by current language and priority filters for counting
-              let filteredForCount = allTemplates;
-              if (languageFilter !== 'all') {
-                filteredForCount = filteredForCount.filter(t => t.language === languageFilter);
-              }
+              let filteredForCount = allTemplates.filter(t => t.language === currentLanguage);
               if (priorityFilter) {
                 filteredForCount = filteredForCount.filter(t => t.priority === priorityFilter);
               }
@@ -349,10 +331,7 @@ function Templates() {
                       backgroundColor: getPriorityColor(template.priority)
                     }}
                   >
-                    {template.priority}
-                  </span>
-                  <span style={styles.languageBadge}>
-                    {template.language === 'vi' ? 'VI' : 'EN'}
+                    {t(`templateEditor.priorities.${template.priority}`, { defaultValue: template.priority })}
                   </span>
                 </div>
               </div>
@@ -368,13 +347,12 @@ function Templates() {
               </div>
             </div>
 
-            <div style={styles.templateKey}>
-              <span style={styles.keyLabel}>{t('templates.key')}</span>
-              <span style={styles.keyValue}>{template.templateKey}</span>
-            </div>
 
             {template.description && (
-              <p style={styles.templateDescription}>{template.description}</p>
+              <div style={styles.templateDescription}>
+                <span style={styles.descriptionLabel}>{t('templates.description', { defaultValue: 'Mô tả' })}: </span>
+                <span>{template.description}</span>
+              </div>
             )}
 
             <div style={styles.templateInfo}>
@@ -453,7 +431,7 @@ function Templates() {
                         const languageTemplates = DEFAULT_TEMPLATES[lang];
                         if (languageTemplates) {
                           Object.keys(languageTemplates).forEach(templateKey => {
-                            if (!templates.some(t => t.templateKey === templateKey && t.language === lang)) {
+                            if (!allTemplates.some(t => t.templateKey === templateKey && t.language === lang)) {
                               allAvailableKeys.push(`${templateKey}::${lang}`);
                             }
                           });
@@ -479,9 +457,9 @@ function Templates() {
                       return a[1].name.localeCompare(b[1].name);
                     });
 
-                    // Filter out existing templates
+                    // Filter out existing templates (check against allTemplates, not filtered templates)
                     const availableTemplates = sortedTemplates.filter(([templateKey]) => {
-                      return !templates.some(t => t.templateKey === templateKey && t.language === lang);
+                      return !allTemplates.some(t => t.templateKey === templateKey && t.language === lang);
                     });
 
                     if (availableTemplates.length === 0) return null;
@@ -510,7 +488,7 @@ function Templates() {
                           {availableTemplates.map(([templateKey, templateData]) => {
                             const key = `${templateKey}::${lang}`;
                             const isSelected = selectedTemplates.includes(key);
-                            const exists = templates.some(t => t.templateKey === templateKey && t.language === lang);
+                            const exists = allTemplates.some(t => t.templateKey === templateKey && t.language === lang);
                             
                             return (
                               <label key={key} style={styles.checkboxItem}>
@@ -737,6 +715,10 @@ const styles = {
     color: '#7f8c8d',
     fontSize: '14px',
     marginBottom: '16px'
+  },
+  descriptionLabel: {
+    fontWeight: '500',
+    color: '#2C3E50'
   },
   templateInfo: {
     marginBottom: '16px',

@@ -21,10 +21,21 @@ function RuleEditor() {
     createdBy: '',
     priority: 'medium',
     isActive: true,
-    cooldownPeriod: 300000,
+    cooldownPeriod: 120000, // 2 minutes (default for medium)
     conditions: [{ type: 'sensor', sensor: 'temperature', operator: '>', value: '', unit: '°C' }],
     actions: [{ type: 'send_alert', message: '' }]
   });
+
+  // Function to get cooldown period based on priority
+  const getCooldownByPriority = (priority) => {
+    const cooldownMap = {
+      urgent: 30000,    // 30 seconds
+      high: 60000,       // 1 minute
+      medium: 120000,   // 2 minutes
+      low: 180000       // 3 minutes
+    };
+    return cooldownMap[priority] || 120000; // Default to medium if not found
+  };
 
   useEffect(() => {
     fetchDevices();
@@ -239,7 +250,11 @@ function RuleEditor() {
               <label style={styles.label}>{t('ruleEditor.priority')}</label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                onChange={(e) => {
+                  const newPriority = e.target.value;
+                  const newCooldown = getCooldownByPriority(newPriority);
+                  setFormData({ ...formData, priority: newPriority, cooldownPeriod: newCooldown });
+                }}
                 style={styles.select}
               >
                 <option value="low">{t('ruleEditor.priorities.low')}</option>

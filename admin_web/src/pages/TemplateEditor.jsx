@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '../hooks/useLanguage';
 import templatesService from '../services/templatesService';
 
 function TemplateEditor() {
   const { t } = useTranslation();
+  const { currentLanguage } = useLanguage();
   const { templateKey } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isEdit = !!templateKey;
-  const languageParam = searchParams.get('language') || 'vi';
+  const languageParam = searchParams.get('language') || currentLanguage;
 
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState('');
@@ -17,14 +19,32 @@ function TemplateEditor() {
     templateKey: '',
     name: '',
     description: '',
-    language: languageParam,
+    language: isEdit ? languageParam : currentLanguage, // Auto-set to current language when creating
     priority: 'medium',
     isActive: true,
-    cooldownPeriod: 300000,
+    cooldownPeriod: 120000, // 2 minutes (default for medium)
     conditions: [{ type: 'sensor', sensor: 'temperature', operator: '>', value: '', unit: '°C' }],
     actions: [{ type: 'send_alert', message: '' }]
   });
+
+  // Update language when currentLanguage changes (only when creating new)
+  useEffect(() => {
+    if (!isEdit) {
+      setFormData(prev => ({ ...prev, language: currentLanguage }));
+    }
+  }, [currentLanguage, isEdit]);
   const [isTemplateKeyManuallyEdited, setIsTemplateKeyManuallyEdited] = useState(false);
+
+  // Function to get cooldown period based on priority
+  const getCooldownByPriority = (priority) => {
+    const cooldownMap = {
+      urgent: 30000,    // 30 seconds
+      high: 60000,       // 1 minute
+      medium: 120000,   // 2 minutes
+      low: 180000       // 3 minutes
+    };
+    return cooldownMap[priority] || 120000; // Default to medium if not found
+  };
 
   // Function to generate templateKey from name
   const generateTemplateKey = (name) => {
@@ -211,38 +231,40 @@ function TemplateEditor() {
           
           <div style={styles.formRow}>
             {isEdit && (
-              <div style={styles.formGroup}>
-                <label style={styles.label}>{t('templateEditor.templateKey')}</label>
-                <input
-                  type="text"
-                  value={formData.templateKey}
-                  onChange={(e) => {
-                    setIsTemplateKeyManuallyEdited(true);
-                    setFormData({ ...formData, templateKey: e.target.value });
-                  }}
-                  required
-                  disabled={isEdit}
-                  style={{...styles.input, ...(isEdit ? styles.disabledInput : {})}}
-                  placeholder="e.g., temp_emergency"
-                />
-                <small style={styles.helpText}>{t('templateEditor.keyHint')}</small>
-              </div>
-            )}
+              <>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>{t('templateEditor.templateKey')}</label>
+                  <input
+                    type="text"
+                    value={formData.templateKey}
+                    onChange={(e) => {
+                      setIsTemplateKeyManuallyEdited(true);
+                      setFormData({ ...formData, templateKey: e.target.value });
+                    }}
+                    required
+                    disabled={isEdit}
+                    style={{...styles.input, ...(isEdit ? styles.disabledInput : {})}}
+                    placeholder="e.g., temp_emergency"
+                  />
+                  <small style={styles.helpText}>{t('templateEditor.keyHint')}</small>
+                </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>{t('templateEditor.language')}</label>
-              <select
-                value={formData.language}
-                onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-                required
-                disabled={isEdit}
-                style={{...styles.select, ...(isEdit ? styles.disabledInput : {})}}
-              >
-                <option value="vi">{t('templates.vietnamese')}</option>
-                <option value="en">{t('templates.english')}</option>
-              </select>
-              {isEdit && <small style={styles.helpText}>{t('templateEditor.languageHint')}</small>}
-            </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>{t('templateEditor.language')}</label>
+                  <select
+                    value={formData.language}
+                    onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                    required
+                    disabled={isEdit}
+                    style={{...styles.select, ...(isEdit ? styles.disabledInput : {})}}
+                  >
+                    <option value="vi">{t('templates.vietnamese')}</option>
+                    <option value="en">{t('templates.english')}</option>
+                  </select>
+                  <small style={styles.helpText}>{t('templateEditor.languageHint')}</small>
+                </div>
+              </>
+            )}
           </div>
 
           <div style={styles.formGroup}>
@@ -273,7 +295,11 @@ function TemplateEditor() {
               <label style={styles.label}>{t('templateEditor.priority')}</label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                onChange={(e) => {
+                  const newPriority = e.target.value;
+                  const newCooldown = getCooldownByPriority(newPriority);
+                  setFormData({ ...formData, priority: newPriority, cooldownPeriod: newCooldown });
+                }}
                 style={styles.select}
               >
                 <option value="low">{t('templateEditor.priorities.low')}</option>

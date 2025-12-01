@@ -18,7 +18,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🌡️ Nhiệt độ cao',
       description: 'Cảnh báo khi nhiệt độ 31–40°C',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000,
       conditions: [
         { type: 'sensor', sensor: 'temperature', operator: '>=', value: 31, unit: '°C' },
         { type: 'sensor', sensor: 'temperature', operator: '<=', value: 40, unit: '°C' }
@@ -32,7 +32,7 @@ export const DEFAULT_TEMPLATES = {
       name: '❄️ Nhiệt độ thấp',
       description: 'Cảnh báo khi nhiệt độ < 15°C',
       priority: 'low',
-      cooldownPeriod: 900000,
+      cooldownPeriod: 180000,
       conditions: [
         { type: 'sensor', sensor: 'temperature', operator: '<', value: 15, unit: '°C' }
       ],
@@ -58,7 +58,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💧 Độ ẩm cao',
       description: 'Cảnh báo khi độ ẩm 61–80%',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000,
       conditions: [
         { type: 'sensor', sensor: 'humidity', operator: '>=', value: 61, unit: '%' },
         { type: 'sensor', sensor: 'humidity', operator: '<=', value: 80, unit: '%' }
@@ -72,7 +72,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💧 Độ ẩm thấp',
       description: 'Cảnh báo khi độ ẩm < 30%',
       priority: 'low',
-      cooldownPeriod: 900000,
+      cooldownPeriod: 180000,
       conditions: [
         { type: 'sensor', sensor: 'humidity', operator: '<', value: 30, unit: '%' }
       ],
@@ -98,7 +98,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💨 Khí gas cao',
       description: 'Cảnh báo khi khí gas 401–1000 ppm',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000,
       conditions: [
         { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 401, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 1000, unit: 'ppm' }
@@ -112,7 +112,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💨 Khí gas trung bình',
       description: 'Cảnh báo khi khí gas 200–400 ppm',
       priority: 'medium',
-      cooldownPeriod: 600000,
+      cooldownPeriod: 120000,
       conditions: [
         { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 200, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 400, unit: 'ppm' }
@@ -139,7 +139,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🔥 Khói cao',
       description: 'Cảnh báo khi khói 301–700 ppm',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000,
       conditions: [
         { type: 'sensor', sensor: 'smoke', operator: '>=', value: 301, unit: 'ppm' },
         { type: 'sensor', sensor: 'smoke', operator: '<=', value: 700, unit: 'ppm' }
@@ -153,7 +153,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💨 Khói trung bình',
       description: 'Cảnh báo khi khói 100–300 ppm',
       priority: 'medium',
-      cooldownPeriod: 600000,
+      cooldownPeriod: 120000,
       conditions: [
         { type: 'sensor', sensor: 'smoke', operator: '>=', value: 100, unit: 'ppm' },
         { type: 'sensor', sensor: 'smoke', operator: '<=', value: 300, unit: 'ppm' }
@@ -197,7 +197,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🌡️ High Temperature',
       description: 'Alert when temperature is between 31–40°C',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000,
       conditions: [
         { type: 'sensor', sensor: 'temperature', operator: '>=', value: 31, unit: '°C' },
         { type: 'sensor', sensor: 'temperature', operator: '<=', value: 40, unit: '°C' }
@@ -211,7 +211,7 @@ export const DEFAULT_TEMPLATES = {
       name: '❄️ Low Temperature',
       description: 'Alert when temperature < 15°C',
       priority: 'low',
-      cooldownPeriod: 900000,
+      cooldownPeriod: 180000,
       conditions: [
         { type: 'sensor', sensor: 'temperature', operator: '<', value: 15, unit: '°C' }
       ],
@@ -237,7 +237,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💧 High Humidity',
       description: 'Alert when humidity is between 61–80%',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000,
       conditions: [
         { type: 'sensor', sensor: 'humidity', operator: '>=', value: 61, unit: '%' },
         { type: 'sensor', sensor: 'humidity', operator: '<=', value: 80, unit: '%' }
@@ -251,7 +251,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💧 Low Humidity',
       description: 'Alert when humidity < 30%',
       priority: 'low',
-      cooldownPeriod: 900000,
+      cooldownPeriod: 180000,
       conditions: [
         { type: 'sensor', sensor: 'humidity', operator: '<', value: 30, unit: '%' }
       ],
@@ -277,7 +277,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💨 High Gas Level',
       description: 'Alert when gas concentration is between 401–1000 ppm',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000,
       conditions: [
         { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 401, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 1000, unit: 'ppm' }
@@ -291,7 +291,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💨 Medium Gas Level',
       description: 'Alert when gas concentration is between 200–400 ppm',
       priority: 'medium',
-      cooldownPeriod: 600000,
+      cooldownPeriod: 120000,
       conditions: [
         { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 200, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 400, unit: 'ppm' }
@@ -318,7 +318,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🔥 High Smoke Level',
       description: 'Alert when smoke 301–700 ppm',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000,
       conditions: [
         { type: 'sensor', sensor: 'smoke', operator: '>=', value: 301, unit: 'ppm' },
         { type: 'sensor', sensor: 'smoke', operator: '<=', value: 700, unit: 'ppm' }
@@ -332,7 +332,7 @@ export const DEFAULT_TEMPLATES = {
       name: '💨 Medium Smoke Level',
       description: 'Alert when smoke 100–300 ppm',
       priority: 'medium',
-      cooldownPeriod: 600000,
+      cooldownPeriod: 120000,
       conditions: [
         { type: 'sensor', sensor: 'smoke', operator: '>=', value: 100, unit: 'ppm' },
         { type: 'sensor', sensor: 'smoke', operator: '<=', value: 300, unit: 'ppm' }
