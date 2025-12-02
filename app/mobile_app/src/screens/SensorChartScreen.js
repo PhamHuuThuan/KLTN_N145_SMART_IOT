@@ -95,7 +95,7 @@ const SensorChartScreen = ({ navigation, route }) => {
   }, []);
 
   const loadTelemetryData = useCallback(async () => {
-    if (!selectedDevice) return;
+    if (!selectedDevice || !selectedSensor) return;
     
     try {
       setLoading(true);
@@ -105,34 +105,33 @@ const SensorChartScreen = ({ navigation, route }) => {
         ? Math.ceil((customDateRange.endDate - customDateRange.startDate) / (1000 * 60 * 60))
         : selectedTimeRange;
       
-      log.info(`Loading telemetry data for device ${selectedDevice}, hours: ${hours}`);
+      log.info(`Loading telemetry data for device ${selectedDevice}, sensor: ${selectedSensor}, hours: ${hours}`);
       
-      const response = await apiService.getTelemetryHistory(selectedDevice, hours);
+      // Pass sensorType and date range to backend for filtering
+      const response = await apiService.getTelemetryHistory(
+        selectedDevice, 
+        hours,
+        selectedSensor, // Filter by sensor type at backend
+        customDateRange?.startDate,
+        customDateRange?.endDate
+      );
       
       if (response.success && response.data) {
         let data = Array.isArray(response.data) ? response.data : [];
         
-        // Limit data immediately to prevent memory issues
-        const MAX_LOAD_RECORDS = 100000;
-        if (data.length > MAX_LOAD_RECORDS) {
-          log.warn(`Limiting data from ${data.length} to ${MAX_LOAD_RECORDS} records`);
-          data = data.slice(0, MAX_LOAD_RECORDS);
-        }
+        // Backend already filters and sorts, but validate data
+        data = data.filter(item => {
+          try {
+            const timestamp = item.createdAt || item.payload?.ts;
+            if (!timestamp) return false;
+            const itemDate = new Date(timestamp);
+            return !isNaN(itemDate.getTime());
+          } catch {
+            return false;
+          }
+        });
         
-        // Filter by custom date range if set
-        if (customDateRange) {
-          data = data.filter(item => {
-            try {
-              const itemDate = new Date(item.createdAt || item.payload?.ts);
-              if (isNaN(itemDate.getTime())) return false;
-              return itemDate >= customDateRange.startDate && itemDate <= customDateRange.endDate;
-            } catch {
-              return false;
-            }
-          });
-        }
-        
-        // Sort by timestamp ascending with error handling
+        // Ensure data is sorted (backend should already sort, but double-check)
         try {
           data.sort((a, b) => {
             try {
@@ -151,7 +150,7 @@ const SensorChartScreen = ({ navigation, route }) => {
         // Only set data if we have valid data
         if (data.length > 0) {
           setTelemetryData(data);
-          log.info(`Loaded ${data.length} telemetry records`);
+          log.info(`Loaded ${data.length} telemetry records for ${selectedSensor} (filtered at backend)`);
         } else {
           setTelemetryData([]);
           log.info('No valid telemetry records after processing');
@@ -166,7 +165,7 @@ const SensorChartScreen = ({ navigation, route }) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDevice, selectedTimeRange, customDateRange, t]);
+  }, [selectedDevice, selectedSensor, selectedTimeRange, customDateRange, t]);
 
   // Helper function to check sensor data availability
   const checkSensorDataAvailability = useCallback(() => {
@@ -241,7 +240,7 @@ const SensorChartScreen = ({ navigation, route }) => {
     
     let isMounted = true;
     
-    if (selectedDevice) {
+    if (selectedDevice && selectedSensor) {
       loadDataTimeoutRef.current = setTimeout(() => {
         if (isMounted) {
           loadTelemetryData().catch(err => {
@@ -261,7 +260,7 @@ const SensorChartScreen = ({ navigation, route }) => {
         clearTimeout(loadDataTimeoutRef.current);
       }
     };
-  }, [loadTelemetryData, selectedDevice]); // Only reload when device or time range changes, not sensor
+  }, [loadTelemetryData, selectedDevice, selectedSensor]); // Reload when device, time range, or sensor changes
 
   // Process data for chart
   const chartData = useMemo(() => {
