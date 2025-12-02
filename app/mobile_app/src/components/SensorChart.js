@@ -8,7 +8,7 @@ const PADDING_X = 50;
 const PADDING_Y = 40; 
 const PADDING_BOTTOM = 20;
 const PADDING_LEFT = 10;
-const MAX_POINTS = 800; // Increased for better detail on longer time ranges
+const MAX_POINTS = 800;
 const MIN_HEIGHT = 120;
 const TOUCH_TOLERANCE = 30;
 const Y_AXIS_LABELS = 5;
@@ -18,8 +18,8 @@ const X_AXIS_LABELS = 5;
 const THRESHOLDS = {
   temperature: { low: 15, normal: 40, high: 50 },
   humidity: { low: 30, normal: 80, high: 90 },
-  gas: { low: 200, normal: 500, high: 1000 },
-  smoke: { low: 1.0, normal: 1.4, high: 1.6 },
+  gas: { low: 300, normal: 800, high: 1000 },
+  smoke: { low: 1.5, normal: 3.4, high: 4.6 },
 };
 
 // Light mode
@@ -30,7 +30,7 @@ const LEVEL_COLORS_LIGHT = {
   veryHigh: '#EF5350', 
 };
 
-// Color mapping for levels - Dark mode
+//Dark mode
 const LEVEL_COLORS_DARK = {
   low:      '#1E3A8A',
   normal:   '#4B5563',
@@ -44,7 +44,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [selectedVirtualPoint, setSelectedVirtualPoint] = useState(null);
   
-  // Select colors based on theme
   const LEVEL_COLORS = isDarkMode ? LEVEL_COLORS_DARK : LEVEL_COLORS_LIGHT;
 
   const chartWidth = useMemo(() => {
@@ -87,7 +86,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       let ts = timestamps;
       let gapPoints = isGapPoints;
       if (numeric.length > MAX_POINTS) {
-        // Use simple step sampling for all cases (faster performance)
         const targetPoints = MAX_POINTS;
         const step = Math.ceil(numeric.length / targetPoints);
         const tmp = [];
@@ -100,7 +98,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
           tmpGaps.push(isGapPoints[i]);
         }
         
-        // Always include last point
         if (tmp[tmp.length - 1] !== numeric[numeric.length - 1]) {
           tmp.push(numeric[numeric.length - 1]);
           tmpTs.push(timestamps[timestamps.length - 1]);
@@ -119,13 +116,11 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
         minValue = 0;
         maxValue = 1;
       } else {
-        // Always start from 0 or below, extend to include thresholds if sensorType is provided
         if (sensorType && THRESHOLDS[sensorType]) {
           const thresholds = THRESHOLDS[sensorType];
           minValue = Math.min(0, minValue, thresholds.low || minValue);
           maxValue = Math.max(maxValue, thresholds.high || maxValue);
         } else {
-          // For other cases, ensure we show from 0 if values are positive
           if (minValue >= 0) {
             minValue = 0;
           }
@@ -137,11 +132,8 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       
       const valueRange = maxValue - minValue || 1;
 
-      console.log('[SensorChart] prepared values:', values.length, 'min:', minValue, 'max:', maxValue);
-
       return { values, timestamps: ts, isGapPoints: gapPoints, minValue, maxValue, valueRange };
     } catch (e) {
-      console.log('[SensorChart] prepare error:', e);
       return null;
     }
   }, [data, sensorType]);
@@ -170,7 +162,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       let finalTimestamps = timestamps;
       let finalIsGapPoints = isGapPoints || [];
       if (values.length > maxPointsForWidth) {
-        // Use simple step sampling for all cases (faster performance)
         const targetPoints = maxPointsForWidth;
         const step = Math.ceil(values.length / targetPoints);
         const tmp = [];
@@ -183,7 +174,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
           tmpGaps.push(isGapPoints[i] || false);
         }
         
-        // Always include last point
         if (tmp[tmp.length - 1] !== values[values.length - 1]) {
           tmp.push(values[values.length - 1]);
           tmpTs.push(timestamps[timestamps.length - 1]);
@@ -284,7 +274,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
           }
         });
       } else {
-        // Normal line chart - connect continuously using default value for missing data
         const { minValue, maxValue, minTime, maxTime } = points;
         const valueRange = maxValue - minValue || 1;
         const defaultValue = 0;
@@ -294,39 +283,33 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
         const chartStartX = PADDING_X;
         const chartEndX = PADDING_X + chartAreaWidth;
         
-        // Check if first point starts from chart start (X=0 position)
         let needsStartConnection = false;
         if (points.points.length > 0) {
           const firstPoint = points.points[0];
-          if (firstPoint.x > chartStartX + 5) { // Small tolerance for rounding
+          if (firstPoint.x > chartStartX + 5) {
             needsStartConnection = true;
           }
         }
         
-        // Check if last point ends at chart end
         let needsEndConnection = false;
         if (points.points.length > 0) {
           const lastPoint = points.points[points.points.length - 1];
-          if (lastPoint.x < chartEndX - 5) { // Small tolerance for rounding
+          if (lastPoint.x < chartEndX - 5) {
             needsEndConnection = true;
           }
         }
         
-        // Draw line from chart start to first point if needed
         if (needsStartConnection && points.points.length > 0) {
           const firstPoint = points.points[0];
           d = `M ${chartStartX.toFixed(precision)} ${defaultY.toFixed(precision)}`;
           d += ` L ${firstPoint.x.toFixed(precision)} ${defaultY.toFixed(precision)}`;
           d += ` L ${firstPoint.x.toFixed(precision)} ${firstPoint.y.toFixed(precision)}`;
         } else if (points.points.length > 0) {
-          // Start from first point
           d = `M ${points.points[0].x.toFixed(precision)} ${points.points[0].y.toFixed(precision)}`;
         }
         
-        // Draw connections between points
         points.points.forEach((point, idx) => {
           if (idx === 0 && !needsStartConnection) {
-            // Already handled above
             return;
           }
           
@@ -336,30 +319,22 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
               const timeGap = Math.abs(point.timestamp.getTime() - prevPoint.timestamp.getTime());
               
               if (timeGap > timeThreshold) {
-                // Missing data gap - draw line down to default, across, then up
-                // Step 1: Line down from previous point to default value
+
                 d += ` L ${prevPoint.x.toFixed(precision)} ${defaultY.toFixed(precision)}`;
-                // Step 2: Line across at default value to next point X
                 d += ` L ${point.x.toFixed(precision)} ${defaultY.toFixed(precision)}`;
-                // Step 3: Line up from default value to current point
                 d += ` L ${point.x.toFixed(precision)} ${point.y.toFixed(precision)}`;
               } else {
-                // Normal connection
                 d += ` L ${point.x.toFixed(precision)} ${point.y.toFixed(precision)}`;
               }
             } else {
-              // No timestamp - normal connection
               d += ` L ${point.x.toFixed(precision)} ${point.y.toFixed(precision)}`;
             }
           }
         });
         
-        // Draw line from last point to chart end if needed
         if (needsEndConnection && points.points.length > 0) {
           const lastPoint = points.points[points.points.length - 1];
-          // Step 1: Line down from last point to default value
           d += ` L ${lastPoint.x.toFixed(precision)} ${defaultY.toFixed(precision)}`;
-          // Step 2: Line across at default value to chart end
           d += ` L ${chartEndX.toFixed(precision)} ${defaultY.toFixed(precision)}`;
         }
       }

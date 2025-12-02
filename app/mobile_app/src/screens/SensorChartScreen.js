@@ -271,48 +271,43 @@ const SensorChartScreen = ({ navigation, route }) => {
       const sensorConfig = SENSOR_TYPES[selectedSensor];
       if (!sensorConfig) return { labels: [], values: [], timestamps: [] };
 
-      const isSmokeSensor = selectedSensor === 'smoke';
+      // Calculate min/max values from actual data for all sensors
+      let minValue = Infinity;
+      let maxValue = -Infinity;
+      const validValues = [];
       
-
-      let minValue = isSmokeSensor ? 0 : Infinity;
-      let maxValue = isSmokeSensor ? 2 : -Infinity;
-      
-      if (!isSmokeSensor) {
-        minValue = Infinity;
-        maxValue = -Infinity;
-        const validValues = [];
-        
-        for (let i = 0; i < telemetryData.length; i++) {
-          try {
-            const item = telemetryData[i];
-            const payload = item?.payload || {};
-            const value = payload[sensorConfig.key];
-            
-            if (value !== null && value !== undefined) {
-              const numValue = Number(value);
-              if (!isNaN(numValue) && isFinite(numValue)) {
-                validValues.push(numValue);
-                if (numValue < minValue) {
-                  minValue = numValue;
-                }
-                if (numValue > maxValue) {
-                  maxValue = numValue;
-                }
+      for (let i = 0; i < telemetryData.length; i++) {
+        try {
+          const item = telemetryData[i];
+          const payload = item?.payload || {};
+          const value = payload[sensorConfig.key];
+          
+          if (value !== null && value !== undefined) {
+            const numValue = Number(value);
+            if (!isNaN(numValue) && isFinite(numValue)) {
+              validValues.push(numValue);
+              if (numValue < minValue) {
+                minValue = numValue;
+              }
+              if (numValue > maxValue) {
+                maxValue = numValue;
               }
             }
-          } catch (err) {
-            // Skip invalid items
           }
+        } catch (err) {
+          // Skip invalid items
         }
-        
-        if (minValue === Infinity || validValues.length === 0) {
-          minValue = 0;
-          maxValue = 100;
-        } else if (minValue === maxValue) {
-          const padding = Math.max(1, Math.abs(minValue) * 0.1);
-          minValue = minValue - padding;
-          maxValue = maxValue + padding;
-        }
+      }
+      
+      // Set default range if no valid values found
+      if (minValue === Infinity || validValues.length === 0) {
+        minValue = 0;
+        maxValue = 100;
+      } else if (minValue === maxValue) {
+        // Add padding if all values are the same
+        const padding = Math.max(1, Math.abs(minValue) * 0.1);
+        minValue = minValue - padding;
+        maxValue = maxValue + padding;
       }
       
       const data = [];
@@ -325,45 +320,25 @@ const SensorChartScreen = ({ navigation, route }) => {
           const timestamp = new Date(item?.createdAt || payload?.ts || Date.now());
           if (isNaN(timestamp.getTime())) continue;
           
-          // For smoke sensor, always include (null/undefined = 0)
-          if (isSmokeSensor) {
-            let numValue = 0;
-            if (value !== null && value !== undefined) {
-              const parsed = Number(value);
-              if (!isNaN(parsed) && isFinite(parsed)) {
-                numValue = parsed > 0 ? 1 : 0;
-              }
-            }
-            
-            const label = formatTimeLabel(timestamp);
-            if (!label) continue;
-            
-            data.push({
-              timestamp,
-              value: numValue,
-              label,
-              isGapPoint: false,
-            });
-          } else {
-            if (value === null || value === undefined) {
-              continue;
-            }
-            
-            const numValue = Number(value);
-            if (isNaN(numValue) || !isFinite(numValue)) {
-              continue;
-            }
-            
-            const label = formatTimeLabel(timestamp);
-            if (!label) continue;
-            
-            data.push({
-              timestamp,
-              value: numValue,
-              label,
-              isGapPoint: false,
-            });
+          // Process all sensors the same way - keep float values
+          if (value === null || value === undefined) {
+            continue;
           }
+          
+          const numValue = Number(value);
+          if (isNaN(numValue) || !isFinite(numValue)) {
+            continue;
+          }
+          
+          const label = formatTimeLabel(timestamp);
+          if (!label) continue;
+          
+          data.push({
+            timestamp,
+            value: numValue,
+            label,
+            isGapPoint: false,
+          });
         } catch (err) {
           log.warn('Error processing data item:', err);
           continue; // Skip this item
@@ -682,9 +657,7 @@ const SensorChartScreen = ({ navigation, route }) => {
                         {t('charts.current')}
                       </Text>
                       <Text style={[styles.statValue, { color: sensorColor }]}>
-                        {selectedSensor === 'smoke' 
-                          ? chartData.values[chartData.values.length - 1] 
-                          : chartData.values[chartData.values.length - 1]?.toFixed(1)}
+                        {chartData.values[chartData.values.length - 1]?.toFixed(1)}
                         {sensorConfig.unit}
                       </Text>
                     </View>
@@ -753,9 +726,7 @@ const SensorChartScreen = ({ navigation, route }) => {
                     <Text style={[styles.logDetailValue, { color: sensorColor, fontWeight: 'bold' }]}>
                       {selectedLog.isGapPoint 
                         ? (t('charts.noData') || 'Không có thông tin')
-                        : (selectedSensor === 'smoke' 
-                            ? selectedLog.selectedValue 
-                            : selectedLog.selectedValue?.toFixed(1) || '0') + sensorConfig.unit}
+                        : (selectedLog.selectedValue?.toFixed(1) || '0') + sensorConfig.unit}
                     </Text>
                   </View>
                 </View>

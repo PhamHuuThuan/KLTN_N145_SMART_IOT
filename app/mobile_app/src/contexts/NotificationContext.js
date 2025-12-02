@@ -787,7 +787,6 @@ export const NotificationProvider = ({ children }) => {
     addNotification,
     getNotificationStats,
     testApiConnection,
-    // expose for manual re-registration if needed
     registerFCMToken,
     dispatch,
   };

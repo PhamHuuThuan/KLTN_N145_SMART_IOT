@@ -30,8 +30,8 @@ const SensorGrid = ({ deviceData, onViewChart }) => {
   const THRESHOLDS = {
     temperature: { low: 15, normal: 40, high: 50 },
     humidity: { low: 30, normal: 80, high: 90 },
-    gas: { low: 200, normal: 500, high: 1000 },
-    smoke: { low: 1.0, normal: 1.4, high: 1.6 },
+    gas: { low: 300, normal: 800, high: 1000 },
+    smoke: { low: 1.5, normal: 3.4, high: 4.6 },
   };
 
   //levels - Light mode
