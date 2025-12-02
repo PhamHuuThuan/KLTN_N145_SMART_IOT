@@ -67,9 +67,9 @@ export function smartDownsample(logs, maxRecords, sensorField = null) {
     return sampled;
   }
   
-  const reservedSlots = Math.max(100, Math.floor(maxRecords * 0.2));
+  const reservedSlots = Math.max(50, Math.floor(maxRecords * 0.15));
   const availableSlots = maxRecords - reservedSlots;
-  const numBuckets = Math.max(10, Math.floor(availableSlots / 2));
+  const numBuckets = Math.max(20, Math.floor(availableSlots / 1.5));
   
   const bucketSize = timeRange / numBuckets;
   
@@ -106,7 +106,7 @@ export function smartDownsample(logs, maxRecords, sensorField = null) {
   
   sampled.push(firstPoint);
   
-  const maxPointsPerBucket = Math.max(2, Math.floor((maxRecords - 2) / numBuckets));
+  const maxPointsPerBucket = Math.max(1, Math.floor((maxRecords - 2) / numBuckets));
   
   for (let i = 0; i < buckets.length; i++) {
     const bucket = buckets[i];

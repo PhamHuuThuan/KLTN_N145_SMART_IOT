@@ -245,7 +245,20 @@ export const getTelemetryHistory = async (req, res) => {
     
     const normalizedLogs = normalizeTelemetryLogs(logs, sensorField);
     
-    const MAX_RECORDS = 50000;
+    let actualHours = hours;
+    if (startDateParam && endDateParam) {
+      actualHours = Math.ceil((new Date(endDateParam) - new Date(startDateParam)) / (1000 * 60 * 60));
+    }
+    
+    let MAX_RECORDS;
+    if (actualHours <= 24) {
+      MAX_RECORDS = Math.floor(actualHours * 33);
+    } else if (actualHours <= 168) {
+      MAX_RECORDS = Math.floor(800 + (actualHours - 24) * 2.8);
+    } else {
+      MAX_RECORDS = Math.floor(1200 + (actualHours - 168) * 0.5);
+    }
+    MAX_RECORDS = Math.min(2000, Math.max(500, MAX_RECORDS));
     const limitedLogs = normalizedLogs.length > MAX_RECORDS
       ? smartDownsample(normalizedLogs, MAX_RECORDS, sensorField)
       : normalizedLogs;
