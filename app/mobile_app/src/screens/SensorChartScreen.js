@@ -61,6 +61,7 @@ const SensorChartScreen = ({ navigation, route }) => {
   const [customDateRange, setCustomDateRange] = useState(null);
   const [selectedLog, setSelectedLog] = useState(null);
   const loadDataTimeoutRef = useRef(null);
+  const loadingSensorRef = useRef(null);
 
   // Format time label for chart
   const formatTimeLabel = useCallback((timestamp) => {
@@ -97,6 +98,8 @@ const SensorChartScreen = ({ navigation, route }) => {
   const loadTelemetryData = useCallback(async () => {
     if (!selectedDevice || !selectedSensor) return;
     
+    loadingSensorRef.current = selectedSensor;
+    
     try {
       setLoading(true);
       setError(null);
@@ -107,11 +110,10 @@ const SensorChartScreen = ({ navigation, route }) => {
       
       log.info(`Loading telemetry data for device ${selectedDevice}, sensor: ${selectedSensor}, hours: ${hours}`);
       
-      // Pass sensorType and date range to backend for filtering
       const response = await apiService.getTelemetryHistory(
         selectedDevice, 
         hours,
-        selectedSensor, // Filter by sensor type at backend
+        selectedSensor,
         customDateRange?.startDate,
         customDateRange?.endDate
       );
@@ -119,7 +121,6 @@ const SensorChartScreen = ({ navigation, route }) => {
       if (response.success && response.data) {
         let data = Array.isArray(response.data) ? response.data : [];
         
-        // Backend already filters and sorts, but validate data
         data = data.filter(item => {
           try {
             const timestamp = item.createdAt || item.payload?.ts;
@@ -131,7 +132,6 @@ const SensorChartScreen = ({ navigation, route }) => {
           }
         });
         
-        // Ensure data is sorted (backend should already sort, but double-check)
         try {
           data.sort((a, b) => {
             try {
@@ -147,23 +147,31 @@ const SensorChartScreen = ({ navigation, route }) => {
           log.error('Error sorting data:', sortErr);
         }
         
-        // Only set data if we have valid data
-        if (data.length > 0) {
-          setTelemetryData(data);
-          log.info(`Loaded ${data.length} telemetry records for ${selectedSensor} (filtered at backend)`);
-        } else {
-          setTelemetryData([]);
-          log.info('No valid telemetry records after processing');
+        if (loadingSensorRef.current === selectedSensor) {
+          if (data.length > 0) {
+            setTelemetryData(data);
+            log.info(`Loaded ${data.length} telemetry records for ${selectedSensor} (filtered at backend)`);
+          } else {
+            setTelemetryData([]);
+            log.info('No valid telemetry records after processing');
+          }
         }
       } else {
-        setTelemetryData([]);
+        if (loadingSensorRef.current === selectedSensor) {
+          setTelemetryData([]);
+        }
       }
     } catch (err) {
       log.error('Error loading telemetry data:', err);
-      setError(err.message || t('charts.loadError'));
-      setTelemetryData([]);
+      if (loadingSensorRef.current === selectedSensor) {
+        setError(err.message || t('charts.loadError'));
+        setTelemetryData([]);
+      }
     } finally {
-      setLoading(false);
+      if (loadingSensorRef.current === selectedSensor) {
+        setLoading(false);
+      }
+      loadingSensorRef.current = null;
     }
   }, [selectedDevice, selectedSensor, selectedTimeRange, customDateRange, t]);
 
@@ -187,19 +195,18 @@ const SensorChartScreen = ({ navigation, route }) => {
     return sensorDataAvailability;
   }, [telemetryData]);
 
-  // Auto-select sensor with available data when telemetry data is loaded
   useEffect(() => {
-    if (!telemetryData.length) {
+    if (!telemetryData.length || loading || loadingSensorRef.current) {
+      return;
+    }
+    
+    if (loadingSensorRef.current === selectedSensor) {
       return;
     }
     
     const sensorDataAvailability = checkSensorDataAvailability();
-    log.info('Sensor data availability:', sensorDataAvailability);
-    
-    // Check if current selected sensor has data
     const currentHasData = sensorDataAvailability[selectedSensor];
     
-    // If current sensor has no data, select first available sensor
     if (!currentHasData) {
       const firstAvailableSensor = Object.keys(sensorDataAvailability).find(
         key => sensorDataAvailability[key]
@@ -209,28 +216,7 @@ const SensorChartScreen = ({ navigation, route }) => {
         setSelectedSensor(firstAvailableSensor);
       }
     }
-  }, [telemetryData, checkSensorDataAvailability]); // Only depend on telemetryData to avoid loops
-
-  // Also check when selectedSensor changes (user manually selects)
-  useEffect(() => {
-    if (!telemetryData.length) {
-      return;
-    }
-    
-    const sensorDataAvailability = checkSensorDataAvailability();
-    const currentHasData = sensorDataAvailability[selectedSensor];
-    
-    // If user selected a sensor with no data, auto-switch to first available
-    if (!currentHasData) {
-      const firstAvailableSensor = Object.keys(sensorDataAvailability).find(
-        key => sensorDataAvailability[key]
-      );
-      if (firstAvailableSensor && firstAvailableSensor !== selectedSensor) {
-        log.info(`Switching from ${selectedSensor} (no data) to ${firstAvailableSensor}`);
-        setSelectedSensor(firstAvailableSensor);
-      }
-    }
-  }, [selectedSensor, checkSensorDataAvailability]);
+  }, [telemetryData, selectedSensor, loading, checkSensorDataAvailability]);
 
   useEffect(() => {
     // Clear any pending timeout
@@ -529,30 +515,23 @@ const SensorChartScreen = ({ navigation, route }) => {
           </View>
         ) : (
           <>
-            {/* Animated Controls Bar */}
             <View style={[styles.controlsBar, { backgroundColor: 'transparent' }]}>
-              {/* Sensor Selector - Animated NavBar */}
               <View style={styles.controlsRow}>
                 <AnimatedNavBar
                   items={Object.entries(SENSOR_TYPES).map(([sensorKey, config]) => {
-                    // sensorKey is 'temperature', 'humidity', 'gas', 'smoke'
-                    // config.key is 'temp', 'humid', 'gas_ppm', 'smoke' (field name in payload)
-                    // We need to use sensorKey as the item key, not config.key
                     return {
                       ...config,
-                      sensorKey, // Store sensor key separately
-                      key: sensorKey, // This is what we use for selection
+                      sensorKey,
+                      key: sensorKey,
                     };
                   })}
                   selectedValue={selectedSensor}
                   onSelect={(key) => {
-                    // Update UI immediately - don't wait for data load
                     setSelectedSensor(key);
-                    setSelectedLog(null); // Clear selected log when switching sensor
-                    // Data will be loaded by useEffect with debounce
+                    setSelectedLog(null);
+                    setTelemetryData([]);
                   }}
                   getItemKey={(item) => {
-                    // Ensure we get the correct key
                     return item?.key;
                   }}
                   getItemLabel={(item) => t(item.label)}
