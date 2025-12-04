@@ -1,6 +1,4 @@
-"""
-Main ML service that coordinates models and predictions (no external deps)
-"""
+"""Main ML service that coordinates models and predictions."""
 import os
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
@@ -18,11 +16,10 @@ class MLService:
             model_dir=os.getenv("MODEL_SAVE_DIR", "./models")
         )
 
-        # Load models if they exist
         self.anomaly_detector.load_models()
-        
-        # In-memory history: device_id -> sensor_type -> last 3 values
-        self.history: Dict[str, Dict[str, deque]] = defaultdict(lambda: defaultdict(lambda: deque(maxlen=3)))
+        self.history: Dict[str, Dict[str, deque]] = defaultdict(
+            lambda: defaultdict(lambda: deque(maxlen=3))
+        )
         
     async def process_multi_sensor(self, device_id: str, all_sensors: Dict[str, float]) -> Dict:
         """
@@ -36,7 +33,6 @@ class MLService:
             Combined prediction result with correlation analysis
         """
         try:
-            # Individual predictions for each sensor
             individual_results = {}
             max_combined_score = 0.0
             
@@ -45,39 +41,23 @@ class MLService:
                     continue
                 
                 try:
-                    # Process single sensor
-                    anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type, device_id=device_id)
+                    anomaly_score, is_anomaly = self.anomaly_detector.predict(
+                        value, sensor_type, device_id=device_id
+                    )
                     danger_score = 0.5
                     is_danger = False
                 except Exception as sensor_err:
-                    logger.error(f"Error processing sensor {sensor_type} for {device_id}: {sensor_err}")
+                    logger.error(
+                        f"Error processing sensor {sensor_type} for {device_id}: {sensor_err}"
+                    )
                     continue
                 
                 try:
                     v = float(value)
-                    if sensor_type == "gas":
-                        if v >= 1500:
-                            danger_score = max(danger_score, 0.9)
-                        elif v >= 700:
-                            danger_score = max(danger_score, 0.75)
-                        elif v >= 500:
-                            danger_score = max(danger_score, 0.6)
-                    elif sensor_type == "smoke":
-                        if v >= 4:
-                            danger_score = max(danger_score, 0.9)
-                        elif v >= 3.4:
-                            danger_score = max(danger_score, 0.75)
-                        elif v >= 3.0:
-                            danger_score = max(danger_score, 0.6)
-                    elif sensor_type == "temperature":
-                        if v >= 50:
-                            danger_score = max(danger_score, 0.9)
-                        elif v >= 45:
-                            danger_score = max(danger_score, 0.7)
+                    danger_score = self._calculate_danger_score(sensor_type, v)
                 except Exception:
                     pass
                 
-                # Update history and analyze trend
                 trend_info = self._update_and_analyze_trend(device_id, sensor_type, float(value))
                 
                 base_score = max(anomaly_score, danger_score)
@@ -193,10 +173,33 @@ class MLService:
                 risk = max(risk, min(0.99, overheat_score))
             
             return min(0.99, max(0.0, risk))
-            
         except Exception as e:
             logger.error(f"Error in correlation analysis: {e}")
             return 0.0
+    
+    def _calculate_danger_score(self, sensor_type: str, value: float) -> float:
+        """Calculate danger score based on sensor type and value."""
+        danger_score = 0.5
+        if sensor_type == "gas":
+            if value >= 1500:
+                danger_score = 0.9
+            elif value >= 700:
+                danger_score = 0.75
+            elif value >= 500:
+                danger_score = 0.6
+        elif sensor_type == "smoke":
+            if value >= 4:
+                danger_score = 0.9
+            elif value >= 3.4:
+                danger_score = 0.75
+            elif value >= 3.0:
+                danger_score = 0.6
+        elif sensor_type == "temperature":
+            if value >= 50:
+                danger_score = 0.9
+            elif value >= 45:
+                danger_score = 0.7
+        return danger_score
         
     async def process_sensor_data(self, sensor_data: Dict) -> Dict:
         """
@@ -217,35 +220,17 @@ class MLService:
                 logger.warning("Incomplete sensor data")
                 return None
             
-            anomaly_score, is_anomaly = self.anomaly_detector.predict(value, sensor_type, device_id=device_id)
-            
-            danger_score = 0.5
-            is_danger = False
+            anomaly_score, is_anomaly = self.anomaly_detector.predict(
+                value, sensor_type, device_id=device_id
+            )
             
             try:
                 v = float(value)
-                if sensor_type == "gas":
-                    if v >= 800:
-                        danger_score = max(danger_score, 0.9)
-                    elif v >= 500:
-                        danger_score = max(danger_score, 0.75)
-                    elif v >= 200:
-                        danger_score = max(danger_score, 0.6)
-                elif sensor_type == "smoke":
-                    if v >= 50:
-                        danger_score = max(danger_score, 0.9)
-                    elif v >= 30:
-                        danger_score = max(danger_score, 0.75)
-                    elif v >= 15:
-                        danger_score = max(danger_score, 0.6)
-                elif sensor_type == "temperature":
-                    if v >= 50:
-                        danger_score = max(danger_score, 0.9)
-                    elif v >= 45:
-                        danger_score = max(danger_score, 0.7)
+                danger_score = self._calculate_danger_score(sensor_type, v)
             except Exception:
-                pass
-
+                danger_score = 0.5
+            
+            is_danger = False
             trend_info = self._update_and_analyze_trend(device_id, sensor_type, float(value))
 
             base_score = max(anomaly_score, danger_score)
@@ -280,7 +265,10 @@ class MLService:
             logger.error(f"Error processing sensor data: {e}")
             return None
     
-    def _update_and_analyze_trend(self, device_id: str, sensor_type: str, value: float) -> Dict:
+    def _update_and_analyze_trend(
+        self, device_id: str, sensor_type: str, value: float
+    ) -> Dict:
+        """Update history and analyze trend for sensor values."""
         try:
             dq = self.history[device_id][sensor_type]
             dq.append(value)
@@ -289,18 +277,21 @@ class MLService:
             increasing = False
             decreasing = False
             sudden_spike = False
+            
             if len(values) >= 3:
                 v1, v2, v3 = values[-3], values[-2], values[-1]
                 increasing = v1 < v2 < v3
                 decreasing = v1 > v2 > v3
                 prev_avg = (v1 + v2) / 2 if (v1 + v2) != 0 else v2 or v1 or 0
                 sudden_spike = (v3 > prev_avg * 1.25) if prev_avg != 0 else False
+                
                 if increasing:
                     trend = "increasing"
                 elif decreasing:
                     trend = "decreasing"
                 elif sudden_spike:
                     trend = "spike"
+            
             return {
                 "history": values,
                 "trend": trend,
@@ -309,9 +300,18 @@ class MLService:
                 "sudden_spike": sudden_spike
             }
         except Exception:
-            return {"history": [], "trend": "unknown", "increasing": False, "decreasing": False, "sudden_spike": False}
+            return {
+                "history": [],
+                "trend": "unknown",
+                "increasing": False,
+                "decreasing": False,
+                "sudden_spike": False
+            }
 
-    def _should_trigger_alert(self, score: float, alert_level: str, trend_info: Dict) -> bool:
+    def _should_trigger_alert(
+        self, score: float, alert_level: str, trend_info: Dict
+    ) -> bool:
+        """Determine if alert should be triggered based on score and trend."""
         base = 0.6
         if trend_info.get("increasing") or trend_info.get("sudden_spike"):
             base -= 0.1
