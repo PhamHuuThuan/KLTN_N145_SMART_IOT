@@ -27,10 +27,6 @@ class EventDocRequest(BaseModel):
     """Devices-service event document"""
     doc: Dict
 
-class TrainingRequest(BaseModel):
-    """Request model for training"""
-    training_data: List[Dict]
-
 class ModelStatusResponse(BaseModel):
     """Response model for model status"""
     anomaly_detector_trained: bool
@@ -98,22 +94,6 @@ def setup_routes(ml_service: MLService):
             
         except Exception as e:
             logger.error(f"Error in batch predict: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    @router.post("/train", response_model=Dict)
-    async def train_models(request: TrainingRequest):
-        """Train ML models with new data"""
-        try:
-            success = await ml_service.train_models(request.training_data)
-            
-            return {
-                "success": success,
-                "message": "Models trained successfully" if success else "Training failed",
-                "training_samples": len(request.training_data)
-            }
-            
-        except Exception as e:
-            logger.error(f"Error training models: {e}")
             raise HTTPException(status_code=500, detail=str(e))
     
     @router.get("/status", response_model=ModelStatusResponse)

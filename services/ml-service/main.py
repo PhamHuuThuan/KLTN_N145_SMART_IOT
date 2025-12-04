@@ -101,10 +101,9 @@ async def root():
         "endpoints": {
             "predict": "/api/ml/predict",
             "predict_batch": "/api/ml/predict/batch",
-            "train": "/api/ml/train",
             "status": "/api/ml/status",
-            "predict_from_event": "/api/ml/predict/event"
-            
+            "predict_from_event": "/api/ml/predict/event",
+            "predict_from_event_aggregate": "/api/ml/predict/event/aggregate"
         }
     }
 

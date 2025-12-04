@@ -139,49 +139,49 @@ class MLService:
             
             risk = 0.0
             
-            if temp > 40 or smoke > 10 or gas > 500:
+            if temp > 40 or smoke > 3.0 or gas > 500:
                 fire_score = 0.0
                 if temp > 50:
                     fire_score += 0.4
                 elif temp > 40:
                     fire_score += 0.3
-                if smoke > 50:
+                if smoke > 4.0:
                     fire_score += 0.4
-                elif smoke > 30:
+                elif smoke > 3.4:
                     fire_score += 0.3
-                elif smoke > 15:
+                elif smoke > 3.2:
                     fire_score += 0.2
-                if gas > 800:
+                if gas > 1500:
                     fire_score += 0.2
-                elif gas > 500:
+                elif gas > 700:
                     fire_score += 0.15
-                elif gas > 200:
+                elif gas > 500:
                     fire_score += 0.1
                 
                 fire_score = min(0.99, fire_score)
                 
-                if (temp > 40 and smoke > 15 and gas > 500):
+                if (temp > 40 and smoke > 3.0 and gas > 500):
                     fire_score = min(0.99, fire_score + 0.15)
-                elif (temp > 40 and smoke > 15) or (temp > 40 and gas > 500):
+                elif (temp > 40 and smoke > 3.0) or (temp > 40 and gas > 500):
                     fire_score = min(0.99, fire_score + 0.1)
                 
                 risk = max(risk, fire_score)
             
-            if gas > 300 or smoke > 10:
+            if gas > 300 or smoke > 3.0:
                 aqi_score = 0.0
-                if gas > 800:
+                if gas > 1500:
                     aqi_score += 0.5
-                elif gas > 500:
+                elif gas > 700:
                     aqi_score += 0.35
                 elif gas > 300:
                     aqi_score += 0.2
-                if smoke > 30:
+                if smoke > 4.0:
                     aqi_score += 0.4
-                elif smoke > 15:
+                elif smoke > 3.4:
                     aqi_score += 0.2
                 
                 aqi_score = min(0.99, aqi_score)
-                if gas > 500 and smoke > 15:
+                if gas > 500 and smoke > 3.0:
                     aqi_score = min(0.99, aqi_score + 0.1)
                 
                 risk = max(risk, aqi_score)
@@ -331,24 +331,6 @@ class MLService:
             return "low"
         else:
             return "info"
-    
-    async def train_models(self, training_data: List[Dict]) -> bool:
-        try:
-            logger.info("Starting model training...")
-            
-            # Train anomaly detector
-            anomaly_success = self.anomaly_detector.train(training_data)
-            
-            if anomaly_success:
-                logger.info("✅ Model training completed successfully")
-                return True
-            else:
-                logger.warning("Model training completed with some failures")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error training models: {e}")
-            return False
     
     async def get_model_status(self) -> Dict:
         return {

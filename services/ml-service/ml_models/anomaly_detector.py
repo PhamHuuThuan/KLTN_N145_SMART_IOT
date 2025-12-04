@@ -224,6 +224,36 @@ class AnomalyDetector:
         except Exception:
             pass
 
+    def _filter_normal_samples(self, samples: List[dict], device_id: str) -> List[dict]:
+        """Filter out anomaly samples to prevent training on abnormal data"""
+        state = self._get_state(device_id)
+        if not state["is_trained"]:
+            return samples
+        
+        normal_samples = []
+        for sample in samples:
+            try:
+                value = float(sample.get("value", 0))
+                features = np.array([[value]], dtype=float)
+                try:
+                    if hasattr(state["scaler"], "scale_"):
+                        features = state["scaler"].transform(features)
+                except Exception:
+                    features = np.array([[value]], dtype=float)
+                
+                prediction = state["model"].decision_function(features)
+                raw_score = prediction[0]
+                normalized = (raw_score + 0.5) / 1.0
+                anomaly_score = 1.0 - normalized
+                anomaly_score = float(max(0.0, min(0.99, anomaly_score)))
+                is_anomaly = anomaly_score > 0.85
+                
+                if not is_anomaly and anomaly_score < 0.7:
+                    normal_samples.append(sample)
+            except Exception:
+                continue
+        return normal_samples
+
     def _maybe_retrain(self, device_id: str):
         state = self._get_state(device_id)
         buffer = state["buffer"]
@@ -235,6 +265,12 @@ class AnomalyDetector:
             return
 
         samples = list(buffer)
+        if state["is_trained"]:
+            normal_samples = self._filter_normal_samples(samples, device_id)
+            if len(normal_samples) < self.retrain_min_samples:
+                return
+            samples = normal_samples
+        
         success = self.train(samples, sensor_type=None, device_id=device_id)
         if success:
             buffer.clear()
