@@ -104,9 +104,9 @@ class RuleEvaluationService {
       }
       const now = Date.now();
       const lastTime = this.lastEvaluationTime.get(deviceId);
-      if (lastTime && (now - lastTime) < this.evaluationCooldown) {
-        return;
-      }
+      // if (lastTime && (now - lastTime) < this.evaluationCooldown) {
+      //   return;
+      // }
       
       this.lastEvaluationTime.set(deviceId, now);
 

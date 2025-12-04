@@ -65,13 +65,13 @@ def setup_routes(ml_service: MLService):
     async def predict_danger(request: PredictionRequest, compact: bool = Query(True)):
         """Get ML prediction for sensor data"""
         try:
-            logger.info(f"/predict input: {request.dict()}")
             sensor_data = request.dict()
             result = await ml_service.process_sensor_data(sensor_data)
             
             if result:
                 response = { "success": True, "prediction": _compact_prediction(result) if compact else result }
-                logger.info(f"/predict output: {response}")
+                if result.get("is_danger") or result.get("prediction_score", 0) >= 0.6:
+                    logger.warning(f"/predict - ALERT: {result.get('device_id')}/{result.get('sensor_type')} score={result.get('prediction_score'):.2f}")
                 return response
             else:
                 raise HTTPException(status_code=400, detail="Failed to process prediction")
@@ -84,20 +84,23 @@ def setup_routes(ml_service: MLService):
     async def predict_batch(request: PredictionBatchRequest, compact: bool = Query(True)):
         """Batch prediction endpoint"""
         try:
-            logger.info(f"/predict/batch input count: {len(request.data)}")
             results = []
+            alert_count = 0
             
             for sensor_data in request.data:
                 result = await ml_service.process_sensor_data(sensor_data)
                 if result:
                     results.append(_compact_prediction(result) if compact else result)
+                    if result.get("is_danger") or result.get("prediction_score", 0) >= 0.6:
+                        alert_count += 1
             
             response = {
                 "success": True,
                 "predictions": results,
                 "count": len(results)
             }
-            logger.info(f"/predict/batch output count: {response['count']}")
+            if alert_count > 0:
+                logger.warning(f"/predict/batch - {alert_count}/{len(results)} alerts")
             return response
             
         except Exception as e:
@@ -145,7 +148,6 @@ def setup_routes(ml_service: MLService):
         """Accept device-service event doc and map to single-sensor predictions."""
         try:
             doc = request.doc or {}
-            logger.info(f"/predict/event input: doc keys={list(doc.keys())}")
             device_id = doc.get('deviceId') or doc.get('device_id') or 'unknown'
             payload = doc.get('payload', {})
 
@@ -161,6 +163,7 @@ def setup_routes(ml_service: MLService):
                 raise HTTPException(status_code=400, detail="No sensor values in event doc")
 
             results = {}
+            has_alert = False
             for sensor_type, value in mapping.items():
                 sensor_data = {
                     'device_id': device_id,
@@ -168,13 +171,15 @@ def setup_routes(ml_service: MLService):
                     'value': float(value),
                     'timestamp': payload.get('ts')
                 }
-                logger.info(f"/predict/event mapped -> {sensor_type}={value}")
                 pred = await ml_service.process_sensor_data(sensor_data)
                 if pred:
                     # In event responses, avoid repeating identifiers per sensor
                     results[sensor_type] = _compact_prediction_no_ids(pred) if compact else pred
+                    if pred.get("is_danger") or pred.get("prediction_score", 0) >= 0.6:
+                        has_alert = True
             response = { 'success': True, 'device_id': device_id, 'predictions': results }
-            logger.info(f"/predict/event output sensors: {list(results.keys())}")
+            if has_alert:
+                logger.warning(f"/predict/event - ALERT: {device_id}")
             return response
         
         except HTTPException:
@@ -192,7 +197,6 @@ def setup_routes(ml_service: MLService):
         """Aggregate all sensors of a device and return device-level decision using correlation."""
         try:
             doc = request.doc or {}
-            logger.info(f"/predict/event/aggregate input: doc keys={list(doc.keys())}")
             device_id = doc.get('deviceId') or doc.get('device_id') or 'unknown'
             payload = doc.get('payload', {})
 
@@ -205,7 +209,10 @@ def setup_routes(ml_service: MLService):
             }
             all_sensors = {k: float(v) for k, v in all_sensors.items() if v is not None}
             if not all_sensors:
+                logger.warning(f"/predict/event/aggregate - No sensor values in payload: {payload}")
                 raise HTTPException(status_code=400, detail="No sensor values in event doc")
+            
+            logger.info(f"/predict/event/aggregate - Input: {device_id}, sensors={all_sensors}")
 
             agg = await ml_service.process_multi_sensor(device_id, all_sensors)
             if not agg:
@@ -240,7 +247,6 @@ def setup_routes(ml_service: MLService):
                     }
                 response['predictions'] = sensor_details
 
-            logger.info(f"/predict/event/aggregate output: level={device_summary['alert_level']}, overall={device_summary['overall_score']}")
             return response
 
         except HTTPException:

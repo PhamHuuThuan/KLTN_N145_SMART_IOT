@@ -60,14 +60,6 @@ class NotificationConsumer {
         });
         return;
       }
-
-      if (!mongoose.Types.ObjectId.isValid(userId)) {
-        logger.warn('Notification request message has invalid userId format, skipping notification', {
-          userId,
-          message
-        });
-        return;
-      }
       
       const notificationData = {
         userId,

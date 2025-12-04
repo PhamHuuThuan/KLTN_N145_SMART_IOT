@@ -70,6 +70,41 @@ class AnomalyDetector:
     # ------------------------------------------------------------------ #
     # Training logic
     # ------------------------------------------------------------------ #
+    def _filter_outliers(self, values: np.ndarray) -> np.ndarray:
+        """Filter outliers from training data using IQR method to prevent them from being learned as normal."""
+        if len(values) < 20:
+            return values
+        
+        sorted_values = np.sort(values.flatten())
+        q1 = np.percentile(sorted_values, 25)
+        q3 = np.percentile(sorted_values, 75)
+        iqr = q3 - q1
+        
+        if iqr == 0:
+            mean = np.mean(sorted_values)
+            std = np.std(sorted_values)
+            if std == 0:
+                return values
+            lower_bound = mean - 2 * std
+            upper_bound = mean + 2 * std
+        else:
+            lower_bound = q1 - 1.5 * iqr
+            upper_bound = q3 + 1.5 * iqr
+        
+        mask = (values >= lower_bound) & (values <= upper_bound)
+        filtered_values = values[mask]
+        
+        filtered_count = len(values) - len(filtered_values)
+        if filtered_count > len(values) * 0.3:
+            logger.warning(f"Too many outliers filtered ({filtered_count}/{len(values)}), using original data")
+            return values
+        
+        if len(filtered_values) < 20:
+            logger.warning(f"Too few samples after filtering ({len(filtered_values)}), using original data")
+            return values
+        
+        return filtered_values.reshape(-1, 1)
+
     def train(self, training_data: List[dict], sensor_type: Optional[str] = 'temperature', device_id: Optional[str] = None):
         """Train anomaly detection models. If device_id is None, group data per device."""
         try:
@@ -109,25 +144,29 @@ class AnomalyDetector:
                     continue
 
                 X = df[['value']].astype(float).values
+                
+                X_filtered = self._filter_outliers(X)
+                
+                if len(X_filtered) < 20:
+                    logger.warning(f"Device {dev_id} skipped training - insufficient samples after outlier filtering ({len(X_filtered)})")
+                    continue
+                
                 state = self._get_state(dev_id)
 
                 try:
-                    X_scaled = state["scaler"].fit_transform(X)
+                    X_scaled = state["scaler"].fit_transform(X_filtered)
                 except Exception as scaler_err:
                     logger.warning(f"Scaler fit failed for {dev_id}, fallback to raw: {scaler_err}")
                     state["scaler"] = StandardScaler()
-                    X_scaled = X
+                    X_scaled = X_filtered
 
-                logger.info(f"Training Isolation Forest for device {dev_id} ({len(X_scaled)} samples)")
                 state["model"].fit(X_scaled)
                 state["is_trained"] = True
                 state["feature_names"] = ['value']
-
                 self._save_device_state(dev_id, state)
                 success = True
 
             if success:
-                logger.info("Anomaly detector training completed")
                 self.is_trained = True
             return success
 
@@ -241,22 +280,34 @@ class AnomalyDetector:
         """Persist a single device model and scaler."""
         try:
             device_dir = self._device_dir(device_id)
+            if not os.path.exists(device_dir):
+                os.makedirs(device_dir, exist_ok=True)
+            
+            model_path = os.path.join(device_dir, 'isolation_forest.joblib')
+            scaler_path = os.path.join(device_dir, 'scaler.joblib')
+            meta_path = os.path.join(device_dir, 'meta.joblib')
+            
             joblib.dump(
                 {"device_id": device_id, "model": state["model"]},
-                os.path.join(device_dir, 'isolation_forest.joblib')
+                model_path
             )
+            
             joblib.dump(
                 {"device_id": device_id, "scaler": state["scaler"]},
-                os.path.join(device_dir, 'scaler.joblib')
+                scaler_path
             )
+            
             meta = {
                 "device_id": device_id,
                 "last_retrain_at": state["last_retrain_at"].isoformat() if isinstance(state["last_retrain_at"], datetime) else None,
                 "feature_names": state.get("feature_names")
             }
-            joblib.dump(meta, os.path.join(device_dir, 'meta.joblib'))
+            joblib.dump(meta, meta_path)
+            
+            if not (os.path.exists(model_path) and os.path.exists(scaler_path)):
+                logger.error(f"Model files not found after save for device {device_id}")
         except Exception as e:
-            logger.error(f"Error saving model for {device_id}: {e}")
+            logger.error(f"Error saving model for {device_id}: {e}", exc_info=True)
 
     def save_models(self):
         """Save all trained device models."""

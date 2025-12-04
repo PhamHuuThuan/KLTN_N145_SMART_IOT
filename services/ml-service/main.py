@@ -27,6 +27,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Disable uvicorn access log
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("uvicorn").setLevel(logging.WARNING)
+
 # Global services
 ml_service_instance = None
 app_state = {}
@@ -116,5 +120,5 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "3007"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True, access_log=False, log_level="warning")
 

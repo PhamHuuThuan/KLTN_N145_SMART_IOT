@@ -43,7 +43,7 @@ class MLService:
             Combined prediction result with correlation analysis
         """
         try:
-            logger.info(f"MLMulti: {device_id} -> {list(all_sensors.keys())}")
+            logger.debug(f"[MLMulti] Processing: {device_id}, sensors={all_sensors}")
             
             # Individual predictions for each sensor
             individual_results = {}
@@ -131,7 +131,15 @@ class MLService:
                 "timestamp": datetime.now().isoformat()
             }
             
-            logger.info(f"MLMultiOutput: {device_id}, overall={overall_score:.3f}, max_indiv={max_combined_score:.3f}, correlation={correlation_risk:.3f}, alert={overall_alert}")
+            values_str = ",".join([f"{k}={v:.1f}" for k, v in all_sensors.items()])
+            if is_critical or overall_score >= 0.6:
+                logger.warning(f"[MLMulti] - [{values_str}] - [ALERT: {overall_alert}, score={overall_score:.2f}, indiv={max_combined_score:.2f}, corr={correlation_risk:.2f}]")
+            else:
+                logger.info(f"[MLMulti] - [{values_str}] - [OK: {overall_score:.2f}]")
+            
+            if not individual_results:
+                logger.warning(f"[MLMulti] - No individual results processed for {device_id}, sensors={all_sensors}")
+            
             return result
             
         except Exception as e:
@@ -226,7 +234,6 @@ class MLService:
             Dictionary with predictions and alert status
         """
         try:
-            logger.info(f"MLInput: {sensor_data.get('device_id')}/{sensor_data.get('sensor_type')}={sensor_data.get('value')}")
             device_id = sensor_data.get("device_id")
             sensor_type = sensor_data.get("sensor_type")
             value = sensor_data.get("value")
@@ -252,27 +259,20 @@ class MLService:
                 if sensor_type == "gas":
                     if v >= 800:
                         danger_score = max(danger_score, 0.9)
-                        logger.info(f"DomainOverride: gas={v} => danger_score>=0.9")
                     elif v >= 500:
                         danger_score = max(danger_score, 0.75)
-                        logger.info(f"DomainOverride: gas={v} => danger_score>=0.75")
                     elif v >= 200:
                         danger_score = max(danger_score, 0.6)
-                        logger.info(f"DomainOverride: gas={v} => danger_score>=0.6")
                 elif sensor_type == "smoke":
                     if v >= 300:
                         danger_score = max(danger_score, 0.8)
-                        logger.info(f"DomainOverride: smoke={v} => danger_score>=0.8")
                     elif v >= 200:
                         danger_score = max(danger_score, 0.6)
-                        logger.info(f"DomainOverride: smoke={v} => danger_score>=0.6")
                 elif sensor_type == "temperature":
                     if v >= 50:
                         danger_score = max(danger_score, 0.9)
-                        logger.info(f"DomainOverride: temperature={v} => danger_score>=0.9")
                     elif v >= 45:
                         danger_score = max(danger_score, 0.7)
-                        logger.info(f"DomainOverride: temperature={v} => danger_score>=0.7")
             except Exception:
                 pass
 
@@ -283,7 +283,6 @@ class MLService:
             combined_score = max(anomaly_score, danger_score)
             if trend_info.get("increasing") or trend_info.get("sudden_spike"):
                 combined_score = min(1.0, combined_score + 0.1)
-                logger.info("TrendBoost: increasing/spike => +0.1 to combined_score")
             is_critical = is_anomaly or is_danger
             
             # Determine alert level
@@ -306,7 +305,10 @@ class MLService:
                 "trend": trend_info
             }
 
-            logger.info(f"MLOutput: {device_id}/{sensor_type}, score={prediction_result['prediction_score']:.3f}, is_danger={prediction_result['is_danger']}, alert={prediction_result['alert_level']}, trend={prediction_result['trend']['trend']}")
+            if is_critical or combined_score >= 0.6:
+                logger.warning(f"[ML] - [{sensor_type}={value:.1f}] - [ALERT: {alert_level}, score={combined_score:.2f}, anomaly={anomaly_score:.2f}, trend={trend_info.get('trend', 'stable')}]")
+            else:
+                logger.info(f"[ML] - [{sensor_type}={value:.1f}] - [OK: {combined_score:.2f}]")
             return prediction_result
             
         except Exception as e:

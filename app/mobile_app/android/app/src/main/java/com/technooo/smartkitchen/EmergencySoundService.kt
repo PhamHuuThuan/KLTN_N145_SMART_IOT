@@ -15,6 +15,7 @@ import android.os.IBinder
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.core.app.NotificationCompat
+import android.app.PendingIntent
 
 class EmergencySoundService : Service() {
   private var player: MediaPlayer? = null
@@ -145,8 +146,8 @@ class EmergencySoundService : Service() {
 
   private fun buildNotification(text: String): Notification {
     val stopIntent = Intent(this, EmergencySoundService::class.java).apply { action = ACTION_STOP }
-    val stopPending = androidx.core.app.PendingIntentCompat.getService(
-      this, 1010, stopIntent, 0, true
+    val stopPending = PendingIntent.getService(
+      this, 1010, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
     val builder = NotificationCompat.Builder(this, "emergency")
