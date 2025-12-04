@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '../hooks/useLanguage';
 import templatesService from '../services/templatesService';
 
 function TemplateEditor() {
   const { t } = useTranslation();
+  const { currentLanguage } = useLanguage();
   const { templateKey } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isEdit = !!templateKey;
-  const languageParam = searchParams.get('language') || 'vi';
+  const languageParam = searchParams.get('language') || currentLanguage;
 
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState('');
@@ -17,19 +19,59 @@ function TemplateEditor() {
     templateKey: '',
     name: '',
     description: '',
-    language: languageParam,
+    language: isEdit ? languageParam : currentLanguage, // Auto-set to current language when creating
     priority: 'medium',
     isActive: true,
-    cooldownPeriod: 300000,
+    cooldownPeriod: 120000, // 2 minutes (default for medium)
     conditions: [{ type: 'sensor', sensor: 'temperature', operator: '>', value: '', unit: '°C' }],
     actions: [{ type: 'send_alert', message: '' }]
   });
+
+  // Update language when currentLanguage changes (only when creating new)
+  useEffect(() => {
+    if (!isEdit) {
+      setFormData(prev => ({ ...prev, language: currentLanguage }));
+    }
+  }, [currentLanguage, isEdit]);
+  const [isTemplateKeyManuallyEdited, setIsTemplateKeyManuallyEdited] = useState(false);
+
+  // Function to get cooldown period based on priority
+  const getCooldownByPriority = (priority) => {
+    const cooldownMap = {
+      urgent: 30000,    // 30 seconds
+      high: 60000,       // 1 minute
+      medium: 120000,   // 2 minutes
+      low: 180000       // 3 minutes
+    };
+    return cooldownMap[priority] || 120000; // Default to medium if not found
+  };
+
+  // Function to generate templateKey from name
+  const generateTemplateKey = (name) => {
+    if (!name) return '';
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
+      .replace(/\s+/g, '_') // Replace spaces with underscores
+      .replace(/-+/g, '_') // Replace hyphens with underscores
+      .replace(/_+/g, '_') // Replace multiple underscores with single underscore
+      .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+  };
 
   useEffect(() => {
     if (isEdit) {
       fetchTemplate();
     }
   }, [templateKey, languageParam]);
+
+  // Auto-generate templateKey from name when creating new template
+  useEffect(() => {
+    if (!isEdit && !isTemplateKeyManuallyEdited) {
+      const generatedKey = generateTemplateKey(formData.name);
+      setFormData(prev => ({ ...prev, templateKey: generatedKey }));
+    }
+  }, [formData.name, isEdit, isTemplateKeyManuallyEdited]);
 
   const fetchTemplate = async () => {
     try {
@@ -58,8 +100,14 @@ function TemplateEditor() {
     e.preventDefault();
     setError(''); // Clear previous error
     
+    // Auto-generate templateKey if not provided when creating new template
+    let finalFormData = { ...formData };
+    if (!isEdit && !finalFormData.templateKey && finalFormData.name) {
+      finalFormData.templateKey = generateTemplateKey(finalFormData.name);
+    }
+    
     // Validate
-    if (!formData.templateKey || !formData.name || !formData.conditions.length || !formData.actions.length) {
+    if (!finalFormData.templateKey || !finalFormData.name || !finalFormData.conditions.length || !finalFormData.actions.length) {
       setError(t('templateEditor.validation.required'));
       return;
     }
@@ -82,10 +130,10 @@ function TemplateEditor() {
 
     try {
       if (isEdit) {
-        await templatesService.updateTemplate(templateKey, formData.language, formData);
+        await templatesService.updateTemplate(templateKey, finalFormData.language, finalFormData);
         alert(t('templateEditor.updateSuccess'));
       } else {
-        await templatesService.createTemplate(formData);
+        await templatesService.createTemplate(finalFormData);
         alert(t('templateEditor.createSuccess'));
       }
       navigate('/templates');
@@ -182,34 +230,41 @@ function TemplateEditor() {
           <h2 style={styles.sectionTitle}>{t('templateEditor.basicInfo', { defaultValue: 'Basic Information' })}</h2>
           
           <div style={styles.formRow}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>{t('templateEditor.templateKey')}</label>
-              <input
-                type="text"
-                value={formData.templateKey}
-                onChange={(e) => setFormData({ ...formData, templateKey: e.target.value })}
-                required
-                disabled={isEdit}
-                style={{...styles.input, ...(isEdit ? styles.disabledInput : {})}}
-                placeholder="e.g., temp_emergency"
-              />
-              {isEdit && <small style={styles.helpText}>{t('templateEditor.keyHint')}</small>}
-            </div>
+            {isEdit && (
+              <>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>{t('templateEditor.templateKey')}</label>
+                  <input
+                    type="text"
+                    value={formData.templateKey}
+                    onChange={(e) => {
+                      setIsTemplateKeyManuallyEdited(true);
+                      setFormData({ ...formData, templateKey: e.target.value });
+                    }}
+                    required
+                    disabled={isEdit}
+                    style={{...styles.input, ...(isEdit ? styles.disabledInput : {})}}
+                    placeholder="e.g., temp_emergency"
+                  />
+                  <small style={styles.helpText}>{t('templateEditor.keyHint')}</small>
+                </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>{t('templateEditor.language')}</label>
-              <select
-                value={formData.language}
-                onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-                required
-                disabled={isEdit}
-                style={{...styles.select, ...(isEdit ? styles.disabledInput : {})}}
-              >
-                <option value="vi">{t('templates.vietnamese')}</option>
-                <option value="en">{t('templates.english')}</option>
-              </select>
-              {isEdit && <small style={styles.helpText}>{t('templateEditor.languageHint')}</small>}
-            </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>{t('templateEditor.language')}</label>
+                  <select
+                    value={formData.language}
+                    onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                    required
+                    disabled={isEdit}
+                    style={{...styles.select, ...(isEdit ? styles.disabledInput : {})}}
+                  >
+                    <option value="vi">{t('templates.vietnamese')}</option>
+                    <option value="en">{t('templates.english')}</option>
+                  </select>
+                  <small style={styles.helpText}>{t('templateEditor.languageHint')}</small>
+                </div>
+              </>
+            )}
           </div>
 
           <div style={styles.formGroup}>
@@ -240,7 +295,11 @@ function TemplateEditor() {
               <label style={styles.label}>{t('templateEditor.priority')}</label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                onChange={(e) => {
+                  const newPriority = e.target.value;
+                  const newCooldown = getCooldownByPriority(newPriority);
+                  setFormData({ ...formData, priority: newPriority, cooldownPeriod: newCooldown });
+                }}
                 style={styles.select}
               >
                 <option value="low">{t('templateEditor.priorities.low')}</option>
@@ -311,8 +370,17 @@ function TemplateEditor() {
                   <select
                     value={condition.sensor}
                     onChange={(e) => {
-                      updateCondition(index, 'sensor', e.target.value);
-                      updateCondition(index, 'unit', getSensorUnit(e.target.value));
+                      const newSensor = e.target.value;
+                      const newUnit = getSensorUnit(newSensor);
+                      // Update sensor, unit, and clear value when sensor changes
+                      const newConditions = [...formData.conditions];
+                      newConditions[index] = {
+                        ...newConditions[index],
+                        sensor: newSensor,
+                        unit: newUnit,
+                        value: '' // Clear value when sensor changes
+                      };
+                      setFormData({ ...formData, conditions: newConditions });
                     }}
                     style={styles.select}
                   >
