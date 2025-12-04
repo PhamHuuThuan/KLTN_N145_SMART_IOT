@@ -8,8 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from services.ml_service import MLService
 from controllers.ml_controller import setup_routes
-# Kafka consumer disabled
-# from consumers.sensor_consumer import SensorConsumer
 
 # Load .env if available (optional)
 try:
@@ -41,7 +39,7 @@ async def lifespan(app: FastAPI):
     global ml_service_instance
     
     # Startup
-    logger.info("🚀 Starting ML Service...")
+    logger.info("Starting ML Service...")
     
     try:
         # Initialize ML service
@@ -52,12 +50,7 @@ async def lifespan(app: FastAPI):
         router = setup_routes(ml_service_instance)
         app.include_router(router)
 
-        logger.info("✅ ML Service initialized - FastAPI ready to accept requests")
-        
-        # Kafka consumer disabled - ML service only accepts HTTP API requests
-        logger.info("Kafka consumer disabled - ML service operates via HTTP API only")
-
-        logger.info("✅ ML Service started successfully (minimal)")
+        logger.info("✅ ML Service initialized")
         
     except Exception as e:
         logger.error(f"Error during startup: {e}")
@@ -65,8 +58,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("🛑 Shutting down ML Service...")
-    logger.info("✅ ML Service shut down")
+    logger.info("Shutting down ML Service...")
 
 # Create FastAPI app
 app = FastAPI(
@@ -86,7 +78,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# app_state already defined at top
 
 # Health check endpoint - MUST be defined early and always return 200
 @app.get("/health")

@@ -34,7 +34,6 @@ class TrainingRequest(BaseModel):
 class ModelStatusResponse(BaseModel):
     """Response model for model status"""
     anomaly_detector_trained: bool
-    danger_predictor_trained: bool
 
 def setup_routes(ml_service: MLService):
     """Setup API routes"""
@@ -69,10 +68,7 @@ def setup_routes(ml_service: MLService):
             result = await ml_service.process_sensor_data(sensor_data)
             
             if result:
-                response = { "success": True, "prediction": _compact_prediction(result) if compact else result }
-                if result.get("is_danger") or result.get("prediction_score", 0) >= 0.6:
-                    logger.warning(f"/predict - ALERT: {result.get('device_id')}/{result.get('sensor_type')} score={result.get('prediction_score'):.2f}")
-                return response
+                return { "success": True, "prediction": _compact_prediction(result) if compact else result }
             else:
                 raise HTTPException(status_code=400, detail="Failed to process prediction")
                 
@@ -94,14 +90,11 @@ def setup_routes(ml_service: MLService):
                     if result.get("is_danger") or result.get("prediction_score", 0) >= 0.6:
                         alert_count += 1
             
-            response = {
+            return {
                 "success": True,
                 "predictions": results,
                 "count": len(results)
             }
-            if alert_count > 0:
-                logger.warning(f"/predict/batch - {alert_count}/{len(results)} alerts")
-            return response
             
         except Exception as e:
             logger.error(f"Error in batch predict: {e}")
@@ -111,16 +104,13 @@ def setup_routes(ml_service: MLService):
     async def train_models(request: TrainingRequest):
         """Train ML models with new data"""
         try:
-            logger.info(f"/train input samples: {len(request.training_data)}")
             success = await ml_service.train_models(request.training_data)
             
-            response = {
+            return {
                 "success": success,
                 "message": "Models trained successfully" if success else "Training failed",
                 "training_samples": len(request.training_data)
             }
-            logger.info(f"/train output: {response}")
-            return response
             
         except Exception as e:
             logger.error(f"Error training models: {e}")
@@ -132,12 +122,9 @@ def setup_routes(ml_service: MLService):
         try:
             status = await ml_service.get_model_status()
             
-            response = ModelStatusResponse(
-                anomaly_detector_trained=status["anomaly_detector"]["is_trained"],
-                danger_predictor_trained=status["danger_predictor"]["is_trained"]
+            return ModelStatusResponse(
+                anomaly_detector_trained=status["anomaly_detector"]["is_trained"]
             )
-            logger.info(f"/status output: {response.dict()}")
-            return response
             
         except Exception as e:
             logger.error(f"Error getting model status: {e}")
@@ -175,12 +162,7 @@ def setup_routes(ml_service: MLService):
                 if pred:
                     # In event responses, avoid repeating identifiers per sensor
                     results[sensor_type] = _compact_prediction_no_ids(pred) if compact else pred
-                    if pred.get("is_danger") or pred.get("prediction_score", 0) >= 0.6:
-                        has_alert = True
-            response = { 'success': True, 'device_id': device_id, 'predictions': results }
-            if has_alert:
-                logger.warning(f"/predict/event - ALERT: {device_id}")
-            return response
+            return { 'success': True, 'device_id': device_id, 'predictions': results }
         
         except HTTPException:
             raise
@@ -209,10 +191,7 @@ def setup_routes(ml_service: MLService):
             }
             all_sensors = {k: float(v) for k, v in all_sensors.items() if v is not None}
             if not all_sensors:
-                logger.warning(f"/predict/event/aggregate - No sensor values in payload: {payload}")
                 raise HTTPException(status_code=400, detail="No sensor values in event doc")
-            
-            logger.info(f"/predict/event/aggregate - Input: {device_id}, sensors={all_sensors}")
 
             agg = await ml_service.process_multi_sensor(device_id, all_sensors)
             if not agg:

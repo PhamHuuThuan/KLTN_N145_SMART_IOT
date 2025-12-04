@@ -96,11 +96,9 @@ class AnomalyDetector:
         
         filtered_count = len(values) - len(filtered_values)
         if filtered_count > len(values) * 0.3:
-            logger.warning(f"Too many outliers filtered ({filtered_count}/{len(values)}), using original data")
             return values
         
         if len(filtered_values) < 20:
-            logger.warning(f"Too few samples after filtering ({len(filtered_values)}), using original data")
             return values
         
         return filtered_values.reshape(-1, 1)
@@ -109,7 +107,6 @@ class AnomalyDetector:
         """Train anomaly detection models. If device_id is None, group data per device."""
         try:
             if not training_data:
-                logger.warning("No training data provided")
                 return False
 
             # Lazy import to avoid hard dependency when only predicting
@@ -126,7 +123,6 @@ class AnomalyDetector:
             success = False
             for dev_id, samples in groups.items():
                 if len(samples) < 20:
-                    logger.warning(f"Device {dev_id} skipped training - insufficient samples ({len(samples)})")
                     continue
 
                 df = pd.DataFrame(samples)
@@ -135,12 +131,7 @@ class AnomalyDetector:
                 if sensor_type and 'sensor_type' in df.columns:
                     df = df[df['sensor_type'] == sensor_type]
 
-                if 'value' not in df.columns:
-                    logger.error(f"'value' column not found in training data for device {dev_id}")
-                    continue
-
-                if df.empty:
-                    logger.warning(f"Device {dev_id} has no samples after filtering")
+                if 'value' not in df.columns or df.empty:
                     continue
 
                 X = df[['value']].astype(float).values
@@ -148,15 +139,13 @@ class AnomalyDetector:
                 X_filtered = self._filter_outliers(X)
                 
                 if len(X_filtered) < 20:
-                    logger.warning(f"Device {dev_id} skipped training - insufficient samples after outlier filtering ({len(X_filtered)})")
                     continue
                 
                 state = self._get_state(dev_id)
 
                 try:
                     X_scaled = state["scaler"].fit_transform(X_filtered)
-                except Exception as scaler_err:
-                    logger.warning(f"Scaler fit failed for {dev_id}, fallback to raw: {scaler_err}")
+                except Exception:
                     state["scaler"] = StandardScaler()
                     X_scaled = X_filtered
 
@@ -191,14 +180,21 @@ class AnomalyDetector:
             try:
                 if hasattr(state["scaler"], "scale_"):
                     features = state["scaler"].transform(features)
-            except Exception as scale_err:
-                logger.debug(f"Scaler transform failed for {dev_id}, using raw value: {scale_err}")
+            except Exception:
                 features = np.array([[value]], dtype=float)
 
             prediction = state["model"].decision_function(features)
-            anomaly_score = 1 - (prediction[0] + 1) / 2  # Normalize to 0-1
+            # decision_function: negative = anomalous, positive = normal
+            # Normalize to 0-1 range (max 0.99 to avoid 100%)
+            raw_score = prediction[0]
+            # decision_function typically ranges from -0.5 to 0.5
+            # Simple linear transformation: map [-0.5, 0.5] -> [0.99, 0.0]
+            normalized = (raw_score + 0.5) / 1.0  # Maps [-0.5, 0.5] -> [0, 1]
+            anomaly_score = 1.0 - normalized  # Invert: anomalies -> high score
+            # Clip to ensure 0-0.99 range (avoid 100%)
+            anomaly_score = float(max(0.0, min(0.99, anomaly_score)))
             is_anomaly = anomaly_score > 0.85
-            return float(anomaly_score), bool(is_anomaly)
+            return anomaly_score, bool(is_anomaly)
 
         except Exception as e:
             logger.error(f"Error in prediction: {e}")
@@ -225,8 +221,8 @@ class AnomalyDetector:
                 "timestamp": datetime.utcnow().isoformat()
             }
             state["buffer"].append(sample)
-        except Exception as err:
-            logger.debug(f"Failed to record sample for retraining ({device_id}): {err}")
+        except Exception:
+            pass
 
     def _maybe_retrain(self, device_id: str):
         state = self._get_state(device_id)
@@ -241,14 +237,8 @@ class AnomalyDetector:
         samples = list(buffer)
         success = self.train(samples, sensor_type=None, device_id=device_id)
         if success:
-            logger.info(
-                f"IsolationForest auto-retrained for {device_id} with {len(samples)} samples "
-                f"(interval {self.retrain_interval}, min {self.retrain_min_samples})"
-            )
             buffer.clear()
             state["last_retrain_at"] = now
-        else:
-            logger.warning(f"Auto-retraining skipped for {device_id} due to training failure")
 
     def force_retrain_from_buffer(self, device_id: Optional[str] = None) -> bool:
         """Expose manual trigger to retrain immediately with buffered data (per device or all)."""
@@ -256,14 +246,12 @@ class AnomalyDetector:
             dev_id = self._get_device_id(device_id)
             buffer = self._get_state(dev_id)["buffer"]
             if not buffer:
-                logger.info(f"No buffered samples available for manual retraining ({dev_id})")
                 return False
             samples = list(buffer)
             success = self.train(samples, sensor_type=None, device_id=dev_id)
             if success:
                 buffer.clear()
                 self._get_state(dev_id)["last_retrain_at"] = datetime.utcnow()
-                logger.info(f"Manual retraining completed for {dev_id}")
             return success
 
         # Retrain all devices
@@ -304,17 +292,14 @@ class AnomalyDetector:
             }
             joblib.dump(meta, meta_path)
             
-            if not (os.path.exists(model_path) and os.path.exists(scaler_path)):
-                logger.error(f"Model files not found after save for device {device_id}")
         except Exception as e:
-            logger.error(f"Error saving model for {device_id}: {e}", exc_info=True)
+            logger.error(f"Error saving model for {device_id}: {e}")
 
     def save_models(self):
         """Save all trained device models."""
         for device_id, state in self.device_states.items():
             if state["is_trained"]:
                 self._save_device_state(device_id, state)
-        logger.info("Per-device anomaly models saved successfully")
 
     def _try_load_device_state(self, device_id: str):
         """Attempt to load an existing device model from disk."""
@@ -345,7 +330,6 @@ class AnomalyDetector:
                         pass
                 state["feature_names"] = meta.get("feature_names")
 
-            logger.info(f"Loaded anomaly model for device {device_id}")
         except Exception as e:
             logger.error(f"Failed to load model for {device_id}: {e}")
 
@@ -379,19 +363,15 @@ class AnomalyDetector:
         legacy_model = os.path.join(self.model_dir, 'isolation_forest.joblib')
         legacy_scaler = os.path.join(self.model_dir, 'scaler.joblib')
         if os.path.exists(legacy_model) and os.path.exists(legacy_scaler):
-            logger.info("Loading legacy anomaly detector model as global fallback")
             fallback_state = self._get_state(self.default_device_id)
             try:
                 fallback_state["model"] = joblib.load(legacy_model)
                 fallback_state["scaler"] = joblib.load(legacy_scaler)
                 fallback_state["is_trained"] = True
                 loaded_any = True
-            except Exception as legacy_err:
-                logger.error(f"Failed to load legacy anomaly detector: {legacy_err}")
+            except Exception:
+                pass
 
         if loaded_any:
-            logger.info("Per-device anomaly models loaded successfully")
             self.is_trained = True
-        else:
-            logger.warning("No anomaly models found on disk")
         return loaded_any
