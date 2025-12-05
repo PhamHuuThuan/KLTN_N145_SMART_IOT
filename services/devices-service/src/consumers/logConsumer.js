@@ -91,14 +91,14 @@ async function updateDeviceStatus(data) {
         flame: hasValue(payload.flame) ? payload.flame : prev.flame,
         o: (payload.o || payload.outlets || prev.o || {})
       };
-      emitDeviceTelemetry(deviceId, device.latestTelemetry);
+      emitDeviceTelemetry(deviceId, device.latestTelemetry, device);
     } else if (type === 'event' && payload.o) {
       if (!device.latestTelemetry) {
         device.latestTelemetry = { ts: Date.now(), o: {} };
       }
       device.latestTelemetry.o = payload.o || device.latestTelemetry.o;
       device.latestTelemetry.ts = payload.ts || Date.now();
-      emitDeviceTelemetry(deviceId, device.latestTelemetry);
+      emitDeviceTelemetry(deviceId, device.latestTelemetry, device);
     } else {
       logger.error(`No sensor data found in ${type} log, keeping existing telemetry`);
     }

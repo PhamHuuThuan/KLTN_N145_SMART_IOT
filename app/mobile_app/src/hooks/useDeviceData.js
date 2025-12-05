@@ -273,6 +273,8 @@ export const useDeviceData = () => {
             lastSeenAt: payloadTsIso,
             status: 'online',
             isOnline: true,
+            ...(payload.emergencyMode !== undefined && { emergencyMode: payload.emergencyMode }),
+            ...(payload.lastEmergencyAt && { lastEmergencyAt: toIso(payload.lastEmergencyAt) || prev?.lastEmergencyAt }),
           }));
         }
       } catch (e) {
@@ -302,37 +304,6 @@ export const useDeviceData = () => {
         return {
           ...prev,
           latestTelemetry: { ...(prev.latestTelemetry || {}), o },
-          lastUpdate: nowIso,
-          lastSeenAt: nowIso,
-          status: 'online',
-          isOnline: true,
-        };
-      });
-    });
-
-    socket.on('device.emergency', ({ deviceId: dId, emergencyMode, lastEmergencyAt }) => {
-      log.info('Emergency mode update received', { deviceId: dId, emergencyMode });
-      const nowIso = new Date().toISOString();
-      
-      setDevicesList((prev) => {
-        if (!Array.isArray(prev) || !prev.length) return prev;
-        return prev.map((item) => (item.deviceId === (dId || item.deviceId)
-          ? {
-              ...item,
-              status: 'online',
-              isOnline: true,
-              lastSeenAt: nowIso,
-            }
-          : item));
-      });
-
-      if (selectedDevice && dId !== selectedDevice) return;
-      setDeviceData((prev) => {
-        if (!prev || prev.deviceId !== dId) return prev;
-        return {
-          ...prev,
-          emergencyMode: !!emergencyMode,
-          lastEmergencyAt: lastEmergencyAt ? new Date(lastEmergencyAt).toISOString() : prev.lastEmergencyAt,
           lastUpdate: nowIso,
           lastSeenAt: nowIso,
           status: 'online',

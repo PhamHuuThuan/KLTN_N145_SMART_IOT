@@ -1,6 +1,7 @@
 import Device from '../models/Device.js';
 import { producer } from '../config/kafka.js';
 import logger from '../utils/logger.js';
+import { emitDeviceTelemetry } from '../realtime/socket.js';
 
 const AUTO_EMERGENCY_DELAY_MS = Number(process.env.AUTO_EMERGENCY_DELAY_MS || 60_000);
 const KAFKA_SEND_TIMEOUT_MS = Number(process.env.KAFKA_SEND_TIMEOUT_MS || 1_500);
@@ -127,6 +128,14 @@ export async function activateEmergencyMode(device, options = {}) {
     await publishUserActionEvent(device, context);
   } catch (error) {
     logger.error('Failed to publish user action event for emergency mode:', error);
+  }
+
+  try {
+    if (device.latestTelemetry) {
+      emitDeviceTelemetry(device.deviceId, device.latestTelemetry, device);
+    }
+  } catch (error) {
+    logger.error('Failed to emit device telemetry with emergency mode:', error);
   }
 
   return device;
