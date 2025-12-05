@@ -37,7 +37,7 @@ class MLService:
             max_combined_score = 0.0
             
             for sensor_type, value in all_sensors.items():
-                if value is None:
+                if value is None or sensor_type == 'flame':
                     continue
                 
                 try:
@@ -133,9 +133,9 @@ class MLService:
                     fire_score += 0.2
                 if gas > 1500:
                     fire_score += 0.2
-                elif gas > 700:
+                elif gas > 800:
                     fire_score += 0.15
-                elif gas > 500:
+                elif gas > 600:
                     fire_score += 0.1
                 
                 fire_score = min(0.99, fire_score)
@@ -183,14 +183,14 @@ class MLService:
         if sensor_type == "gas":
             if value >= 1500:
                 danger_score = 0.9
-            elif value >= 700:
+            elif value >= 800:
                 danger_score = 0.75
-            elif value >= 500:
+            elif value >= 600:
                 danger_score = 0.6
         elif sensor_type == "smoke":
             if value >= 4:
                 danger_score = 0.9
-            elif value >= 3.4:
+            elif value >= 3.3:
                 danger_score = 0.75
             elif value >= 3.0:
                 danger_score = 0.6
@@ -321,7 +321,7 @@ class MLService:
         return score >= base
     
     def _determine_alert_level(self, score: float) -> str:
-        if score >= 0.9:
+        if score >= 0.85:
             return "critical"
         elif score >= 0.75:
             return "high"

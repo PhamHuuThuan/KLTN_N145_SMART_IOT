@@ -841,24 +841,26 @@ class RuleEvaluationService {
         if (score > maxScore) {
           maxScore = score;
           maxSensor = sensor;
-          switch (sensor) {
-            case 'temperature':
-              maxSensorValue = sensorData.temp;
-              break;
-            case 'humidity':
-              maxSensorValue = sensorData.humid;
-              break;
-            case 'gas_ppm':
-              maxSensorValue = sensorData.gas_ppm;
-              break;
-            case 'smoke':
-              maxSensorValue = sensorData.smoke;
-              break;
-            case 'flame':
-              maxSensorValue = sensorData.flame;
-              break;
-            default:
-              maxSensorValue = null;
+          
+          if (prediction.value !== undefined && prediction.value !== null) {
+            maxSensorValue = prediction.value;
+          } else {
+            switch (sensor) {
+              case 'temperature':
+                maxSensorValue = sensorData.temp;
+                break;
+              case 'humidity':
+                maxSensorValue = sensorData.humid;
+                break;
+              case 'gas_ppm':
+                maxSensorValue = sensorData.gas_ppm;
+                break;
+              case 'smoke':
+                maxSensorValue = sensorData.smoke;
+                break;
+              default:
+                maxSensorValue = null;
+            }
           }
         }
       }
@@ -870,7 +872,7 @@ class RuleEvaluationService {
       }
 
       const isCritical = deviceAlertLevel === 'critical' || 
-                        (maxSensor === 'gas_ppm' && maxSensorValue > 1000) ||
+                        ((maxSensor === 'gas' || maxSensor === 'gas_ppm') && maxSensorValue > 1000) ||
                         (maxSensor === 'flame' && maxSensorValue) ||
                         (maxSensor === 'smoke' && maxSensorValue > 1.5);
 
@@ -881,6 +883,7 @@ class RuleEvaluationService {
       const sensorNameMap = {
         'temperature': 'Nhiệt độ',
         'humidity': 'Độ ẩm',
+        'gas': 'Khí gas',
         'gas_ppm': 'Khí gas',
         'smoke': 'Khói',
         'flame': 'Lửa'
