@@ -61,6 +61,7 @@ const SensorChartScreen = ({ navigation, route }) => {
   const [customDateRange, setCustomDateRange] = useState(null);
   const [selectedLog, setSelectedLog] = useState(null);
   const loadDataTimeoutRef = useRef(null);
+  const loadingSensorRef = useRef(null);
 
   // Format time label for chart
   const formatTimeLabel = useCallback((timestamp) => {
@@ -95,7 +96,9 @@ const SensorChartScreen = ({ navigation, route }) => {
   }, []);
 
   const loadTelemetryData = useCallback(async () => {
-    if (!selectedDevice) return;
+    if (!selectedDevice || !selectedSensor) return;
+    
+    loadingSensorRef.current = selectedSensor;
     
     try {
       setLoading(true);
@@ -105,34 +108,30 @@ const SensorChartScreen = ({ navigation, route }) => {
         ? Math.ceil((customDateRange.endDate - customDateRange.startDate) / (1000 * 60 * 60))
         : selectedTimeRange;
       
-      log.info(`Loading telemetry data for device ${selectedDevice}, hours: ${hours}`);
+      log.info(`Loading telemetry data for device ${selectedDevice}, sensor: ${selectedSensor}, hours: ${hours}`);
       
-      const response = await apiService.getTelemetryHistory(selectedDevice, hours);
+      const response = await apiService.getTelemetryHistory(
+        selectedDevice, 
+        hours,
+        selectedSensor,
+        customDateRange?.startDate,
+        customDateRange?.endDate
+      );
       
       if (response.success && response.data) {
         let data = Array.isArray(response.data) ? response.data : [];
         
-        // Limit data immediately to prevent memory issues
-        const MAX_LOAD_RECORDS = 100000;
-        if (data.length > MAX_LOAD_RECORDS) {
-          log.warn(`Limiting data from ${data.length} to ${MAX_LOAD_RECORDS} records`);
-          data = data.slice(0, MAX_LOAD_RECORDS);
-        }
+        data = data.filter(item => {
+          try {
+            const timestamp = item.createdAt || item.payload?.ts;
+            if (!timestamp) return false;
+            const itemDate = new Date(timestamp);
+            return !isNaN(itemDate.getTime());
+          } catch {
+            return false;
+          }
+        });
         
-        // Filter by custom date range if set
-        if (customDateRange) {
-          data = data.filter(item => {
-            try {
-              const itemDate = new Date(item.createdAt || item.payload?.ts);
-              if (isNaN(itemDate.getTime())) return false;
-              return itemDate >= customDateRange.startDate && itemDate <= customDateRange.endDate;
-            } catch {
-              return false;
-            }
-          });
-        }
-        
-        // Sort by timestamp ascending with error handling
         try {
           data.sort((a, b) => {
             try {
@@ -148,25 +147,33 @@ const SensorChartScreen = ({ navigation, route }) => {
           log.error('Error sorting data:', sortErr);
         }
         
-        // Only set data if we have valid data
-        if (data.length > 0) {
-          setTelemetryData(data);
-          log.info(`Loaded ${data.length} telemetry records`);
-        } else {
-          setTelemetryData([]);
-          log.info('No valid telemetry records after processing');
+        if (loadingSensorRef.current === selectedSensor) {
+          if (data.length > 0) {
+            setTelemetryData(data);
+            log.info(`Loaded ${data.length} telemetry records for ${selectedSensor} (filtered at backend)`);
+          } else {
+            setTelemetryData([]);
+            log.info('No valid telemetry records after processing');
+          }
         }
       } else {
-        setTelemetryData([]);
+        if (loadingSensorRef.current === selectedSensor) {
+          setTelemetryData([]);
+        }
       }
     } catch (err) {
       log.error('Error loading telemetry data:', err);
-      setError(err.message || t('charts.loadError'));
-      setTelemetryData([]);
+      if (loadingSensorRef.current === selectedSensor) {
+        setError(err.message || t('charts.loadError'));
+        setTelemetryData([]);
+      }
     } finally {
-      setLoading(false);
+      if (loadingSensorRef.current === selectedSensor) {
+        setLoading(false);
+      }
+      loadingSensorRef.current = null;
     }
-  }, [selectedDevice, selectedTimeRange, customDateRange, t]);
+  }, [selectedDevice, selectedSensor, selectedTimeRange, customDateRange, t]);
 
   // Helper function to check sensor data availability
   const checkSensorDataAvailability = useCallback(() => {
@@ -188,19 +195,18 @@ const SensorChartScreen = ({ navigation, route }) => {
     return sensorDataAvailability;
   }, [telemetryData]);
 
-  // Auto-select sensor with available data when telemetry data is loaded
   useEffect(() => {
-    if (!telemetryData.length) {
+    if (!telemetryData.length || loading || loadingSensorRef.current) {
+      return;
+    }
+    
+    if (loadingSensorRef.current === selectedSensor) {
       return;
     }
     
     const sensorDataAvailability = checkSensorDataAvailability();
-    log.info('Sensor data availability:', sensorDataAvailability);
-    
-    // Check if current selected sensor has data
     const currentHasData = sensorDataAvailability[selectedSensor];
     
-    // If current sensor has no data, select first available sensor
     if (!currentHasData) {
       const firstAvailableSensor = Object.keys(sensorDataAvailability).find(
         key => sensorDataAvailability[key]
@@ -210,28 +216,7 @@ const SensorChartScreen = ({ navigation, route }) => {
         setSelectedSensor(firstAvailableSensor);
       }
     }
-  }, [telemetryData, checkSensorDataAvailability]); // Only depend on telemetryData to avoid loops
-
-  // Also check when selectedSensor changes (user manually selects)
-  useEffect(() => {
-    if (!telemetryData.length) {
-      return;
-    }
-    
-    const sensorDataAvailability = checkSensorDataAvailability();
-    const currentHasData = sensorDataAvailability[selectedSensor];
-    
-    // If user selected a sensor with no data, auto-switch to first available
-    if (!currentHasData) {
-      const firstAvailableSensor = Object.keys(sensorDataAvailability).find(
-        key => sensorDataAvailability[key]
-      );
-      if (firstAvailableSensor && firstAvailableSensor !== selectedSensor) {
-        log.info(`Switching from ${selectedSensor} (no data) to ${firstAvailableSensor}`);
-        setSelectedSensor(firstAvailableSensor);
-      }
-    }
-  }, [selectedSensor, checkSensorDataAvailability]);
+  }, [telemetryData, selectedSensor, loading, checkSensorDataAvailability]);
 
   useEffect(() => {
     // Clear any pending timeout
@@ -241,7 +226,7 @@ const SensorChartScreen = ({ navigation, route }) => {
     
     let isMounted = true;
     
-    if (selectedDevice) {
+    if (selectedDevice && selectedSensor) {
       loadDataTimeoutRef.current = setTimeout(() => {
         if (isMounted) {
           loadTelemetryData().catch(err => {
@@ -261,7 +246,7 @@ const SensorChartScreen = ({ navigation, route }) => {
         clearTimeout(loadDataTimeoutRef.current);
       }
     };
-  }, [loadTelemetryData, selectedDevice]); // Only reload when device or time range changes, not sensor
+  }, [loadTelemetryData, selectedDevice, selectedSensor]); // Reload when device, time range, or sensor changes
 
   // Process data for chart
   const chartData = useMemo(() => {
@@ -271,48 +256,43 @@ const SensorChartScreen = ({ navigation, route }) => {
       const sensorConfig = SENSOR_TYPES[selectedSensor];
       if (!sensorConfig) return { labels: [], values: [], timestamps: [] };
 
-      const isSmokeSensor = selectedSensor === 'smoke';
+      // Calculate min/max values from actual data for all sensors
+      let minValue = Infinity;
+      let maxValue = -Infinity;
+      const validValues = [];
       
-
-      let minValue = isSmokeSensor ? 0 : Infinity;
-      let maxValue = isSmokeSensor ? 2 : -Infinity;
-      
-      if (!isSmokeSensor) {
-        minValue = Infinity;
-        maxValue = -Infinity;
-        const validValues = [];
-        
-        for (let i = 0; i < telemetryData.length; i++) {
-          try {
-            const item = telemetryData[i];
-            const payload = item?.payload || {};
-            const value = payload[sensorConfig.key];
-            
-            if (value !== null && value !== undefined) {
-              const numValue = Number(value);
-              if (!isNaN(numValue) && isFinite(numValue)) {
-                validValues.push(numValue);
-                if (numValue < minValue) {
-                  minValue = numValue;
-                }
-                if (numValue > maxValue) {
-                  maxValue = numValue;
-                }
+      for (let i = 0; i < telemetryData.length; i++) {
+        try {
+          const item = telemetryData[i];
+          const payload = item?.payload || {};
+          const value = payload[sensorConfig.key];
+          
+          if (value !== null && value !== undefined) {
+            const numValue = Number(value);
+            if (!isNaN(numValue) && isFinite(numValue)) {
+              validValues.push(numValue);
+              if (numValue < minValue) {
+                minValue = numValue;
+              }
+              if (numValue > maxValue) {
+                maxValue = numValue;
               }
             }
-          } catch (err) {
-            // Skip invalid items
           }
+        } catch (err) {
+          // Skip invalid items
         }
-        
-        if (minValue === Infinity || validValues.length === 0) {
-          minValue = 0;
-          maxValue = 100;
-        } else if (minValue === maxValue) {
-          const padding = Math.max(1, Math.abs(minValue) * 0.1);
-          minValue = minValue - padding;
-          maxValue = maxValue + padding;
-        }
+      }
+      
+      // Set default range if no valid values found
+      if (minValue === Infinity || validValues.length === 0) {
+        minValue = 0;
+        maxValue = 100;
+      } else if (minValue === maxValue) {
+        // Add padding if all values are the same
+        const padding = Math.max(1, Math.abs(minValue) * 0.1);
+        minValue = minValue - padding;
+        maxValue = maxValue + padding;
       }
       
       const data = [];
@@ -325,45 +305,25 @@ const SensorChartScreen = ({ navigation, route }) => {
           const timestamp = new Date(item?.createdAt || payload?.ts || Date.now());
           if (isNaN(timestamp.getTime())) continue;
           
-          // For smoke sensor, always include (null/undefined = 0)
-          if (isSmokeSensor) {
-            let numValue = 0;
-            if (value !== null && value !== undefined) {
-              const parsed = Number(value);
-              if (!isNaN(parsed) && isFinite(parsed)) {
-                numValue = parsed > 0 ? 1 : 0;
-              }
-            }
-            
-            const label = formatTimeLabel(timestamp);
-            if (!label) continue;
-            
-            data.push({
-              timestamp,
-              value: numValue,
-              label,
-              isGapPoint: false,
-            });
-          } else {
-            if (value === null || value === undefined) {
-              continue;
-            }
-            
-            const numValue = Number(value);
-            if (isNaN(numValue) || !isFinite(numValue)) {
-              continue;
-            }
-            
-            const label = formatTimeLabel(timestamp);
-            if (!label) continue;
-            
-            data.push({
-              timestamp,
-              value: numValue,
-              label,
-              isGapPoint: false,
-            });
+          // Process all sensors the same way - keep float values
+          if (value === null || value === undefined) {
+            continue;
           }
+          
+          const numValue = Number(value);
+          if (isNaN(numValue) || !isFinite(numValue)) {
+            continue;
+          }
+          
+          const label = formatTimeLabel(timestamp);
+          if (!label) continue;
+          
+          data.push({
+            timestamp,
+            value: numValue,
+            label,
+            isGapPoint: false,
+          });
         } catch (err) {
           log.warn('Error processing data item:', err);
           continue; // Skip this item
@@ -555,30 +515,23 @@ const SensorChartScreen = ({ navigation, route }) => {
           </View>
         ) : (
           <>
-            {/* Animated Controls Bar */}
             <View style={[styles.controlsBar, { backgroundColor: 'transparent' }]}>
-              {/* Sensor Selector - Animated NavBar */}
               <View style={styles.controlsRow}>
                 <AnimatedNavBar
                   items={Object.entries(SENSOR_TYPES).map(([sensorKey, config]) => {
-                    // sensorKey is 'temperature', 'humidity', 'gas', 'smoke'
-                    // config.key is 'temp', 'humid', 'gas_ppm', 'smoke' (field name in payload)
-                    // We need to use sensorKey as the item key, not config.key
                     return {
                       ...config,
-                      sensorKey, // Store sensor key separately
-                      key: sensorKey, // This is what we use for selection
+                      sensorKey,
+                      key: sensorKey,
                     };
                   })}
                   selectedValue={selectedSensor}
                   onSelect={(key) => {
-                    // Update UI immediately - don't wait for data load
                     setSelectedSensor(key);
-                    setSelectedLog(null); // Clear selected log when switching sensor
-                    // Data will be loaded by useEffect with debounce
+                    setSelectedLog(null);
+                    setTelemetryData([]);
                   }}
                   getItemKey={(item) => {
-                    // Ensure we get the correct key
                     return item?.key;
                   }}
                   getItemLabel={(item) => t(item.label)}
@@ -682,9 +635,7 @@ const SensorChartScreen = ({ navigation, route }) => {
                         {t('charts.current')}
                       </Text>
                       <Text style={[styles.statValue, { color: sensorColor }]}>
-                        {selectedSensor === 'smoke' 
-                          ? chartData.values[chartData.values.length - 1] 
-                          : chartData.values[chartData.values.length - 1]?.toFixed(1)}
+                        {chartData.values[chartData.values.length - 1]?.toFixed(1)}
                         {sensorConfig.unit}
                       </Text>
                     </View>
@@ -753,9 +704,7 @@ const SensorChartScreen = ({ navigation, route }) => {
                     <Text style={[styles.logDetailValue, { color: sensorColor, fontWeight: 'bold' }]}>
                       {selectedLog.isGapPoint 
                         ? (t('charts.noData') || 'Không có thông tin')
-                        : (selectedSensor === 'smoke' 
-                            ? selectedLog.selectedValue 
-                            : selectedLog.selectedValue?.toFixed(1) || '0') + sensorConfig.unit}
+                        : (selectedLog.selectedValue?.toFixed(1) || '0') + sensorConfig.unit}
                     </Text>
                   </View>
                 </View>

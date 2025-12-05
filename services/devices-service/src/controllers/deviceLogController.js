@@ -1,6 +1,11 @@
 import DeviceLog from '../models/DeviceLog.js';
 import Device from '../models/Device.js';
 import logger from '../utils/logger.js';
+import { 
+  normalizeTelemetryLogs, 
+  smartDownsample, 
+  SENSOR_FIELD_MAP 
+} from '../utils/telemetryDataProcessor.js';
 
 const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
   const device = await Device.findOne({ deviceId });
@@ -193,7 +198,7 @@ export const getTelemetryHistory = async (req, res) => {
     const { deviceId } = req.params;
     const userId = req.user?.sub;
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'service';
-    const { hours = 24 } = req.query;
+    const { hours = 24, sensorType, startDate: startDateParam, endDate: endDateParam } = req.query;
     
     if (userId) {
       const ownershipCheck = await checkDeviceOwnership(deviceId, userId, isAdmin);
@@ -205,40 +210,69 @@ export const getTelemetryHistory = async (req, res) => {
       }
     }
     
-    const startDate = new Date(Date.now() - parseInt(hours) * 60 * 60 * 1000);
+    const sensorField = sensorType ? SENSOR_FIELD_MAP[sensorType] : null;
     
-    const logs = await DeviceLog.find({
+    let dateFilter = {};
+    if (startDateParam && endDateParam) {
+      dateFilter.createdAt = {
+        $gte: new Date(startDateParam),
+        $lte: new Date(endDateParam)
+      };
+    } else {
+      const startDate = new Date(Date.now() - parseInt(hours) * 60 * 60 * 1000);
+      dateFilter.createdAt = { $gte: startDate };
+    }
+    
+    const query = {
       deviceId,
       type: 'telemetry',
-      createdAt: { $gte: startDate }
-    })
-    .sort({ createdAt: -1 })
-    .select('payload createdAt')
-    .lean();
+      ...dateFilter
+    };
     
-    const normalizedLogs = logs.map(log => ({
-      ...log,
-      payload: {
-        ...log.payload,
-        temp: log.payload?.temp ?? 0,
-        humid: log.payload?.humid ?? 0,
-        smoke: log.payload?.smoke ?? 0,
-        gas_ppm: log.payload?.gas_ppm ?? 0,
-        flame: log.payload?.flame ?? false,
-        o: {
-          o1: log.payload?.o?.o1 ?? false,
-          o2: log.payload?.o?.o2 ?? false,
-          o3: log.payload?.o?.o3 ?? false,
-          o4: log.payload?.o?.o4 ?? false,
-        }
-      }
-    }));
+    if (sensorField) {
+      query[`payload.${sensorField}`] = { $exists: true, $ne: null };
+    }
+    
+    let selectFields = 'createdAt payload';
+    if (!sensorField) {
+      selectFields += ' payload.temp payload.humid payload.smoke payload.gas_ppm';
+    }
+    
+    const logs = await DeviceLog.find(query)
+      .sort({ createdAt: 1 })
+      .select(selectFields)
+      .lean();
+    
+    const normalizedLogs = normalizeTelemetryLogs(logs, sensorField);
+    
+    let actualHours = hours;
+    if (startDateParam && endDateParam) {
+      actualHours = Math.ceil((new Date(endDateParam) - new Date(startDateParam)) / (1000 * 60 * 60));
+    }
+    
+    let MAX_RECORDS;
+    if (actualHours <= 24) {
+      MAX_RECORDS = Math.floor(actualHours * 33);
+    } else if (actualHours <= 168) {
+      MAX_RECORDS = Math.floor(800 + (actualHours - 24) * 2.8);
+    } else {
+      MAX_RECORDS = Math.floor(1200 + (actualHours - 168) * 0.5);
+    }
+    MAX_RECORDS = Math.min(2000, Math.max(500, MAX_RECORDS));
+    const limitedLogs = normalizedLogs.length > MAX_RECORDS
+      ? smartDownsample(normalizedLogs, MAX_RECORDS, sensorField)
+      : normalizedLogs;
     
     res.json({
       success: true,
-      data: normalizedLogs,
-      period: `${hours} hours`,
-      count: normalizedLogs.length
+      data: limitedLogs,
+      period: startDateParam && endDateParam 
+        ? `${new Date(startDateParam).toISOString()} to ${new Date(endDateParam).toISOString()}`
+        : `${hours} hours`,
+      count: limitedLogs.length,
+      totalCount: normalizedLogs.length,
+      sensorType: sensorType || 'all',
+      limited: normalizedLogs.length > MAX_RECORDS
     });
   } catch (error) {
     logger.error('Error fetching telemetry history:', error);

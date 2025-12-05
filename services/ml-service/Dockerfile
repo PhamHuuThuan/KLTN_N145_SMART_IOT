@@ -26,5 +26,5 @@ RUN mkdir -p models
 EXPOSE 3007
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3007"]
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3007", "--no-access-log", "--log-level", "warning"]
 

@@ -18,21 +18,16 @@ class AnomalyDetector:
         self.model_dir = model_dir
         os.makedirs(model_dir, exist_ok=True)
 
-        # Configuration
         self.max_buffer_size = int(os.getenv("ANOMALY_BUFFER_SIZE", "4000"))
-        self.retrain_min_samples = int(os.getenv("ANOMALY_RETRAIN_MIN_SAMPLES", "200"))
+        self.retrain_min_samples = int(
+            os.getenv("ANOMALY_RETRAIN_MIN_SAMPLES", "200")
+        )
         self.retrain_interval = timedelta(
             minutes=int(os.getenv("ANOMALY_RETRAIN_INTERVAL_MIN", "15"))
         )
         self.default_device_id = "__global__"
-
-        # Per-device state cache
         self.device_states: Dict[str, Dict] = {}
         self.is_trained = False
-
-    # ------------------------------------------------------------------ #
-    # Internal helpers
-    # ------------------------------------------------------------------ #
     def _new_state(self) -> Dict:
         return {
             "model": IsolationForest(
@@ -67,17 +62,45 @@ class AnomalyDetector:
             self._try_load_device_state(key)
         return self.device_states[key]
 
-    # ------------------------------------------------------------------ #
-    # Training logic
-    # ------------------------------------------------------------------ #
+    def _filter_outliers(self, values: np.ndarray) -> np.ndarray:
+        """Filter outliers from training data using IQR method."""
+        if len(values) < 20:
+            return values
+        
+        sorted_values = np.sort(values.flatten())
+        q1 = np.percentile(sorted_values, 25)
+        q3 = np.percentile(sorted_values, 75)
+        iqr = q3 - q1
+        
+        if iqr == 0:
+            mean = np.mean(sorted_values)
+            std = np.std(sorted_values)
+            if std == 0:
+                return values
+            lower_bound = mean - 2 * std
+            upper_bound = mean + 2 * std
+        else:
+            lower_bound = q1 - 1.5 * iqr
+            upper_bound = q3 + 1.5 * iqr
+        
+        mask = (values >= lower_bound) & (values <= upper_bound)
+        filtered_values = values[mask]
+        
+        filtered_count = len(values) - len(filtered_values)
+        if filtered_count > len(values) * 0.3:
+            return values
+        
+        if len(filtered_values) < 20:
+            return values
+        
+        return filtered_values.reshape(-1, 1)
+
     def train(self, training_data: List[dict], sensor_type: Optional[str] = 'temperature', device_id: Optional[str] = None):
         """Train anomaly detection models. If device_id is None, group data per device."""
         try:
             if not training_data:
-                logger.warning("No training data provided")
                 return False
 
-            # Lazy import to avoid hard dependency when only predicting
             import pandas as pd
 
             if device_id:
@@ -91,43 +114,38 @@ class AnomalyDetector:
             success = False
             for dev_id, samples in groups.items():
                 if len(samples) < 20:
-                    logger.warning(f"Device {dev_id} skipped training - insufficient samples ({len(samples)})")
                     continue
 
                 df = pd.DataFrame(samples)
 
-                # Filter by sensor type if provided
                 if sensor_type and 'sensor_type' in df.columns:
                     df = df[df['sensor_type'] == sensor_type]
 
-                if 'value' not in df.columns:
-                    logger.error(f"'value' column not found in training data for device {dev_id}")
-                    continue
-
-                if df.empty:
-                    logger.warning(f"Device {dev_id} has no samples after filtering")
+                if 'value' not in df.columns or df.empty:
                     continue
 
                 X = df[['value']].astype(float).values
+                
+                X_filtered = self._filter_outliers(X)
+                
+                if len(X_filtered) < 20:
+                    continue
+                
                 state = self._get_state(dev_id)
 
                 try:
-                    X_scaled = state["scaler"].fit_transform(X)
-                except Exception as scaler_err:
-                    logger.warning(f"Scaler fit failed for {dev_id}, fallback to raw: {scaler_err}")
+                    X_scaled = state["scaler"].fit_transform(X_filtered)
+                except Exception:
                     state["scaler"] = StandardScaler()
-                    X_scaled = X
+                    X_scaled = X_filtered
 
-                logger.info(f"Training Isolation Forest for device {dev_id} ({len(X_scaled)} samples)")
                 state["model"].fit(X_scaled)
                 state["is_trained"] = True
                 state["feature_names"] = ['value']
-
                 self._save_device_state(dev_id, state)
                 success = True
 
             if success:
-                logger.info("Anomaly detector training completed")
                 self.is_trained = True
             return success
 
@@ -135,10 +153,12 @@ class AnomalyDetector:
             logger.error(f"Error training anomaly detector: {e}")
             return False
 
-    # ------------------------------------------------------------------ #
-    # Prediction logic
-    # ------------------------------------------------------------------ #
-    def predict(self, value: float, sensor_type: str = 'temperature', device_id: Optional[str] = None) -> Tuple[float, bool]:
+    def predict(
+        self,
+        value: float,
+        sensor_type: str = 'temperature',
+        device_id: Optional[str] = None
+    ) -> Tuple[float, bool]:
         try:
             dev_id = self._get_device_id(device_id)
             self._record_sample(dev_id, value, sensor_type)
@@ -152,14 +172,16 @@ class AnomalyDetector:
             try:
                 if hasattr(state["scaler"], "scale_"):
                     features = state["scaler"].transform(features)
-            except Exception as scale_err:
-                logger.debug(f"Scaler transform failed for {dev_id}, using raw value: {scale_err}")
+            except Exception:
                 features = np.array([[value]], dtype=float)
 
             prediction = state["model"].decision_function(features)
-            anomaly_score = 1 - (prediction[0] + 1) / 2  # Normalize to 0-1
+            raw_score = prediction[0]
+            normalized = (raw_score + 0.5) / 1.0
+            anomaly_score = 1.0 - normalized
+            anomaly_score = float(max(0.0, min(0.99, anomaly_score)))
             is_anomaly = anomaly_score > 0.85
-            return float(anomaly_score), bool(is_anomaly)
+            return anomaly_score, bool(is_anomaly)
 
         except Exception as e:
             logger.error(f"Error in prediction: {e}")
@@ -173,9 +195,6 @@ class AnomalyDetector:
             results.append((score, is_anomaly))
         return results
 
-    # ------------------------------------------------------------------ #
-    # Retraining helpers
-    # ------------------------------------------------------------------ #
     def _record_sample(self, device_id: str, value: float, sensor_type: str):
         try:
             state = self._get_state(device_id)
@@ -186,8 +205,40 @@ class AnomalyDetector:
                 "timestamp": datetime.utcnow().isoformat()
             }
             state["buffer"].append(sample)
-        except Exception as err:
-            logger.debug(f"Failed to record sample for retraining ({device_id}): {err}")
+        except Exception:
+            pass
+
+    def _filter_normal_samples(
+        self, samples: List[dict], device_id: str
+    ) -> List[dict]:
+        """Filter out anomaly samples to prevent training on abnormal data."""
+        state = self._get_state(device_id)
+        if not state["is_trained"]:
+            return samples
+        
+        normal_samples = []
+        for sample in samples:
+            try:
+                value = float(sample.get("value", 0))
+                features = np.array([[value]], dtype=float)
+                try:
+                    if hasattr(state["scaler"], "scale_"):
+                        features = state["scaler"].transform(features)
+                except Exception:
+                    features = np.array([[value]], dtype=float)
+                
+                prediction = state["model"].decision_function(features)
+                raw_score = prediction[0]
+                normalized = (raw_score + 0.5) / 1.0
+                anomaly_score = 1.0 - normalized
+                anomaly_score = float(max(0.0, min(0.99, anomaly_score)))
+                is_anomaly = anomaly_score > 0.85
+                
+                if not is_anomaly and anomaly_score < 0.7:
+                    normal_samples.append(sample)
+            except Exception:
+                continue
+        return normal_samples
 
     def _maybe_retrain(self, device_id: str):
         state = self._get_state(device_id)
@@ -200,61 +251,72 @@ class AnomalyDetector:
             return
 
         samples = list(buffer)
+        if state["is_trained"]:
+            normal_samples = self._filter_normal_samples(samples, device_id)
+            if len(normal_samples) < self.retrain_min_samples:
+                return
+            samples = normal_samples
+        
         success = self.train(samples, sensor_type=None, device_id=device_id)
         if success:
-            logger.info(
-                f"IsolationForest auto-retrained for {device_id} with {len(samples)} samples "
-                f"(interval {self.retrain_interval}, min {self.retrain_min_samples})"
-            )
             buffer.clear()
             state["last_retrain_at"] = now
-        else:
-            logger.warning(f"Auto-retraining skipped for {device_id} due to training failure")
 
-    def force_retrain_from_buffer(self, device_id: Optional[str] = None) -> bool:
-        """Expose manual trigger to retrain immediately with buffered data (per device or all)."""
+    def force_retrain_from_buffer(
+        self, device_id: Optional[str] = None
+    ) -> bool:
+        """Force retrain immediately with buffered data."""
         if device_id:
             dev_id = self._get_device_id(device_id)
             buffer = self._get_state(dev_id)["buffer"]
             if not buffer:
-                logger.info(f"No buffered samples available for manual retraining ({dev_id})")
                 return False
             samples = list(buffer)
             success = self.train(samples, sensor_type=None, device_id=dev_id)
             if success:
                 buffer.clear()
                 self._get_state(dev_id)["last_retrain_at"] = datetime.utcnow()
-                logger.info(f"Manual retraining completed for {dev_id}")
             return success
 
-        # Retrain all devices
         overall_success = False
         for dev_id in list(self.device_states.keys()):
             if self.force_retrain_from_buffer(dev_id):
                 overall_success = True
         return overall_success
 
-    # ------------------------------------------------------------------ #
-    # Persistence helpers
-    # ------------------------------------------------------------------ #
     def _save_device_state(self, device_id: str, state: Dict):
         """Persist a single device model and scaler."""
         try:
             device_dir = self._device_dir(device_id)
+            if not os.path.exists(device_dir):
+                os.makedirs(device_dir, exist_ok=True)
+            
+            model_path = os.path.join(device_dir, 'isolation_forest.joblib')
+            scaler_path = os.path.join(device_dir, 'scaler.joblib')
+            meta_path = os.path.join(device_dir, 'meta.joblib')
+            
             joblib.dump(
                 {"device_id": device_id, "model": state["model"]},
-                os.path.join(device_dir, 'isolation_forest.joblib')
+                model_path
             )
+            
             joblib.dump(
                 {"device_id": device_id, "scaler": state["scaler"]},
-                os.path.join(device_dir, 'scaler.joblib')
+                scaler_path
+            )
+            
+            last_retrain = (
+                state["last_retrain_at"].isoformat()
+                if isinstance(state["last_retrain_at"], datetime)
+                else None
             )
             meta = {
                 "device_id": device_id,
-                "last_retrain_at": state["last_retrain_at"].isoformat() if isinstance(state["last_retrain_at"], datetime) else None,
+                "last_retrain_at": last_retrain,
                 "feature_names": state.get("feature_names")
             }
-            joblib.dump(meta, os.path.join(device_dir, 'meta.joblib'))
+            joblib.dump(meta, meta_path)
+            
         except Exception as e:
             logger.error(f"Error saving model for {device_id}: {e}")
 
@@ -263,7 +325,6 @@ class AnomalyDetector:
         for device_id, state in self.device_states.items():
             if state["is_trained"]:
                 self._save_device_state(device_id, state)
-        logger.info("Per-device anomaly models saved successfully")
 
     def _try_load_device_state(self, device_id: str):
         """Attempt to load an existing device model from disk."""
@@ -294,7 +355,6 @@ class AnomalyDetector:
                         pass
                 state["feature_names"] = meta.get("feature_names")
 
-            logger.info(f"Loaded anomaly model for device {device_id}")
         except Exception as e:
             logger.error(f"Failed to load model for {device_id}: {e}")
 
@@ -310,7 +370,7 @@ class AnomalyDetector:
             device_dir = os.path.join(self.model_dir, entry)
             if not os.path.isdir(device_dir):
                 continue
-            # Determine device id from metadata if available
+            
             meta_path = os.path.join(device_dir, 'meta.joblib')
             device_id = entry
             if os.path.exists(meta_path):
@@ -324,23 +384,18 @@ class AnomalyDetector:
             if self.device_states[device_id]["is_trained"]:
                 loaded_any = True
 
-        # Backward compatibility: load legacy single-model files into global state
         legacy_model = os.path.join(self.model_dir, 'isolation_forest.joblib')
         legacy_scaler = os.path.join(self.model_dir, 'scaler.joblib')
         if os.path.exists(legacy_model) and os.path.exists(legacy_scaler):
-            logger.info("Loading legacy anomaly detector model as global fallback")
             fallback_state = self._get_state(self.default_device_id)
             try:
                 fallback_state["model"] = joblib.load(legacy_model)
                 fallback_state["scaler"] = joblib.load(legacy_scaler)
                 fallback_state["is_trained"] = True
                 loaded_any = True
-            except Exception as legacy_err:
-                logger.error(f"Failed to load legacy anomaly detector: {legacy_err}")
+            except Exception:
+                pass
 
         if loaded_any:
-            logger.info("Per-device anomaly models loaded successfully")
             self.is_trained = True
-        else:
-            logger.warning("No anomaly models found on disk")
         return loaded_any

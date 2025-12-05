@@ -277,9 +277,20 @@ class ApiService {
     }
   }
 
-  async getTelemetryHistory(deviceId, hours = 24) {
+  async getTelemetryHistory(deviceId, hours = 24, sensorType = null, startDate = null, endDate = null) {
     try {
-      const url = `/api/logs/${deviceId}/history?hours=${hours}`;
+      const params = new URLSearchParams();
+      params.append('hours', hours.toString());
+      if (sensorType) {
+        params.append('sensorType', sensorType);
+      }
+      if (startDate) {
+        params.append('startDate', startDate instanceof Date ? startDate.toISOString() : startDate);
+      }
+      if (endDate) {
+        params.append('endDate', endDate instanceof Date ? endDate.toISOString() : endDate);
+      }
+      const url = `/api/logs/${deviceId}/history?${params.toString()}`;
       const response = await apiClient.get(url);
       return response.data;
     } catch (error) {
