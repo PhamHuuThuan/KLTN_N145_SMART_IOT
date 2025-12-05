@@ -118,12 +118,52 @@ export async function activateEmergencyMode(device, options = {}) {
   }
 
   try {
+    await dispatchBuzzerEvent(device, context);
+  } catch (error) {
+    logger.error('Failed to dispatch buzzer event for emergency mode:', error);
+  }
+
+  try {
     await publishUserActionEvent(device, context);
   } catch (error) {
     logger.error('Failed to publish user action event for emergency mode:', error);
   }
 
   return device;
+}
+
+async function dispatchBuzzerEvent(device, context = {}) {
+  if (!producer) {
+    return;
+  }
+
+  const payload = {
+    userId: device.ownerId || null,
+    deviceId: device.deviceId,
+    deviceName: device.name,
+    outletId: 'o5',
+    outletName: 'o5',
+    status: true,
+    action: 'outlet_toggled',
+    result: 'success',
+    reason: context.reason || 'emergency_mode',
+    triggeredBy: context.triggeredBy || 'manual',
+    initiatedBy: context.initiatedBy || 'user',
+    metadata: context.metadata || {},
+    timestamp: new Date()
+  };
+
+  const sendPromise = producer.send({
+    topic: 'outlet.toggled',
+    messages: [{
+      key: device.deviceId,
+      value: JSON.stringify(payload)
+    }]
+  });
+
+  await withKafkaTimeout(sendPromise).catch((err) => {
+    logger.error('Kafka send error for buzzer o5 (non-fatal):', err?.message || err);
+  });
 }
 
 // async function triggerAutoEmergency(deviceId) {
