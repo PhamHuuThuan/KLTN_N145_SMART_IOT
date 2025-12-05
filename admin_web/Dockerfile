@@ -3,11 +3,14 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* ./
+COPY package.json ./
+COPY package-lock.json* ./
 
-# Install dependencies
-RUN npm ci
+RUN if [ -f package-lock.json ]; then \
+      npm ci --legacy-peer-deps; \
+    else \
+      npm install --legacy-peer-deps; \
+    fi
 
 # Copy source code
 COPY . .
@@ -16,7 +19,6 @@ COPY . .
 ARG VITE_API_URL=http://34.59.250.63:3000
 ENV VITE_API_URL=$VITE_API_URL
 
-# Build the app
 RUN npm run build
 
 # Production stage
