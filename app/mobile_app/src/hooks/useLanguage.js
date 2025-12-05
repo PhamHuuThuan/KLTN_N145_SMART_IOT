@@ -12,7 +12,7 @@ export const useLanguage = () => {
       await AsyncStorage.setItem('user-language', languageCode);
       setCurrentLanguage(languageCode);
     } catch (error) {
-      console.error('Error changing language:', error);
+      // Silently handle error
     }
   };
 

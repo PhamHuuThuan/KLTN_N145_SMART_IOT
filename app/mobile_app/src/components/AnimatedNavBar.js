@@ -150,11 +150,9 @@ const AnimatedNavBar = ({
 
   const handleSelect = (item, index) => {
     if (!item) {
-      console.warn('handleSelect: item is null/undefined');
       return;
     }
     
-    // Smooth layout animation
     LayoutAnimation.configureNext({
       duration: 200,
       create: {
@@ -171,7 +169,7 @@ const AnimatedNavBar = ({
       const key = getItemKey ? getItemKey(item, index) : (item?.key || item?.value || index);
       onSelect(key, item, index);
     } catch (e) {
-      console.warn('Error in handleSelect:', e);
+      // Silently handle error
     }
   };
 
@@ -204,7 +202,7 @@ const AnimatedNavBar = ({
         ]).start();
       }
     } catch (e) {
-      console.warn('Error in handleItemLayout:', e);
+      // Silently handle error
     }
   };
 

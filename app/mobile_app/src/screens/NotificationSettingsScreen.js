@@ -381,17 +381,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
     }
   }, [user?.id]);
 
-  // Update email and phone when user data changes - DISABLED to prevent overriding arrays
-  // useEffect(() => {
-  //   if (user?.email || user?.phone) {
-  //     setPrefs(prev => ({
-  //       ...prev,
-  //       email: { ...prev.email, address: prev.email.address || user?.email || '' },
-  //       sms: { ...prev.sms, phoneNumber: prev.sms.phoneNumber || user?.phone || '' }
-  //     }));
-  //   }
-  // }, [user?.email, user?.phone]);
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>

@@ -56,25 +56,17 @@ const isTunnelMode = () => {
 
 // Get appropriate API URL based on environment
 const getApiUrl = (service = 'GATEWAY') => {
-  // Priority 1: Use explicit API_URL from app.json extra (set via app.config.js from .env)
   const extra = Constants.expoConfig?.extra || {};
   if (extra.apiUrl) {
-    const url = String(extra.apiUrl);
-    console.log(`[ENV] Using API URL from app.json extra: ${url}`);
-    return url;
+    return String(extra.apiUrl);
   }
   
-  // Priority 2: Use ENV.API_BASE_URL (also from app.json extra)
   if (ENV.API_BASE_URL && ENV.API_BASE_URL !== `http://${getLocalIP()}:3000`) {
-    console.log(`[ENV] Using API_BASE_URL: ${ENV.API_BASE_URL}`);
     return ENV.API_BASE_URL;
   }
   
-  // Priority 3: Fallback to service-specific URL
   const tunnelMode = isTunnelMode();
-  const url = tunnelMode ? ENV[service].HTTPS : ENV[service].HTTP;
-  console.log(`[ENV] Using fallback URL for ${service}: ${url}`);
-  return url;
+  return tunnelMode ? ENV[service].HTTPS : ENV[service].HTTP;
 };
 
 export default {

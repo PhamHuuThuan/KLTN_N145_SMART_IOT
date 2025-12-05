@@ -24,36 +24,29 @@ import SensorChartScreen from './src/screens/SensorChartScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import VerifyResetCodeScreen from './src/screens/VerifyResetCodeScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
-import CONFIG from './src/constants/config';
 import apiService from './src/services/apiService';
-import rulesService from './src/services/rulesService';
 
 function AppContent() {
   const { t } = useTranslation();
   const { isAuthenticated, isLoading } = useAuth();
   const { colors } = useTheme();
-  const { emergency, markAllAsRead, loadNotifications, dispatch } = useNotificationContext?.() || {};
+  const { emergency, dispatch } = useNotificationContext?.() || {};
   const [activeTab, setActiveTab] = useState('Home');
   const [currentScreen, setCurrentScreen] = useState('Main');
-  const [nativeEmergency, setNativeEmergency] = useState(null);
   const [navigationParams, setNavigationParams] = useState({});
 
-  // Reset to Home tab when user becomes authenticated (login success)
   useEffect(() => {
     if (isAuthenticated && currentScreen === 'Main') {
       setActiveTab('Home');
     }
   }, [isAuthenticated, currentScreen]);
 
-  // Listen to native EmergencyActivity intent events
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('EmergencyIntent', (data) => {
       const action = data?.emergencyAction;
       const deviceId = data?.deviceId;
       const deviceName = data?.deviceName;
       if (action === 'activate_emergency' && deviceId) {
-        setNativeEmergency({ deviceId, deviceName });
-        // Trigger the same flow as overlay
         handleActivateEmergencyFromNative(deviceId);
       } else if (action === 'inspect_device') {
         setCurrentScreen('Main');
@@ -66,7 +59,6 @@ function AppContent() {
   const handleActivateEmergencyFromNative = async (deviceId) => {
     try {
       await apiService.enterEmergencyMode(deviceId);
-      // Show success notification
       if (dispatch) {
         dispatch({ 
           type: 'ADD_NOTIFICATION', 
@@ -109,7 +101,6 @@ function AppContent() {
       }
     }
 
-    // Reset to Main screen and Home tab when authenticated (fix for registration/login redirect issue)
     if (
       currentScreen !== 'Main' &&
       ![
@@ -127,7 +118,7 @@ function AppContent() {
       ].includes(currentScreen)
     ) {
       setCurrentScreen('Main');
-      setActiveTab('Home'); // Always go to Home tab after login
+      setActiveTab('Home');
     }
 
     switch (currentScreen) {
@@ -194,20 +185,11 @@ function AppContent() {
     }
   };
 
-  const handleCheckNow = async () => {
-    setCurrentScreen('Main');
-    setActiveTab('Home');
-    if (dispatch) {
-      dispatch({ type: 'SET_EMERGENCY', payload: null });
-    }
-  };
-
   const handleActivateEmergency = async () => {
     try {
       const deviceId = emergency?.metadata?.deviceId;
       if (deviceId) {
         await apiService.enterEmergencyMode(deviceId);
-        // Show success notification
         if (dispatch) {
         dispatch({
           type: 'ADD_NOTIFICATION',
@@ -226,19 +208,13 @@ function AppContent() {
         }
       }
     } catch (e) {
-      // Swallow error; UI will still return to app
+      // Silently handle error
     } finally {
       setCurrentScreen('Main');
       setActiveTab('Home');
       if (dispatch) {
         dispatch({ type: 'SET_EMERGENCY', payload: null });
       }
-    }
-  };
-
-  const handleDismissEmergency = async () => {
-    if (dispatch) {
-      dispatch({ type: 'SET_EMERGENCY', payload: null });
     }
   };
 

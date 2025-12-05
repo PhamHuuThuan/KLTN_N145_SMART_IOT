@@ -25,7 +25,6 @@ const ThemeSwitcher = ({ style }) => {
       setFeedbackMessage(message);
       setFeedbackVisible(true);
     } catch (error) {
-      console.error('Error changing theme:', error);
       setFeedbackMessage(t('settings.themeChangeError'));
       setFeedbackVisible(true);
     }

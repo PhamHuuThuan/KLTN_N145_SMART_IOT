@@ -19,14 +19,12 @@ const ActionFeedback = ({ type = 'success', message = 'Done', visible, onHide, d
   useEffect(() => {
     let timer;
     if (visible) {
-      // Animate in from top
       Animated.parallel([
         Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
         Animated.timing(translateY, { toValue: 0, duration: 300, useNativeDriver: true })
       ]).start();
       
       timer = setTimeout(() => {
-        // Animate out to top
         Animated.parallel([
           Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
           Animated.timing(translateY, { toValue: -50, duration: 300, useNativeDriver: true })
@@ -35,7 +33,6 @@ const ActionFeedback = ({ type = 'success', message = 'Done', visible, onHide, d
         });
       }, duration);
     } else {
-      // Reset position when not visible
       opacity.setValue(0);
       translateY.setValue(-50);
     }

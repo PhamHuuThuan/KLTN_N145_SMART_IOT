@@ -30,17 +30,12 @@ const LanguageSwitcher = ({ style }) => {
     try {
       await changeLanguage(languageCode);
       setModalVisible(false);
-      
-      // Show success feedback
       const languageName = languages.find(lang => lang.code === languageCode)?.nativeName;
       setFeedbackMessage(t('settings.languageChanged', { language: languageName }));
       setFeedbackType('success');
       setFeedbackVisible(true);
     } catch (error) {
-      console.error('Error changing language:', error);
       setModalVisible(false);
-      
-      // Show error feedback
       setFeedbackMessage(t('settings.languageChangeError'));
       setFeedbackType('error');
       setFeedbackVisible(true);

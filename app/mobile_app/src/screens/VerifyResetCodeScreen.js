@@ -35,7 +35,6 @@ const VerifyResetCodeScreen = ({ navigation }) => {
   const { verifyResetCode, forgotPassword } = useAuth();
 
   useEffect(() => {
-    // Load email from storage
     const loadEmail = async () => {
       try {
         const storedEmail = await AsyncStorage.getItem('resetEmail');
@@ -80,7 +79,6 @@ const VerifyResetCodeScreen = ({ navigation }) => {
       setShowLoader(true);
       const result = await verifyResetCode(email, code.trim());
       
-      // Hide loader first
       setIsLoading(false);
       setShowLoader(false);
       
@@ -92,20 +90,15 @@ const VerifyResetCodeScreen = ({ navigation }) => {
           message: 'Mã xác nhận hợp lệ' 
         });
         
-        // Navigate to reset password screen after 1 second
         setTimeout(async () => {
           await AsyncStorage.setItem('resetCode', code.trim());
           navigation.navigate('ResetPassword');
         }, 1000);
       } else {
-        console.log('Verify code failed, result:', result); // Debug log
-        // Force hide any existing feedback first
         setFeedback({ visible: false, type: 'error', message: '' });
         
-        // Then set new feedback after a small delay
         setTimeout(() => {
           const errorMessage = result.error || 'Mã xác nhận không hợp lệ';
-          console.log('Setting error message:', errorMessage); // Debug log
           setFeedback({ visible: true, type: 'error', message: errorMessage });
         }, 100);
       }

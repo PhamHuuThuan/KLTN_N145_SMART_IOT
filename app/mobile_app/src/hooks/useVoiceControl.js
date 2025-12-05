@@ -227,7 +227,6 @@ const useVoiceControl = () => {
       
       return { success: false, message: t('voice.commandNotSupported') };
     } catch (error) {
-      console.error('Voice command execution error:', error);
       return { success: false, message: t('voice.commandError') };
     }
   }, [t]);

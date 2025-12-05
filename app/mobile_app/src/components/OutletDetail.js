@@ -39,20 +39,15 @@ const OutletDetail = ({
   const [showLoader, setShowLoader] = useState(false);
   const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
   
-  // Get real-time outlet status
   const getOutletStatus = (outletId) => {
-    // First try to get from latestTelemetry.o (real-time data)
     if (deviceData?.latestTelemetry?.o && deviceData.latestTelemetry.o[outletId] !== undefined) {
       return deviceData.latestTelemetry.o[outletId];
     }
-    
-    // Fallback to outlet.status
     return outlet?.status ?? false;
   };
   
   const outletStatus = getOutletStatus(outlet?.id);
 
-  // Force re-render when deviceData changes
   useEffect(() => {
     log.debug('deviceData updated', outlet?.id);
   }, [deviceData?.latestTelemetry?.o]);
@@ -95,7 +90,6 @@ const OutletDetail = ({
     log.debug('toggle', outlet?.id, '->', action);
     
     if (!onControlOutlet) {
-      console.error(`❌ onControlOutlet function not provided`);
       setFeedback({ visible: true, type: 'error', message: t('devices.controlFunctionNotAvailable') });
       return;
     }

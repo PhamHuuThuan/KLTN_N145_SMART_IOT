@@ -324,7 +324,6 @@ const DeviceSelector = ({
                                   });
                                 }
                               } catch (error) {
-                                console.error('Remove device error:', error);
                                 setFeedback({
                                   visible: true,
                                   type: 'error',
@@ -479,7 +478,6 @@ const DeviceSelector = ({
                         });
                       }
                     } catch (e) {
-                      console.error('Add device error:', e);
                       let errorMessage = t('devices.deviceAddError');
                       
                       if (e.response?.status === 400) {

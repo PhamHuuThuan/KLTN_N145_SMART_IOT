@@ -60,7 +60,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
   const prepared = useMemo(() => {
     try {
       if (!data || !Array.isArray(data.values)) {
-        console.log('[SensorChart] no data or invalid');
         return null;
       }
 
@@ -236,7 +235,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
 
       return { points: pointsArray, minTime, maxTime, minValue, maxValue: minValue + valueRange };
     } catch (e) {
-      console.log('[SensorChart] points error:', e);
       return { points: [], minTime: Date.now(), maxTime: Date.now(), minValue: 0, maxValue: 1 };
     }
   }, [prepared, chartAreaWidth, chartAreaHeight, timeRange]);
@@ -341,7 +339,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
 
       return d;
     } catch (e) {
-      console.log('[SensorChart] path error:', e);
       return '';
     }
   }, [points, isBinary, chartAreaHeight]);
@@ -658,13 +655,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     ];
   
     const regions = regionsRaw.filter(Boolean);
-  
-    regions.forEach((r, idx) => {
-      console.log(
-        `  #${idx + 1} ${r.level} -> y=${r.y.toFixed(1)}, h=${r.height.toFixed(1)}`
-      );
-    });
-  
     return regions;
   }, [sensorType, points, chartAreaHeight, isBinary, LEVEL_COLORS]);
 
