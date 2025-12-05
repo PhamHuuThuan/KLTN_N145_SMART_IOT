@@ -66,7 +66,7 @@ const NotificationScreen = ({ navigation }) => {
     try {
       await loadMoreNotifications();
     } catch (error) {
-      console.error('Error loading more notifications:', error);
+      // Silently handle error
     }
   };
 

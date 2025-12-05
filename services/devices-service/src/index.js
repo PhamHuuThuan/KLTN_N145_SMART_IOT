@@ -1,6 +1,7 @@
 import app from './app.js';
 import http from 'http';
 import { setupSocket } from './realtime/socket.js';
+import { emitDeviceTelemetry } from './realtime/socket.js';
 import connectDB from './config/database.js';
 import { producer } from './config/kafka.js';
 import { startLogConsumer, stopLogConsumer } from './consumers/logConsumer.js';
@@ -74,6 +75,14 @@ async function startEmergencyWatchdog() {
         }).catch((kafkaError) => {
           logger.error('Failed to publish emergency auto-disable event to Kafka:', kafkaError);
         });
+
+        try {
+          if (device.latestTelemetry) {
+            emitDeviceTelemetry(device.deviceId, device.latestTelemetry, device);
+          }
+        } catch (error) {
+          logger.error('Failed to emit device telemetry with emergency mode in watchdog:', error);
+        }
       }
     } catch (err) {
       logger.error('Emergency watchdog error:', err.message);

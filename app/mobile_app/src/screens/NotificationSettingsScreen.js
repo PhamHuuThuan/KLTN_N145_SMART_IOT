@@ -23,7 +23,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
   const [showLoader, setShowLoader] = useState(false);
   const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addModalType, setAddModalType] = useState('email'); // 'email' or 'sms'
+  const [addModalType, setAddModalType] = useState('email');
   const [newContact, setNewContact] = useState({ name: '', address: '', phoneNumber: '' });
   const [prefs, setPrefs] = useState({
     email: { 
@@ -61,8 +61,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
       const res = await notificationService.getPreferences(user.userId);
       if (res.success && res.data?.data) {
         const data = res.data.data;
-        
-        // Use addresses directly from API response
         const emailAddresses = data.email?.addresses || [];
         const smsNumbers = data.sms?.phoneNumbers || [];
         
@@ -238,7 +236,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
     await safeStart(IntentLauncher.ACTION_APPLICATION_DETAILS_SETTINGS, { data: `package:${appId}` });
 
     if (!openedNotif) {
-      // Final fallback: open general settings
       try { await Linking.openSettings(); } catch {}
     }
   };
@@ -353,7 +350,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
   // Remove SMS number
   const removeSMSNumber = (index) => {
     const sms = prefs.sms.phoneNumbers[index];
-    if (sms.isDefault) return; // Cannot remove default phone
+    if (sms.isDefault) return;
     
     setPrefs({
       ...prefs,
@@ -380,17 +377,6 @@ const NotificationSettingsScreen = ({ navigation }) => {
       load();
     }
   }, [user?.id]);
-
-  // Update email and phone when user data changes - DISABLED to prevent overriding arrays
-  // useEffect(() => {
-  //   if (user?.email || user?.phone) {
-  //     setPrefs(prev => ({
-  //       ...prev,
-  //       email: { ...prev.email, address: prev.email.address || user?.email || '' },
-  //       sms: { ...prev.sms, phoneNumber: prev.sms.phoneNumber || user?.phone || '' }
-  //     }));
-  //   }
-  // }, [user?.email, user?.phone]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

@@ -14,7 +14,6 @@ const TOUCH_TOLERANCE = 30;
 const Y_AXIS_LABELS = 5;
 const X_AXIS_LABELS = 5;
 
-// Thresholds for sensor levels
 const THRESHOLDS = {
   temperature: { low: 15, normal: 40, high: 50 },
   humidity: { low: 30, normal: 80, high: 90 },
@@ -22,7 +21,6 @@ const THRESHOLDS = {
   smoke: { low: 1.5, normal: 3.4, high: 4.6 },
 };
 
-// Light mode
 const LEVEL_COLORS_LIGHT = {
   low: '#90CAF9',
   normal: '#E0E0E0',
@@ -30,7 +28,6 @@ const LEVEL_COLORS_LIGHT = {
   veryHigh: '#EF5350', 
 };
 
-//Dark mode
 const LEVEL_COLORS_DARK = {
   low:      '#1E3A8A',
   normal:   '#4B5563',
@@ -60,7 +57,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
   const prepared = useMemo(() => {
     try {
       if (!data || !Array.isArray(data.values)) {
-        console.log('[SensorChart] no data or invalid');
         return null;
       }
 
@@ -236,7 +232,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
 
       return { points: pointsArray, minTime, maxTime, minValue, maxValue: minValue + valueRange };
     } catch (e) {
-      console.log('[SensorChart] points error:', e);
       return { points: [], minTime: Date.now(), maxTime: Date.now(), minValue: 0, maxValue: 1 };
     }
   }, [prepared, chartAreaWidth, chartAreaHeight, timeRange]);
@@ -341,7 +336,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
 
       return d;
     } catch (e) {
-      console.log('[SensorChart] path error:', e);
       return '';
     }
   }, [points, isBinary, chartAreaHeight]);
@@ -377,7 +371,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       prevValue = point.value;
     });
     
-    // Close any open rectangle at the end
     if (rectStartX !== null && points.points.length > 0) {
       const lastPoint = points.points[points.points.length - 1];
       if (lastPoint.x > rectStartX) {
@@ -399,14 +392,11 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     let minDistance = Infinity;
     let nearestPoint = null;
 
-    // First, try to find an existing point
     points.points.forEach((point) => {
       const xDistance = Math.abs(touchX - point.x);
-      // For gap points, use larger tolerance and check both X and Y
       const tolerance = point.isGapPoint ? TOUCH_TOLERANCE * 2 : TOUCH_TOLERANCE;
       
       if (point.isGapPoint) {
-        // For gap points, check both X and Y distance (they're at baseline)
         const yDistance = Math.abs(touchY - point.y);
         const totalDistance = Math.sqrt(xDistance * xDistance + yDistance * yDistance);
         if (totalDistance <= tolerance && totalDistance < minDistance) {
@@ -414,7 +404,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
           nearestPoint = point;
         }
       } else {
-        // For normal points, only check X distance
         if (xDistance <= tolerance && xDistance < minDistance) {
           minDistance = xDistance;
           nearestPoint = point;
@@ -422,13 +411,10 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       }
     });
 
-    // If no point found within tolerance, create a virtual point for missing data
-    // Allow clicking anywhere on the X axis to show default value
     if (!nearestPoint && touchX >= PADDING_X && touchX <= PADDING_X + chartAreaWidth) {
       const { minValue, maxValue, minTime, maxTime } = points;
       const valueRange = maxValue - minValue || 1;
       
-      // Calculate timestamp from X position
       let timestamp = null;
       if (timeRange && timeRange.startTime && timeRange.endTime) {
         const timeRangeMs = timeRange.endTime.getTime() - timeRange.startTime.getTime();
@@ -441,7 +427,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
         const timeOffset = timeRangeMs * xRatio;
         timestamp = new Date(minTime + timeOffset);
       } else {
-        // Fallback: use current time
         timestamp = new Date();
       }
       
@@ -449,14 +434,13 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       const defaultRatio = (defaultValue - minValue) / valueRange;
       const defaultY = PADDING_Y + chartAreaHeight - (chartAreaHeight * Math.max(0, Math.min(1, defaultRatio)));
       
-      // Create virtual point for missing data
       nearestPoint = {
         x: touchX,
         y: defaultY,
         value: defaultValue,
         timestamp: timestamp,
-        index: -1, // Virtual point has no index
-        isGapPoint: true, // Mark as gap/missing point
+        index: -1,
+        isGapPoint: true,
       };
     }
 
@@ -472,7 +456,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
           const { locationX, locationY } = evt.nativeEvent;
           const point = findNearestPoint(locationX, locationY);
           if (point) {
-            //missing data
             if (point.index === -1) {
               setSelectedIndex(null);
               setSelectedVirtualPoint(point);
@@ -492,7 +475,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
           const { locationX, locationY } = evt.nativeEvent;
           const point = findNearestPoint(locationX, locationY);
           if (point) {
-            // Check if it's a virtual point (missing data)
             if (point.index === -1) {
               setSelectedIndex(null);
               setSelectedVirtualPoint(point);
@@ -531,7 +513,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       const zeroY = PADDING_Y + chartAreaHeight * (1 - zeroRatio);
       return { hasZeroLine: true, zeroY, zeroValue: 0 };
     } else if (minValue >= 0 && minValue === 0) {
-      // Zero is at the bottom
       const zeroY = PADDING_Y + chartAreaHeight;
       return { hasZeroLine: true, zeroY, zeroValue: 0 };
     }
@@ -543,7 +524,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     const { minValue, maxValue } = points;
     const valueRange = maxValue - minValue || 1;
     
-    // For binary charts, only show 0 and 1
     if (isBinary) {
       const zeroY = PADDING_Y + chartAreaHeight;
       const oneY = PADDING_Y;
@@ -658,13 +638,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     ];
   
     const regions = regionsRaw.filter(Boolean);
-  
-    regions.forEach((r, idx) => {
-      console.log(
-        `  #${idx + 1} ${r.level} -> y=${r.y.toFixed(1)}, h=${r.height.toFixed(1)}`
-      );
-    });
-  
     return regions;
   }, [sensorType, points, chartAreaHeight, isBinary, LEVEL_COLORS]);
 

@@ -48,7 +48,6 @@ const LoginScreen = ({ navigation }) => {
       setShowLoader(true);
       const result = await login(email.trim(), password);
       
-      // Hide loader first
       setIsLoading(false);
       setShowLoader(false);
       
@@ -56,14 +55,10 @@ const LoginScreen = ({ navigation }) => {
         log.info('Login successful');
         setFeedback({ visible: true, type: 'success', message: 'Đăng nhập thành công' });
       } else {
-        console.log('Login failed, result:', result); // Debug log
-        // Force hide any existing feedback first
         setFeedback({ visible: false, type: 'error', message: '' });
         
-        // Then set new feedback after a small delay
         setTimeout(() => {
           const errorMessage = result.error || 'Đăng nhập thất bại';
-          console.log('Setting error message:', errorMessage); // Debug log
           setFeedback({ visible: true, type: 'error', message: errorMessage });
         }, 100);
       }
@@ -78,16 +73,6 @@ const LoginScreen = ({ navigation }) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
-
-  // const handleGoogleSuccess = async (result) => {
-  //   setFeedback({ visible: true, type: 'success', message: t('auth.loginSuccess') });
-  //   log.info('Google login successful');
-  // };
-
-  // const handleGoogleError = (e) => {
-  //   setFeedback({ visible: true, type: 'error', message: e?.message || t('auth.loginError') });
-  //   log.error('Google login error:', e);
-  // };
 
   return (
     <View style={styles.container}>
@@ -159,11 +144,6 @@ const LoginScreen = ({ navigation }) => {
             >
               <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
-
-            {/* <GoogleLoginButton 
-              onSuccess={handleGoogleSuccess} 
-              onError={handleGoogleError} 
-            /> */}
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>{t('auth.dontHaveAccount')} </Text>

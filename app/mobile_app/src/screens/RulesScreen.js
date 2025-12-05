@@ -92,7 +92,6 @@ const RulesScreen = () => {
     const deviceId = typeof selectedDevice === 'string' ? selectedDevice : selectedDevice?.deviceId || selectedDevice?._id;
     
     if (!deviceId) {
-      console.error('No device ID available for rule creation');
       return;
     }
     

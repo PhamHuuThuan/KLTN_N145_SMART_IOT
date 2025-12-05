@@ -168,15 +168,45 @@ const NotificationItem = ({ notification, onPress }) => {
                 Thiết bị: {notification.metadata.deviceName}
               </Text>
             )}
-            {notification.metadata.sensorType && (
-              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
-                Loại: {notification.metadata.sensorType}
-              </Text>
-            )}
-            {notification.metadata.sensorValue !== undefined && (
-              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
-                Giá trị: {notification.metadata.sensorValue}
-              </Text>
+            {notification.metadata.mlData?.primaryAnomaly ? (
+              <>
+                <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
+                  Cảm biến: {notification.metadata.mlData.primaryAnomaly.sensor === 'gas' ? 'Khí gas' : 
+                             notification.metadata.mlData.primaryAnomaly.sensor === 'temperature' ? 'Nhiệt độ' :
+                             notification.metadata.mlData.primaryAnomaly.sensor === 'humidity' ? 'Độ ẩm' :
+                             notification.metadata.mlData.primaryAnomaly.sensor === 'smoke' ? 'Khói' :
+                             notification.metadata.mlData.primaryAnomaly.sensor === 'flame' ? 'Lửa' :
+                             notification.metadata.mlData.primaryAnomaly.sensor}
+                </Text>
+                {notification.metadata.mlData.primaryAnomaly.value !== null && notification.metadata.mlData.primaryAnomaly.value !== undefined && (
+                  <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
+                    Giá trị: {notification.metadata.mlData.primaryAnomaly.value}
+                  </Text>
+                )}
+                {notification.metadata.mlData.primaryAnomaly.score !== undefined && (
+                  <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
+                    Độ tin cậy: {(notification.metadata.mlData.primaryAnomaly.score * 100).toFixed(1)}%
+                  </Text>
+                )}
+                {notification.metadata.mlData.overallScore !== undefined && (
+                  <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
+                    Tổng điểm: {(notification.metadata.mlData.overallScore * 100).toFixed(1)}%
+                  </Text>
+                )}
+              </>
+            ) : (
+              <>
+                {notification.metadata.sensorType && (
+                  <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
+                    Loại: {notification.metadata.sensorType}
+                  </Text>
+                )}
+                {notification.metadata.sensorValue !== undefined && (
+                  <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
+                    Giá trị: {notification.metadata.sensorValue}
+                  </Text>
+                )}
+              </>
             )}
             {notification.metadata.threshold !== undefined && (
               <Text style={[styles.metadataText, { color: colors.textSecondary }]}>

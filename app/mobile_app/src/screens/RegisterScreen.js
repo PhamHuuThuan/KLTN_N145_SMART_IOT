@@ -55,35 +55,26 @@ const RegisterScreen = ({ navigation }) => {
     try {
       setIsLoading(true);
       setShowLoader(true);
-      console.log('🚀 RegisterScreen: Starting registration process');
       const result = await register(email.trim(), password, name.trim());
       
-      console.log('📱 RegisterScreen: Registration result:', result);
-      
       if (result.success) {
-        console.log('✅ RegisterScreen: Registration successful');
         setShowLoader(false);
         setIsLoading(false);
         
         setTimeout(() => {
           setFeedback({ visible: true, type: 'success', message: 'Đăng ký thành công! Vui lòng đăng nhập.' });
-          console.log('📱 Feedback set:', { visible: true, type: 'success', message: 'Đăng ký thành công! Vui lòng đăng nhập.' });
           
-          // Chuyển về trang login sau 3 giây
           setTimeout(() => {
-            console.log('📱 Navigating to Login...');
             setFeedback({ visible: false, type: 'success', message: '' });
             navigation.navigate('Login');
           }, 3000);
         }, 100);
       } else {
-        console.log('❌ RegisterScreen: Registration failed:', result.error);
         setShowLoader(false);
         setIsLoading(false);
         setFeedback({ visible: true, type: 'error', message: result.error || 'Đăng ký thất bại' });
       }
     } catch (error) {
-      console.error('❌ RegisterScreen: Registration error:', error);
       setShowLoader(false);
       setIsLoading(false);
       setFeedback({ visible: true, type: 'error', message: 'Có lỗi xảy ra khi đăng ký' });

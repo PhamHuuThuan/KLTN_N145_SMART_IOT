@@ -6,40 +6,28 @@ const useVoiceControl = () => {
   const [isListening, setIsListening] = useState(false);
   const [lastCommand, setLastCommand] = useState('');
 
-  // Vietnamese voice commands mapping
   const voiceCommands = {
-    // Turn on commands
     'bật': 'on',
     'mở': 'on', 
     'khởi động': 'on',
     'kích hoạt': 'on',
     'start': 'on',
     'turn on': 'on',
-    
-    // Turn off commands  
     'tắt': 'off',
     'đóng': 'off',
     'dừng': 'off',
     'ngừng': 'off',
     'stop': 'off',
     'turn off': 'off',
-    
-    // Outlet names
     'ổ cắm': 'outlet',
     'socket': 'outlet',
     'outlet': 'outlet',
-    
-    // Device names
     'thiết bị': 'device',
     'device': 'device',
-    
-    // Numbers (Vietnamese and English)
     'một': '1', 'hai': '2', 'ba': '3', 'bốn': '4', 'năm': '5',
     'sáu': '6', 'bảy': '7', 'tám': '8', 'chín': '9', 'mười': '10',
     '1': '1', '2': '2', '3': '3', '4': '4', '5': '5',
     '6': '6', '7': '7', '8': '8', '9': '9', '10': '10',
-    
-    // Device/Appliance names
     'quạt': 'fan',
     'fan': 'fan',
     'đèn': 'light',
@@ -65,8 +53,6 @@ const useVoiceControl = () => {
     'nóng': 'heater',
     'bình nóng lạnh': 'heater',
     'heater': 'heater',
-    
-    // Common words to ignore
     'của': '',
     'the': '',
     'a': '',
@@ -227,7 +213,6 @@ const useVoiceControl = () => {
       
       return { success: false, message: t('voice.commandNotSupported') };
     } catch (error) {
-      console.error('Voice command execution error:', error);
       return { success: false, message: t('voice.commandError') };
     }
   }, [t]);

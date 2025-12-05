@@ -15,10 +15,15 @@ export function setupSocket(server) {
   return ioInstance;
 }
 
-export function emitDeviceTelemetry(deviceId, telemetryPayload) {
+export function emitDeviceTelemetry(deviceId, telemetryPayload, deviceData = null) {
   if (!ioInstance) return;
+  const payload = {
+    ...telemetryPayload,
+    ...(deviceData?.emergencyMode !== undefined && { emergencyMode: deviceData.emergencyMode }),
+    ...(deviceData?.lastEmergencyAt && { lastEmergencyAt: deviceData.lastEmergencyAt }),
+  };
   ioInstance.emit('device.telemetry', {
     deviceId,
-    payload: telemetryPayload,
+    payload,
   });
 }

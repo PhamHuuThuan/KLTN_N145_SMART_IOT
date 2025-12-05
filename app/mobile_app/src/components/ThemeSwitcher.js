@@ -25,7 +25,6 @@ const ThemeSwitcher = ({ style }) => {
       setFeedbackMessage(message);
       setFeedbackVisible(true);
     } catch (error) {
-      console.error('Error changing theme:', error);
       setFeedbackMessage(t('settings.themeChangeError'));
       setFeedbackVisible(true);
     }
@@ -69,7 +68,7 @@ const ThemeSwitcher = ({ style }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'transparent', // Will be set by parent
+    backgroundColor: 'transparent',
   },
   themeButton: {
     flexDirection: 'row',

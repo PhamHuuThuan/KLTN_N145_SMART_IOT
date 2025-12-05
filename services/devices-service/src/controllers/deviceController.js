@@ -3,6 +3,7 @@ import { OUTLET_TYPES } from '../constants/outletTypes.js';
 import { producer } from '../config/kafka.js';
 import logger from '../utils/logger.js';
 import { activateEmergencyMode, cancelAutoEmergency } from '../services/autoEmergencyScheduler.js';
+import { emitDeviceTelemetry } from '../realtime/socket.js';
 
 const checkDeviceOwnership = async (deviceId, userId, isAdmin = false) => {
   const device = await Device.findOne({ deviceId });
@@ -427,6 +428,14 @@ export const exitEmergencyMode = async (req, res) => {
     }).catch((kafkaError) => {
       logger.error('Failed to publish emergency mode deactivation event to Kafka:', kafkaError);
     });
+
+    try {
+      if (device.latestTelemetry) {
+        emitDeviceTelemetry(deviceId, device.latestTelemetry, device);
+      }
+    } catch (error) {
+      logger.error('Failed to emit device telemetry with emergency mode:', error);
+    }
     
     res.json({
       success: true,

@@ -310,7 +310,6 @@ const DeviceSelector = ({
                                   });
                                   setShowPicker(false);
                                   
-                                  // Call onDeviceRemoved callback and auto-select another device
                                   if (onDeviceRemoved) {
                                     const remainingDevices = normalizedDevices.filter(d => d.deviceId !== deviceId);
                                     const newSelectedDevice = remainingDevices.length > 0 ? remainingDevices[0].deviceId : null;
@@ -324,7 +323,6 @@ const DeviceSelector = ({
                                   });
                                 }
                               } catch (error) {
-                                console.error('Remove device error:', error);
                                 setFeedback({
                                   visible: true,
                                   type: 'error',
@@ -479,7 +477,6 @@ const DeviceSelector = ({
                         });
                       }
                     } catch (e) {
-                      console.error('Add device error:', e);
                       let errorMessage = t('devices.deviceAddError');
                       
                       if (e.response?.status === 400) {

@@ -273,6 +273,8 @@ export const useDeviceData = () => {
             lastSeenAt: payloadTsIso,
             status: 'online',
             isOnline: true,
+            ...(payload.emergencyMode !== undefined && { emergencyMode: payload.emergencyMode }),
+            ...(payload.lastEmergencyAt && { lastEmergencyAt: toIso(payload.lastEmergencyAt) || prev?.lastEmergencyAt }),
           }));
         }
       } catch (e) {

@@ -28,7 +28,6 @@ const AnimatedNavBar = ({
   const containerRef = useRef(null);
   const scrollViewRef = useRef(null);
 
-  // Find selected index with safety checks
   const selectedIndex = useMemo(() => {
     if (!items || items.length === 0 || selectedValue === null || selectedValue === undefined) {
       return -1;
@@ -38,7 +37,6 @@ const AnimatedNavBar = ({
       if (!item) return false;
       try {
         const key = getItemKey ? getItemKey(item, idx) : (item?.key || item?.value || idx);
-        // Use strict equality and also check string comparison
         const matches = key === selectedValue || String(key) === String(selectedValue) || item === selectedValue;
         return matches;
       } catch (e) {
@@ -49,10 +47,8 @@ const AnimatedNavBar = ({
     return index;
   }, [items, selectedValue, getItemKey]);
 
-  // Animate indicator position and width
   useEffect(() => {
     if (selectedIndex < 0 || !items || items.length === 0) {
-      // Reset to initial position if no selection
       Animated.parallel([
         Animated.timing(indicatorAnim, {
           toValue: 0,
@@ -150,11 +146,9 @@ const AnimatedNavBar = ({
 
   const handleSelect = (item, index) => {
     if (!item) {
-      console.warn('handleSelect: item is null/undefined');
       return;
     }
     
-    // Smooth layout animation
     LayoutAnimation.configureNext({
       duration: 200,
       create: {
@@ -171,17 +165,15 @@ const AnimatedNavBar = ({
       const key = getItemKey ? getItemKey(item, index) : (item?.key || item?.value || index);
       onSelect(key, item, index);
     } catch (e) {
-      console.warn('Error in handleSelect:', e);
+      // Silently handle error
     }
   };
 
   const handleItemLayout = (index, event) => {
     try {
       const { x, y, width, height } = event.nativeEvent.layout;
-      // Store layout relative to ScrollView content
       itemLayouts.current[index] = { x, y, width, height };
       
-      // If this is the selected item, update indicator immediately
       if (index === selectedIndex && selectedIndex >= 0) {
         Animated.parallel([
           Animated.spring(indicatorAnim, {
@@ -204,7 +196,7 @@ const AnimatedNavBar = ({
         ]).start();
       }
     } catch (e) {
-      console.warn('Error in handleItemLayout:', e);
+      // Silently handle error
     }
   };
 

@@ -175,7 +175,6 @@ const SensorChartScreen = ({ navigation, route }) => {
     }
   }, [selectedDevice, selectedSensor, selectedTimeRange, customDateRange, t]);
 
-  // Helper function to check sensor data availability
   const checkSensorDataAvailability = useCallback(() => {
     if (!telemetryData.length) {
       return {};
@@ -399,7 +398,6 @@ const SensorChartScreen = ({ navigation, route }) => {
     setSelectedTimeRange(hours);
     setCustomDateRange(null);
     setSelectedLog(null);
-    // Data will be loaded by useEffect with debounce
   };
 
   const handlePointSelect = useCallback((point, rawData) => {
@@ -414,7 +412,6 @@ const SensorChartScreen = ({ navigation, route }) => {
       return;
     }
 
-    // Check if this is a gap point (no data)
     if (point.isGapPoint) {
       setSelectedLog({
         payload: {
