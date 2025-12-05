@@ -111,7 +111,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            buildConfigField "String", "API_BASE_URL", "\"http://34.59.250.63:3000\""
+            buildConfigField "String", "API_BASE_URL", "\"http://34.121.236.194:3000\""
             buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"STABLE\""
 
             // Caution! In production, you need to generate your own keystore file.
