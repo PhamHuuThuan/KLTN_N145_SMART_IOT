@@ -48,7 +48,6 @@ const LoginScreen = ({ navigation }) => {
       setShowLoader(true);
       const result = await login(email.trim(), password);
       
-      // Hide loader first
       setIsLoading(false);
       setShowLoader(false);
       

@@ -62,9 +62,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    top: 60, // Show at top of screen instead of bottom
+    top: 60,
     alignItems: 'center',
-    zIndex: 1000, // Ensure it's above other content
+    zIndex: 1000,
   },
   card: {
     flexDirection: 'row',

@@ -68,7 +68,7 @@ const ThemeSwitcher = ({ style }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'transparent', // Will be set by parent
+    backgroundColor: 'transparent',
   },
   themeButton: {
     flexDirection: 'row',

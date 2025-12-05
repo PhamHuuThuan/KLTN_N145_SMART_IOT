@@ -310,7 +310,6 @@ const DeviceSelector = ({
                                   });
                                   setShowPicker(false);
                                   
-                                  // Call onDeviceRemoved callback and auto-select another device
                                   if (onDeviceRemoved) {
                                     const remainingDevices = normalizedDevices.filter(d => d.deviceId !== deviceId);
                                     const newSelectedDevice = remainingDevices.length > 0 ? remainingDevices[0].deviceId : null;

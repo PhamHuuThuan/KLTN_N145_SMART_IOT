@@ -23,7 +23,7 @@ export const useLanguage = () => {
 
   const getCurrentLanguageInfo = () => {
     const languages = getAvailableLanguages();
-    return languages.find(lang => lang.code === currentLanguage) || languages[1]; // Default to Vietnamese
+    return languages.find(lang => lang.code === currentLanguage) || languages[1];
   };
 
   useEffect(() => {
@@ -35,6 +35,6 @@ export const useLanguage = () => {
     changeLanguage,
     getAvailableLanguages,
     getCurrentLanguageInfo,
-    isRTL: false, // Neither English nor Vietnamese are RTL
+    isRTL: false,
   };
 };

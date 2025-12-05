@@ -179,7 +179,6 @@ export const NotificationProvider = ({ children }) => {
       }),
     });
 
-    // Set notification handler for foreground
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
       // Do NOT update list/unread via FCM. Only use FCM to drive full-screen emergency UI.
       const data = notification?.request?.content?.data || {};

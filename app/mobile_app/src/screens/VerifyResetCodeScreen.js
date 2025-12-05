@@ -116,7 +116,7 @@ const VerifyResetCodeScreen = ({ navigation }) => {
       const result = await forgotPassword(email);
       
       if (result.success) {
-        setTimeLeft(900); // Reset timer to 15 minutes
+        setTimeLeft(900);
         setCanResend(false);
         setFeedback({ 
           visible: true, 

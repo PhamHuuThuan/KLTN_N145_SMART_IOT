@@ -141,7 +141,7 @@ const LanguageSwitcher = ({ style }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'transparent', // Will be set by parent
+    backgroundColor: 'transparent',
   },
   languageButton: {
     flexDirection: 'row',

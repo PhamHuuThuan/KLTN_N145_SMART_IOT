@@ -105,8 +105,6 @@ const OutletDetail = ({
     
     if (success) {
       log.info('toggle success', outlet?.id, '->', action);
-      
-      // Refresh device data after successful toggle
       if (onRefreshDeviceData) {
         setTimeout(() => {
           onRefreshDeviceData();
