@@ -78,7 +78,7 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
       'temperature': '°C',
       'humidity': '%',
       'gas_ppm': ' ppm',
-      'smoke': ' ppm',
+      'smoke': ' V',
       'flame': ''
     };
     return unitMap[sensor] || '';
@@ -87,12 +87,12 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
   // Get default cooldown period based on priority
   const getDefaultCooldownPeriod = (priority) => {
     const defaults = {
-      'urgent': 30000,   // 30 giây
-      'high': 300000,    // 5 phút
-      'medium': 600000,  // 10 phút
-      'low': 900000      // 15 phút
+      'urgent': 0,       // Không có thời gian chờ cho chế độ khẩn cấp
+      'low': 180000,     // 3 phút
+      'medium': 120000,  // 2 phút
+      'high': 60000      // 1 phút
     };
-    return defaults[priority] || 300000;
+    return defaults[priority] || 120000;
   };
 
 
@@ -193,32 +193,25 @@ const RuleDetailModal = ({ onClose, selectedRule, editFields, setEditFields, onS
           </View>
         </View>
 
-        {/* Cooldown Period */}
-        <View style={{ marginTop: 16 }}>
-          <Text style={styles.inputLabel}>{t('rules.cooldownPeriod')}</Text>
-          <TextInput
-            style={styles.input}
-            value={editFields.cooldownPeriod ? (editFields.priority === 'urgent' 
-              ? String(Math.floor(editFields.cooldownPeriod / 1000)) 
-              : String(Math.floor(editFields.cooldownPeriod / 60000))) : ''}
-            onChangeText={(text) => {
-              if (editFields.priority === 'urgent') {
-                const seconds = parseInt(text) || 0;
-                setEditFields(prev => ({ ...prev, cooldownPeriod: seconds * 1000 }));
-              } else {
+        {/* Cooldown Period - Ẩn hoàn toàn khi urgent */}
+        {editFields.priority !== 'urgent' && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.inputLabel}>{t('rules.cooldownPeriod')}</Text>
+            <TextInput
+              style={styles.input}
+              value={editFields.cooldownPeriod ? String(Math.floor(editFields.cooldownPeriod / 60000)) : ''}
+              onChangeText={(text) => {
                 const minutes = parseInt(text) || 0;
                 setEditFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
-              }
-            }}
-            placeholder={editFields.priority === 'urgent' ? "30" : "5"}
-            keyboardType="numeric"
-          />
-          {editFields.priority === 'urgent' && (
+              }}
+              placeholder="5"
+              keyboardType="numeric"
+            />
             <Text style={{ fontSize: 12, color: CONFIG.COLORS.gray, marginTop: 4 }}>
-              {t('rules.cooldownPeriodSeconds', 'Thời gian chờ (giây)')}
+              {t('rules.cooldownMinutesLabel', 'Thời gian chờ (phút)')}
             </Text>
-          )}
-        </View>
+          </View>
+        )}
 
         <View style={styles.infoBanner}>
           <MaterialIcons name="notifications-active" size={16} color={CONFIG.COLORS.primary} />
