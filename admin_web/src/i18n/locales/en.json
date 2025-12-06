@@ -314,7 +314,7 @@
     "description": "Description",
     "device": "Device *",
     "selectDevice": "Select Device",
-    "owner": "Owner (User ID)",
+    "owner": "OwnerId",
     "ownerHint": "Leave empty to use admin ID",
     "priority": "Priority Level",
     "cooldown": "Cooldown Period (ms)",

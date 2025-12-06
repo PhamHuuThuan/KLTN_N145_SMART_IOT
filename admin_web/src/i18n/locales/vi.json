@@ -314,7 +314,7 @@
     "description": "Mô tả",
     "device": "Thiết bị *",
     "selectDevice": "Chọn thiết bị",
-    "owner": "Người sở hữu (User ID)",
+    "owner": "Chủ sở hữu",
     "ownerHint": "Để trống để dùng admin ID",
     "priority": "Mức độ ưu tiên",
     "cooldown": "Thời gian chờ (ms)",

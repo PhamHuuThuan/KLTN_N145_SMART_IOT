@@ -120,10 +120,19 @@ function DeviceEditor() {
     }
 
     try {
+      // Lấy ownerId từ device đầu tiên có ownerId trong danh sách
+      const deviceWithOwner = existingDevices.find(device => device.ownerId);
+      const ownerId = deviceWithOwner?.ownerId || null;
+      
       const payload = {
         deviceId: trimmedDeviceId,
         name: (formData.name || trimmedDeviceId).trim()
       };
+      
+      // Thêm ownerId nếu tìm thấy
+      if (ownerId) {
+        payload.ownerId = ownerId;
+      }
 
       const response = await devicesService.createDevice(payload);
       

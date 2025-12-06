@@ -29,10 +29,10 @@ function RuleEditor() {
   // Function to get cooldown period based on priority
   const getCooldownByPriority = (priority) => {
     const cooldownMap = {
-      urgent: 30000,    // 30 seconds
-      high: 60000,       // 1 minute
+      urgent: 0,        // Không có thời gian chờ cho chế độ khẩn cấp
+      low: 180000,      // 3 minutes
       medium: 120000,   // 2 minutes
-      low: 180000       // 3 minutes
+      high: 60000       // 1 minute
     };
     return cooldownMap[priority] || 120000; // Default to medium if not found
   };
@@ -174,7 +174,7 @@ function RuleEditor() {
       temperature: '°C',
       humidity: '%',
       gas_ppm: 'ppm',
-      smoke: 'ppm',
+      smoke: 'V',
       flame: ''
     };
     return units[sensor] || '';
@@ -220,7 +220,13 @@ function RuleEditor() {
               <label style={styles.label}>{t('ruleEditor.device')}</label>
               <select
                 value={formData.deviceId}
-                onChange={(e) => setFormData({ ...formData, deviceId: e.target.value })}
+                onChange={(e) => {
+                  const selectedDeviceId = e.target.value;
+                  // Tự động lấy ownerId từ device được chọn
+                  const selectedDevice = devices.find(d => d.deviceId === selectedDeviceId);
+                  const ownerId = selectedDevice?.ownerId || '';
+                  setFormData({ ...formData, deviceId: selectedDeviceId, createdBy: ownerId });
+                }}
                 required
                 style={styles.select}
               >
@@ -264,23 +270,26 @@ function RuleEditor() {
               </select>
             </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>{t('ruleEditor.cooldown')}</label>
-              <input
-                type="number"
-                value={formData.cooldownPeriod}
-                onChange={(e) => setFormData({ ...formData, cooldownPeriod: parseInt(e.target.value) || 0 })}
-                style={styles.input}
-                min="0"
-                max="86400000"
-              />
-              <small style={styles.helpText}>
-                {formData.cooldownPeriod >= 60000 
-                  ? `${Math.floor(formData.cooldownPeriod / 1000 / 60)} ${t('templates.minutes')}`
-                  : `${Math.floor(formData.cooldownPeriod / 1000)} ${t('templates.seconds')}`
-                }
-              </small>
-            </div>
+            {/* Cooldown Period - Ẩn hoàn toàn khi urgent */}
+            {formData.priority !== 'urgent' && (
+              <div style={styles.formGroup}>
+                <label style={styles.label}>{t('ruleEditor.cooldown')}</label>
+                <input
+                  type="number"
+                  value={formData.cooldownPeriod}
+                  onChange={(e) => setFormData({ ...formData, cooldownPeriod: parseInt(e.target.value) || 0 })}
+                  style={styles.input}
+                  min="0"
+                  max="86400000"
+                />
+                <small style={styles.helpText}>
+                  {formData.cooldownPeriod >= 60000 
+                    ? `${Math.floor(formData.cooldownPeriod / 1000 / 60)} ${t('templates.minutes')}`
+                    : `${Math.floor(formData.cooldownPeriod / 1000)} ${t('templates.seconds')}`
+                  }
+                </small>
+              </div>
+            )}
           </div>
 
           <div style={styles.formGroup}>
