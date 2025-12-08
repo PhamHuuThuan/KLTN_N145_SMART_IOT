@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import DeviceSelector from '../components/DeviceSelector';
@@ -87,12 +87,27 @@ const RulesScreen = () => {
     setCustomizeVisible(true);
   };
 
+  const isDuplicateRule = (template, deviceId, overrides = {}) => {
+    const targetName = overrides.name || t(template.name) || template.name;
+    return rules.some(
+      (rule) =>
+        rule.deviceId === deviceId &&
+        rule.name === targetName &&
+        !rule.deletedAt
+    );
+  };
+
   const handleCreateRuleFromTemplate = async (template, overrides = {}) => {
     // Ensure we pass device ID string, not device object
     const deviceId = typeof selectedDevice === 'string' ? selectedDevice : selectedDevice?.deviceId || selectedDevice?._id;
     
     if (!deviceId) {
       console.error('No device ID available for rule creation');
+      return;
+    }
+
+    if (isDuplicateRule(template, deviceId, overrides)) {
+      Alert.alert(t('rules.duplicateRuleForDevice'));
       return;
     }
     
