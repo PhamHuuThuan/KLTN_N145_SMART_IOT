@@ -137,7 +137,21 @@ function Rules() {
     return createdByObjectId;
   };
 
+  // Prevent creating duplicate rule (same device + template name)
+  const isDuplicateRule = (template, deviceId) => {
+    return allRules.some(
+      (rule) =>
+        rule.deviceId === deviceId &&
+        rule.name === template.name &&
+        !rule.deletedAt
+    );
+  };
+
   const createRuleFromTemplate = async (template, deviceId) => {
+    if (isDuplicateRule(template, deviceId)) {
+      throw new Error('duplicate_rule_for_device');
+    }
+
     const targetDevice = devices.find((d) => d.deviceId === deviceId);
     const createdByObjectId = getCreatedByObjectId();
     
@@ -184,7 +198,11 @@ function Rules() {
       fetchRules();
     } catch (error) {
       console.error('Error creating rule from template:', error);
-      alert(t('rules.createError'));
+      if (error.message === 'duplicate_rule_for_device') {
+        alert(t('rules.duplicateRuleForDevice') || 'Rule từ template này đã tồn tại cho thiết bị đã chọn.');
+      } else {
+        alert(t('rules.createError'));
+      }
     } finally {
       setCreatingRule(false);
     }
@@ -226,9 +244,14 @@ function Rules() {
             successCount++;
             setBulkProgress({ current, total, success: successCount, failed: failedCount });
           } catch (error) {
+            const isDup = error.message === 'duplicate_rule_for_device';
             console.error(`Error creating rule for template ${template.name} and device ${deviceId}:`, error);
             failedCount++;
             setBulkProgress({ current, total, success: successCount, failed: failedCount });
+            if (isDup) {
+              // Skip creating duplicates silently and keep looping
+              continue;
+            }
           }
 
           // Small delay to avoid overwhelming the server

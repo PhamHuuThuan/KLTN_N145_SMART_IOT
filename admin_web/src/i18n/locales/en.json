@@ -150,6 +150,7 @@
     "createRuleConfirm": "Create rule",
     "createSuccess": "Rule created successfully!",
     "createError": "Failed to create rule, please try again",
+    "duplicateRuleForDevice": "A rule from this template already exists for the selected device.",
     "noActiveTemplates": "No active templates available. Please create them first in Templates.",
     "singleMode": "Create Single",
     "bulkMode": "Bulk Create",
