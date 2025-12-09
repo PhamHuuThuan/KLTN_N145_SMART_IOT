@@ -185,6 +185,7 @@
     "ruleUpdated": "Rule updated successfully",
     "ruleDeleted": "Rule deleted successfully",
     "ruleError": "Failed to process rule",
+    "duplicateRuleForDevice": "A rule from this template already exists for the selected device.",
     "ruleStats": "Rule Statistics",
     "executions": "Executions",
     "lastExecuted": "Last Executed",

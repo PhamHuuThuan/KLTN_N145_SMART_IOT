@@ -87,7 +87,7 @@ const CustomizeModal = ({
       'temperature': '°C',
       'humidity': '%',
       'gas_ppm': ' ppm',
-      'smoke': ' ppm',
+      'smoke': ' V',
       'flame': ''
     };
     return unitMap[sensor] || '';
@@ -96,12 +96,12 @@ const CustomizeModal = ({
   // Get default cooldown period based on priority
   const getDefaultCooldownPeriod = (priority) => {
     const defaults = {
-      'urgent': 30000,   // 30 giây
-      'high': 300000,    // 5 phút
-      'medium': 600000,  // 10 phút
-      'low': 900000      // 15 phút
+      'urgent': 0,       // Không có thời gian chờ cho chế độ khẩn cấp
+      'low': 180000,     // 3 phút
+      'medium': 120000,  // 2 phút
+      'high': 60000      // 1 phút
     };
-    return defaults[priority] || 300000;
+    return defaults[priority] || 120000;
   };
 
   return (
@@ -195,32 +195,24 @@ const CustomizeModal = ({
           ))}
         </View>
 
-        {/* Cooldown Period */}
-        <View style={{ marginTop: 16 }}>
-        <Text style={styles.inputLabel}>
-          {customFields.priority === 'urgent'
-            ? t('rules.cooldownSecondsLabel', 'Thời gian chờ (giây)')
-            : t('rules.cooldownMinutesLabel', 'Thời gian chờ (phút)')
-          }
-        </Text>
-          <TextInput
-            style={styles.input}
-            value={customFields.cooldownPeriod ? (customFields.priority === 'urgent' 
-              ? String(Math.floor(customFields.cooldownPeriod / 1000)) 
-              : String(Math.floor(customFields.cooldownPeriod / 60000))) : ''}
-            onChangeText={(text) => {
-              if (customFields.priority === 'urgent') {
-                const seconds = parseInt(text) || 0;
-                setCustomFields(prev => ({ ...prev, cooldownPeriod: seconds * 1000 }));
-              } else {
+        {/* Cooldown Period - Ẩn hoàn toàn khi urgent */}
+        {customFields.priority !== 'urgent' && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.inputLabel}>
+              {t('rules.cooldownMinutesLabel', 'Thời gian chờ (phút)')}
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={customFields.cooldownPeriod ? String(Math.floor(customFields.cooldownPeriod / 60000)) : ''}
+              onChangeText={(text) => {
                 const minutes = parseInt(text) || 0;
                 setCustomFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
-              }
-            }}
-            placeholder={customFields.priority === 'urgent' ? "30" : "5"}
-            keyboardType="numeric"
-          />
-        </View>
+              }}
+              placeholder="5"
+              keyboardType="numeric"
+            />
+          </View>
+        )}
 
 
         <View style={styles.infoBanner}>

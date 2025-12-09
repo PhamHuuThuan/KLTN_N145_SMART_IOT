@@ -9,6 +9,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import OverlayLoader from './OverlayLoader';
 import ActionFeedback from './ActionFeedback';
 import QRScannerModal from './QRScannerModal';
+import rulesService from '../services/rulesService';
+import { getRuleTemplates } from '../constants/ruleTemplates';
 
 const DeviceSelector = ({
   devices,
@@ -22,7 +24,7 @@ const DeviceSelector = ({
   onLoadMore,
   showAddButton = true,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { colors } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -459,6 +461,54 @@ const DeviceSelector = ({
                       const resp = await apiService.post('/api/devices', payload);
                       
                       if (resp?.data?.success) {
+                        // Tự động tạo các quy tắc khẩn cấp từ templates
+                        try {
+                          const language = i18n.language || 'vi';
+                          let templates = {};
+                          let urgentTemplates = [];
+                          
+                          // Ưu tiên lấy templates từ API admin
+                          try {
+                            const apiResponse = await rulesService.getTemplates(language);
+                            if (apiResponse?.data && typeof apiResponse.data === 'object') {
+                              templates = apiResponse.data;
+                              console.log('Loaded templates from API:', Object.keys(templates).length);
+                            }
+                          } catch (apiError) {
+                            console.warn('Failed to load templates from API, using local templates:', apiError);
+                          }
+                          
+                          // Nếu không có templates từ API, dùng templates local
+                          if (Object.keys(templates).length === 0) {
+                            templates = getRuleTemplates(language);
+                            console.log('Using local templates:', Object.keys(templates).length);
+                          }
+                          
+                          // Lọc các templates có priority urgent
+                          urgentTemplates = Object.values(templates).filter(
+                            (template) => template && template.priority === 'urgent'
+                          );
+                          
+                          if (urgentTemplates.length > 0) {
+                            const createPromises = urgentTemplates.map((template) =>
+                              rulesService.createRuleFromTemplate(
+                                template,
+                                payload.deviceId,
+                                { ownerId: user.id }
+                              ).catch((err) => {
+                                console.warn('Failed to create urgent rule:', template.name, err);
+                                return null;
+                              })
+                            );
+                            
+                            await Promise.allSettled(createPromises);
+                            console.log(`Created ${urgentTemplates.length} urgent rules for device ${payload.deviceId}`);
+                          }
+                        } catch (ruleError) {
+                          // Không làm gián đoạn quá trình thêm device nếu tạo rule thất bại
+                          console.warn('Error creating urgent rules:', ruleError);
+                        }
+                        
                         setFeedback({ 
                           visible: true, 
                           type: 'success', 

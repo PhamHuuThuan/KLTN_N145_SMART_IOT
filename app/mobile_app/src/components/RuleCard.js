@@ -101,7 +101,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
       'temperature': '°C',
       'humidity': '%',
       'gas_ppm': ' ppm',
-      'smoke': ' ppm',
+      'smoke': ' V',
       'flame': ''
     };
     return unitMap[sensor] || '';

@@ -185,6 +185,7 @@
     "ruleUpdated": "Cập nhật quy tắc thành công",
     "ruleDeleted": "Xóa quy tắc thành công",
     "ruleError": "Không thể xử lý quy tắc",
+    "duplicateRuleForDevice": "Quy tắc từ mẫu này đã tồn tại cho thiết bị đã chọn.",
     "ruleStats": "Thống kê quy tắc",
     "executions": "Lần thực thi",
     "lastExecuted": "Lần cuối thực thi",
