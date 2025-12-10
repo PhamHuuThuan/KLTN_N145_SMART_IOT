@@ -36,7 +36,7 @@ services:
       - PORT=3003
       - NODE_ENV=production
       - MONGODB_URI=mongodb://mongodb-rules:27017/smart_iot_rules
-      - KAFKA_BROKERS=34.59.250.63:9092
+      - KAFKA_BROKERS=34.121.236.194:9092
       - ML_SERVICE_URL=http://ml-service:3007
       - ML_SUPPORT_ENABLED=true
       - ML_SUPPORT_THRESHOLD=0.8
@@ -44,7 +44,7 @@ services:
       - ML_ALERT_COOLDOWN_MS=300000
       - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
     extra_hosts:
-      - "kafka:34.59.250.63"
+      - "kafka:34.121.236.194"
     networks:
       - smart-iot-network
     depends_on:
@@ -70,11 +70,11 @@ services:
     environment:
       - PORT=3004
       - NODE_ENV=production
-      - MONGODB_URI=mongodb://34.59.250.63:27019/smart_iot_alerts
-      - KAFKA_BROKERS=34.59.250.63:9092
+      - MONGODB_URI=mongodb://34.121.236.194:27019/smart_iot_alerts
+      - KAFKA_BROKERS=34.121.236.194:9092
       - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
-      - APP_URL=http://34.59.250.63:3000
-      - ALLOWED_ORIGINS=http://34.59.250.63:3000,http://localhost:3000
+      - APP_URL=http://34.121.236.194:3000
+      - ALLOWED_ORIGINS=http://34.121.236.194:3000,http://localhost:3000
       - LOG_LEVEL=info
       - RATE_LIMIT_WINDOW_MS=900000
       - RATE_LIMIT_MAX_REQUESTS=100
@@ -96,7 +96,7 @@ services:
       - FCM_CLIENT_EMAIL=${FCM_CLIENT_EMAIL:-}
       - FCM_CLIENT_ID=${FCM_CLIENT_ID:-}
     extra_hosts:
-      - "kafka:34.59.250.63"
+      - "kafka:34.121.236.194"
     networks:
       - smart-iot-network
     restart: unless-stopped
@@ -118,7 +118,7 @@ services:
     environment:
       - PORT=3007
       - NODE_ENV=production
-      - MONGODB_URI=mongodb://34.59.250.63:27021/smart_iot_ml
+      - MONGODB_URI=mongodb://34.121.236.194:27021/smart_iot_ml
       - KAFKA_ENABLED=false
       - MODEL_SAVE_DIR=./models
       # Kafka config removed - ML service operates via HTTP API only
@@ -127,7 +127,7 @@ services:
       - ANOMALY_THRESHOLD=0.85
       - FALSE_ALERT_THRESHOLD=0.3
       - ALERT_COOLDOWN_MINUTES=5
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://34.59.250.63:3000,http://localhost:3000}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://34.121.236.194:3000,http://localhost:3000}
     volumes:
       - ml_models:/app/models
     networks:
@@ -139,6 +139,25 @@ services:
       timeout: 10s
       retries: 8
       start_period: 90s
+
+  # Admin Web
+  admin-web:
+    build:
+      context: ../admin_web
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://34.121.236.194:3000
+    container_name: smart-iot-admin-web
+    ports:
+      - "3002:80"
+    networks:
+      - smart-iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   mongodb_rules_data:
