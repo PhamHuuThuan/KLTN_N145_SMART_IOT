@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ESP32 KitchenBox Telemetry",
+  "type": "object",
+  "required": [
+    "ts"
+  ],
+  "properties": {
+    "ts": {
+      "type": "integer",
+      "description": "Device uptime in ms when telemetry was produced"
+    },
+    "temp": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Temperature in Celsius (nullable if sensor read fails)"
+    },
+    "humid": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Relative humidity in % (nullable)"
+    },
+    "smoke": {
+      "type": ["integer","null"],
+      "enum": [0,1,null],
+      "description": "1 = smoke detected, 0 = none, null = unknown"
+    },
+    "gas_ppm": {
+      "type": ["number","null"],
+      "description": "Gas concentration (ppm) — null when unknown"
+    },
+    "o": {
+      "type": ["object","null"],
+      "properties": {
+        "o1": { "type": ["boolean","null"] },
+        "o2": { "type": ["boolean","null"] },
+        "o3": { "type": ["boolean","null"] },
+        "o4": { "type": ["boolean","null"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "ts": 382253,
+      "temp": 30.4,
+      "humid": 70,
+      "smoke": 0,
+      "gas_ppm": 373.1002,
+      "o": {
+        "o1": false,
+        "o2": false,
+        "o3": false,
+        "o4": false
+      }
+    }
+  ]
+}

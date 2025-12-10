@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Smart IoT Kitchen",
+    "slug": "smart-iot-kitchen-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/logo_app.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/logo_app.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2C3E50"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo_app.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "useNextNotificationsApi": true,
+      "googleServicesFile": "./google-services.json",
+      "package": "com.technooo.smartkitchen",
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "WAKE_LOCK",
+        "USE_FULL_SCREEN_INTENT",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+        "RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/logo_app.png",
+      "bundler": "metro"
+    },
+    "extra": {
+      "apiUrl": "http://127.0.0.1:3000",
+      "eas": {
+        "projectId": "5ea86a56-b10e-4a1b-88a7-6692b50872ed"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2C3E50",
+          "sounds": [
+            "./assets/notification.mp3"
+          ],
+          "mode": "production"
+        }
+      ]
+    ]
+  }
+}

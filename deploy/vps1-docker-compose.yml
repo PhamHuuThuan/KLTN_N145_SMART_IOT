@@ -1,0 +1,283 @@
+version: '3.8'
+
+networks:
+  smart-iot-network:
+    driver: bridge
+
+services:
+  # MongoDB cho Devices Service
+  mongodb-devices:
+    image: mongo:7
+    container_name: smart-iot-mongodb-devices
+    ports:
+      - "27022:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=smart_iot_devices
+    volumes:
+      - mongodb_devices_data:/data/db
+      - mongodb_devices_config:/data/configdb
+    networks:
+      - smart-iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB cho Auth Service
+  mongodb-auth:
+    image: mongo:7
+    container_name: smart-iot-mongodb-auth
+    ports:
+      - "27018:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=smart_iot_auth
+    volumes:
+      - mongodb_auth_data:/data/db
+    networks:
+      - smart-iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB cho Alerts Service
+  mongodb-alerts:
+    image: mongo:7
+    container_name: smart-iot-mongodb-alerts
+    ports:
+      - "27019:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=smart_iot_alerts
+    volumes:
+      - mongodb_alerts_data:/data/db
+    networks:
+      - smart-iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB cho ML Service
+  mongodb-ml:
+    image: mongo:7
+    container_name: smart-iot-mongodb-ml
+    ports:
+      - "27021:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=smart_iot_ml
+    volumes:
+      - mongodb_ml_data:/data/db
+    networks:
+      - smart-iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka Message Broker
+  kafka:
+    image: bitnamilegacy/kafka:3.3.1-debian-11-r9
+    container_name: smart-iot-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      # KRaft mode configuration
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_BROKER_ID=1
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      # Listeners
+      - KAFKA_CFG_LISTENERS=INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://smart-iot-kafka:29092,EXTERNAL://34.121.236.194:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+      # Controller configuration
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      # Cluster ID for KRaft
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+      # Topic configuration
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_LOG_RETENTION_HOURS=168
+      - KAFKA_CFG_NUM_PARTITIONS=3
+    volumes:
+      - kafka_data:/bitnami/kafka
+    networks:
+      - smart-iot-network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:29092 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: smart-iot-kafka-ui
+    depends_on:
+      - kafka
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: vps1-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - smart-iot-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ../services/api-gateway
+      dockerfile: Dockerfile
+    container_name: smart-iot-api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
+      - AUTH_SERVICE_URL=http://auth-service:4001
+      - DEVICES_SERVICE_URL=http://devices-service:3001
+      - RULES_SERVICE_URL=${RULES_SERVICE_URL:-http://34.171.183.30:3003}
+      - ALERTS_SERVICE_URL=${ALERTS_SERVICE_URL:-http://34.171.183.30:3004}
+    networks:
+      - smart-iot-network
+    depends_on:
+      - auth-service
+      - devices-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+    container_name: smart-iot-auth-service
+    ports:
+      - "4001:4001"
+    environment:
+      - PORT=4001
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb-auth:27017/smart_iot_auth
+      - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
+      - MQTT_HOST=${VPS1_IP:-34.121.236.194}
+      - MQTT_PORT=1883
+      - ALERTS_SERVICE_URL=http://34.171.183.30:3004
+    networks:
+      - smart-iot-network
+    depends_on:
+      - mongodb-auth
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MQTT Service (Node.js bridge between MQTT and Kafka)
+  mqtt-service:
+    build:
+      context: ../services/mqtt-service
+      dockerfile: Dockerfile
+    container_name: smart-iot-mqtt-service
+    ports:
+      - "3006:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - MQTT_HOST=host.docker.internal
+      - MQTT_PORT=1883
+      - MQTT_WS_PORT=9001
+      - MQTT_USERNAME=${MQTT_USERNAME:-}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
+      - TOPIC_PREFIX=iot
+      - KAFKA_BROKERS=smart-iot-kafka:29092
+      - REDIS_HOST=host.docker.internal
+      - REDIS_PORT=6379
+      - DEVICE_SERVICE_URL=http://devices-service:3001
+      - DEVICE_SERVICE_TOKEN=${DEVICE_SERVICE_TOKEN:-}
+      - DEVICE_VALIDATION_ENABLED=false
+      - ALLOW_ANONYMOUS=true
+      - LOG_LEVEL=info
+      - HEALTH_CHECK_INTERVAL=30000
+      - HEALTH_CHECK_TIMEOUT=5000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - smart-iot-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+      devices-service:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Devices Service
+  devices-service:
+    build:
+      context: ../services/devices-service
+      dockerfile: Dockerfile
+    container_name: smart-iot-devices-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb-devices:27017/smart_iot_devices
+      - KAFKA_BROKERS=smart-iot-kafka:29092
+      - MQTT_BROKER_URL=mqtt://host.docker.internal:1883
+      - MQTT_TOPIC_PREFIX=iot
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      - JWT_SECRET=${JWT_SECRET:-your-strong-secret}
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=100
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - smart-iot-network
+    depends_on:
+      mongodb-devices:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mongodb_devices_data:
+  mongodb_devices_config:
+  mongodb_auth_data:
+  mongodb_alerts_data:
+  mongodb_ml_data:
+  kafka_data:
+  redis_data:
+

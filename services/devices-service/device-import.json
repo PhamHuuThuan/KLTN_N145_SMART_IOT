@@ -1,0 +1,40 @@
+[
+  {
+    "deviceId": "KITCHEN-ESP32-LED1",
+    "name": "Kitchen ESP32 LED Controller",
+    "status": "online",
+    "lastSeenAt": "2024-01-01T00:00:00.000Z",
+    "ownerId": "admin",
+    "outlets": [
+      {
+        "id": "o1",
+        "name": "Kitchen Outlet 1",
+        "status": false
+      },
+      {
+        "id": "o2",
+        "name": "Kitchen Outlet 2",
+        "status": false
+      },
+      {
+        "id": "o3",
+        "name": "Kitchen Outlet 3",
+        "status": false
+      },
+      {
+        "id": "o4",
+        "name": "Kitchen Outlet 4",
+        "status": false
+      }
+    ],
+    "emergencyMode": false,
+    "latestTelemetry": {
+      "ts": 1640995200000,
+      "temp": 25,
+      "humid": 60,
+      "smoke": 10,
+      "gas_ppm": 50,
+      "o": {}
+    }
+  }
+]
