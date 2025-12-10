@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../contexts/ThemeContext';
 import CONFIG from '../constants/config';
 
 const CustomizeModal = ({
@@ -13,6 +14,7 @@ const CustomizeModal = ({
 }) => {
   if (!customizeTemplate) return null;
   const { t } = useTranslation();
+  const { colors } = useTheme();
 
   // Initialize customFields.conditions if not exists
   React.useEffect(() => {
@@ -105,59 +107,61 @@ const CustomizeModal = ({
   };
 
   return (
-    <View style={styles.modalContainer}>
-      <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>{t('rules.customizeRule')}</Text>
+    <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+      <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.modalTitle, { color: colors.primary }]}>{t('rules.customizeRule')}</Text>
         <TouchableOpacity
           style={styles.closeButton}
           onPress={onClose}
         >
-          <MaterialIcons name="close" size={24} color={CONFIG.COLORS.gray} />
+          <MaterialIcons name="close" size={24} color={colors.gray} />
         </TouchableOpacity>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 20 }}>
-        <Text style={{ marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.ruleName')}</Text>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 20, backgroundColor: colors.background }}>
+        <Text style={{ marginBottom: 6, color: colors.textSecondary }}>{t('rules.ruleName')}</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
           value={customFields.name}
           onChangeText={(t) => setCustomFields(prev => ({ ...prev, name: t }))}
           placeholder={t('rules.ruleNamePlaceholder')}
+          placeholderTextColor={colors.textTertiary}
         />
-        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.ruleDescription')}</Text>
+        <Text style={{ marginTop: 12, marginBottom: 6, color: colors.textSecondary }}>{t('rules.ruleDescription')}</Text>
         <TextInput
-          style={[styles.input, styles.multilineInput]}
+          style={[styles.input, styles.multilineInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
           value={customFields.description}
           onChangeText={(t) => setCustomFields(prev => ({ ...prev, description: t }))}
           multiline
           textAlignVertical="top"
+          placeholderTextColor={colors.textTertiary}
         />
         {/* Editable Conditions */}
         {customizeTemplate.conditions && customizeTemplate.conditions.length > 0 && (
-          <View style={styles.conditionsSection}>
-            <Text style={styles.sectionTitle}>{t('rules.conditionsPreset', 'Điều kiện cảnh báo cố định')}</Text>
+          <View style={[styles.conditionsSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.primary }]}>{t('rules.conditionsPreset', 'Điều kiện cảnh báo cố định')}</Text>
             {customFields.conditions && customFields.conditions.map((condition, index) => (
-              <View key={index} style={styles.conditionEditItem}>
+              <View key={index} style={[styles.conditionEditItem, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
                 <View style={styles.conditionHeader}>
                   <MaterialIcons 
                     name={getSensorIcon(condition.sensor)} 
                     size={16} 
-                    color={CONFIG.COLORS.primary} 
+                    color={colors.primary} 
                   />
-                  <Text style={styles.conditionLabel}>{getSensorLabel(condition.sensor)}</Text>
+                  <Text style={[styles.conditionLabel, { color: colors.primary }]}>{getSensorLabel(condition.sensor)}</Text>
                 </View>
                 
                 <View style={styles.conditionInputs}>
                   <View style={styles.thresholdContainer}>
-                    <Text style={styles.inputLabel}>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
                       {t('rules.thresholdValue', 'Ngưỡng cảnh báo')}
                     </Text>
-                    <View style={styles.thresholdBadge}>
-                      <MaterialIcons name="tune" size={16} color={CONFIG.COLORS.primary} />
-                      <Text style={styles.thresholdText}>
+                    <View style={[styles.thresholdBadge, { backgroundColor: `${colors.primary}11`, borderColor: colors.primary }]}>
+                      <MaterialIcons name="tune" size={16} color={colors.primary} />
+                      <Text style={[styles.thresholdText, { color: colors.primary }]}>
                         {formatConditionThreshold(condition, getSensorUnit)}
                       </Text>
                     </View>
-                    <Text style={styles.thresholdHint}>
+                    <Text style={[styles.thresholdHint, { color: colors.textTertiary }]}>
                       {t('rules.thresholdFixedHint', 'Giá trị do hệ thống thiết lập, liên hệ Admin để thay đổi')}
                       </Text>
                   </View>
@@ -167,7 +171,7 @@ const CustomizeModal = ({
           </View>
         )}
 
-        <Text style={{ marginTop: 12, marginBottom: 6, color: CONFIG.COLORS.gray }}>{t('rules.priorityLabel')}</Text>
+        <Text style={{ marginTop: 12, marginBottom: 6, color: colors.textSecondary }}>{t('rules.priorityLabel')}</Text>
         <View style={styles.prioritySelector}>
           {['low', 'medium', 'high', 'urgent'].map((priority) => (
             <TouchableOpacity
@@ -175,8 +179,8 @@ const CustomizeModal = ({
               activeOpacity={0.85}
               style={[
                 styles.priorityChip,
-                customFields.priority === priority && [styles.priorityChipSelected, { borderColor: getPriorityColor(priority), backgroundColor: `${getPriorityColor(priority)}22` }],
-                { borderColor: getPriorityColor(priority) }
+                { borderColor: getPriorityColor(priority), backgroundColor: colors.surface },
+                customFields.priority === priority && [styles.priorityChipSelected, { borderColor: getPriorityColor(priority), backgroundColor: getPriorityColor(priority) }]
               ]}
               onPress={() => {
                 const defaultCooldown = getDefaultCooldownPeriod(priority);
@@ -188,7 +192,7 @@ const CustomizeModal = ({
               }}
             >
               <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(priority) }]} />
-              <Text style={[styles.priorityLabel, customFields.priority === priority && { color: getPriorityColor(priority), fontWeight: '700' }]}>
+              <Text style={[styles.priorityLabel, { color: customFields.priority === priority ? colors.white : colors.text }]}>
                 {t(`rules.priority.${priority}`)}
               </Text>
             </TouchableOpacity>
@@ -198,26 +202,27 @@ const CustomizeModal = ({
         {/* Cooldown Period - Ẩn hoàn toàn khi urgent */}
         {customFields.priority !== 'urgent' && (
           <View style={{ marginTop: 16 }}>
-            <Text style={styles.inputLabel}>
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
               {t('rules.cooldownMinutesLabel', 'Thời gian chờ (phút)')}
             </Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
               value={customFields.cooldownPeriod ? String(Math.floor(customFields.cooldownPeriod / 60000)) : ''}
               onChangeText={(text) => {
                 const minutes = parseInt(text) || 0;
                 setCustomFields(prev => ({ ...prev, cooldownPeriod: minutes * 60000 }));
               }}
               placeholder="5"
+              placeholderTextColor={colors.textTertiary}
               keyboardType="numeric"
             />
           </View>
         )}
 
 
-        <View style={styles.infoBanner}>
-          <MaterialIcons name="notifications-active" size={16} color={CONFIG.COLORS.primary} />
-          <Text style={styles.infoBannerText}>
+        <View style={[styles.infoBanner, { backgroundColor: `${colors.primary}11`, borderColor: `${colors.primary}33` }]}>
+          <MaterialIcons name="notifications-active" size={16} color={colors.primary} />
+          <Text style={[styles.infoBannerText, { color: colors.textSecondary }]}>
             {t('rules.unlimitedAlertsHint')}
           </Text>
         </View>
@@ -246,6 +251,9 @@ const CustomizeModal = ({
             styles.createButton, 
             { 
               marginTop: 16,
+              backgroundColor: colors.primary,
+              borderWidth: 1,
+              borderColor: `${colors.primary}80`,
               opacity: validateConditions(customFields.conditions).valid ? 1 : 0.5
             }
           ]}
@@ -265,9 +273,9 @@ const CustomizeModal = ({
           <MaterialIcons 
             name={validateConditions(customFields.conditions).valid ? "check" : "error"} 
             size={20} 
-            color={CONFIG.COLORS.white} 
+            color={colors.white} 
           />
-          <Text style={styles.createButtonText}>
+          <Text style={[styles.createButtonText, { color: colors.white }]}>
             {validateConditions(customFields.conditions).valid 
               ? t('rules.createWithCustomization') 
               : 'Sửa lỗi trước khi tạo'
@@ -287,9 +295,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   input: {
-    backgroundColor: CONFIG.THEME.surface,
     borderWidth: 1,
-    borderColor: CONFIG.COLORS.light,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -304,14 +310,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: CONFIG.THEME.surface,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.COLORS.light,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: CONFIG.COLORS.primary,
   },
   closeButton: {
     padding: 4,
@@ -320,14 +323,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: CONFIG.COLORS.primary,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     marginBottom: 20,
   },
   createButtonText: {
-    color: CONFIG.COLORS.white,
     fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 8,
@@ -344,10 +345,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 18,
     borderWidth: 1,
-    backgroundColor: CONFIG.THEME.surface,
   },
   priorityChipSelected: {
-    backgroundColor: '#F5F5F5',
   },
   priorityDot: {
     width: 8,
@@ -357,26 +356,21 @@ const styles = StyleSheet.create({
   },
   priorityLabel: {
     fontSize: 10,
-    color: CONFIG.COLORS.gray,
   },
   inputLabel: {
     marginBottom: 6,
-    color: CONFIG.COLORS.gray,
     fontSize: 14,
   },
   conditionsSection: {
     marginTop: 16,
     marginBottom: 8,
     padding: 12,
-    backgroundColor: CONFIG.THEME.surface,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: CONFIG.COLORS.light,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: CONFIG.COLORS.primary,
     marginBottom: 8,
   },
   conditionItem: {
@@ -393,10 +387,8 @@ const styles = StyleSheet.create({
   conditionEditItem: {
     marginBottom: 16,
     padding: 12,
-    backgroundColor: CONFIG.THEME.background,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: CONFIG.COLORS.light,
   },
   conditionHeader: {
     flexDirection: 'row',
@@ -406,7 +398,6 @@ const styles = StyleSheet.create({
   conditionLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: CONFIG.COLORS.primary,
     marginLeft: 8,
   },
   conditionInputs: {
@@ -532,14 +523,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: `${CONFIG.COLORS.primary}11`,
     borderWidth: 1,
-    borderColor: `${CONFIG.COLORS.primary}33`,
   },
   infoBannerText: {
     flex: 1,
     fontSize: 12,
-    color: CONFIG.COLORS.gray,
     lineHeight: 16,
   },
   thresholdContainer: {
@@ -551,19 +539,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: `${CONFIG.COLORS.primary}11`,
     borderWidth: 1,
-    borderColor: CONFIG.COLORS.primary,
     gap: 8,
   },
   thresholdText: {
     fontSize: 14,
     fontWeight: '600',
-    color: CONFIG.COLORS.primary,
   },
   thresholdHint: {
     fontSize: 11,
-    color: CONFIG.COLORS.gray,
     fontStyle: 'italic',
   },
 });

@@ -2,10 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../contexts/ThemeContext';
 import CONFIG from '../constants/config';
 
 const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
   const { t } = useTranslation();
+  const { colors } = useTheme();
   
   const getPriorityInfo = (priority) => {
     const priorityMap = {
@@ -110,7 +112,7 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
   const priorityInfo = getPriorityInfo(rule.priority);
 
   return (
-    <TouchableOpacity style={styles.ruleCard} activeOpacity={0.9} onPress={onPress}>
+    <TouchableOpacity style={[styles.ruleCard, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]} activeOpacity={0.9} onPress={onPress}>
       <View style={[styles.priorityBadgeAbsolute, { backgroundColor: priorityInfo.color }]}>
         <MaterialIcons name={priorityInfo.icon} size={12} color="white" />
         <Text style={styles.priorityText}>{priorityInfo.label}</Text>
@@ -118,22 +120,22 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
       <View style={styles.ruleHeader}>
         <View style={styles.ruleInfo}>
           <View style={styles.ruleTitleRow}>
-            <Text style={styles.ruleName} numberOfLines={1} ellipsizeMode="tail">{getTranslatedRuleName(rule.name)}</Text>
+            <Text style={[styles.ruleName, { color: colors.primary }]} numberOfLines={1} ellipsizeMode="tail">{getTranslatedRuleName(rule.name)}</Text>
           </View>
-          <Text style={styles.ruleDescription}>{getTranslatedRuleDescription(rule.description)}</Text>
+          <Text style={[styles.ruleDescription, { color: colors.textSecondary }]}>{getTranslatedRuleDescription(rule.description)}</Text>
           
           {/* Conditions Display */}
           {rule.conditions && rule.conditions.length > 0 && (
             <View style={styles.conditionsContainer}>
-              <Text style={styles.conditionsLabel}>{t('rules.conditions')}</Text>
+              <Text style={[styles.conditionsLabel, { color: colors.primary }]}>{t('rules.conditions')}</Text>
               {rule.conditions.map((condition, index) => (
                 <View key={index} style={styles.conditionItem}>
                   <MaterialIcons 
                     name={getSensorIcon(condition.sensor)} 
                     size={14} 
-                    color={CONFIG.COLORS.primary} 
+                    color={colors.primary} 
                   />
-                  <Text style={styles.conditionText}>
+                  <Text style={[styles.conditionText, { color: colors.textSecondary }]}>
                     {getSensorLabel(condition.sensor)}: {condition.operator} {condition.value}
                     {getSensorUnit(condition.sensor)}
                   </Text>
@@ -143,21 +145,21 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
           )}
           
           <View style={styles.ruleMeta}>
-            <View style={styles.ruleStatsDivider} />
+            <View style={[styles.ruleStatsDivider, { backgroundColor: colors.border }]} />
             <View style={styles.ruleStats}>
               <View style={styles.statsRow}>
                 {rule.priority !== 'urgent' && (
                   <View style={styles.statItem}>
-                    <MaterialIcons name="timer" size={12} color={CONFIG.COLORS.gray} />
-                    <Text style={styles.statText}>
+                    <MaterialIcons name="timer" size={12} color={colors.gray} />
+                    <Text style={[styles.statText, { color: colors.textSecondary }]}>
                       {t('rules.cooldown')} {formatCooldown(rule.cooldownPeriod)}
                     </Text>
                   </View>
                 )}
                 {rule.priority !== 'urgent' && (
                   <View style={styles.statItem}>
-                    <MaterialIcons name="repeat" size={12} color={CONFIG.COLORS.gray} />
-                    <Text style={styles.statText}>
+                    <MaterialIcons name="repeat" size={12} color={colors.gray} />
+                    <Text style={[styles.statText, { color: colors.textSecondary }]}>
                       {t('rules.unlimitedAlerts')}
                     </Text>
                   </View>
@@ -173,8 +175,8 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
               </View>
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <MaterialIcons name="flash-on" size={12} color={CONFIG.COLORS.gray} />
-                  <Text style={styles.statText}>
+                  <MaterialIcons name="flash-on" size={12} color={colors.gray} />
+                  <Text style={[styles.statText, { color: colors.textSecondary }]}>
                     {t('rules.triggered')} {rule.triggerCount || 0}
                   </Text>
                 </View>
@@ -186,8 +188,8 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
           <Switch
             value={rule.isActive}
             onValueChange={() => onToggleStatus(rule._id, rule.isActive)}
-            trackColor={{ false: CONFIG.COLORS.gray, true: CONFIG.COLORS.success }}
-            thumbColor={CONFIG.COLORS.white}
+            trackColor={{ false: colors.gray, true: colors.success }}
+            thumbColor={colors.white}
           />
         </View>
       </View>
@@ -195,19 +197,19 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
       <View style={styles.actionsRowFullWidth}>
         <View style={styles.actionsWrap}>
         <TouchableOpacity
-          style={styles.editButton}
+          style={[styles.editButton, { backgroundColor: colors.success }]}
           onPress={onPress}
           activeOpacity={0.85}
         >
-          <MaterialIcons name="edit" size={16} color={CONFIG.COLORS.white} />
+          <MaterialIcons name="edit" size={16} color={colors.white} />
           <Text style={styles.editButtonText}>{t('rules.edit')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.deleteButton}
+          style={[styles.deleteButton, { backgroundColor: colors.danger }]}
           onPress={() => onDelete(rule._id, rule.name)}
           activeOpacity={0.85}
         >
-          <MaterialIcons name="delete" size={16} color={CONFIG.COLORS.white} />
+          <MaterialIcons name="delete" size={16} color={colors.white} />
           <Text style={styles.deleteButtonText}>{t('rules.delete')}</Text>
         </TouchableOpacity>
         </View>
@@ -218,7 +220,6 @@ const RuleCard = ({ rule, onPress, onToggleStatus, onDelete }) => {
 
 const styles = StyleSheet.create({
   ruleCard: {
-    backgroundColor: CONFIG.THEME.surface,
     width: '100%',
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     padding: 16,
@@ -248,7 +249,6 @@ const styles = StyleSheet.create({
   ruleName: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: CONFIG.THEME.primary,
     marginLeft: 8,
     flex: 1,
     minWidth: 0,
@@ -272,7 +272,6 @@ const styles = StyleSheet.create({
   },
   ruleDescription: {
     fontSize: 13,
-    color: CONFIG.THEME.gray,
     marginBottom: 4,
   },
   conditionsContainer: {
@@ -282,7 +281,6 @@ const styles = StyleSheet.create({
   conditionsLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: CONFIG.THEME.primary,
     marginBottom: 4,
   },
   conditionItem: {
@@ -292,7 +290,6 @@ const styles = StyleSheet.create({
   },
   conditionText: {
     fontSize: 11,
-    color: CONFIG.THEME.gray,
     marginLeft: 6,
     flex: 1,
   },
@@ -308,7 +305,6 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: CONFIG.COLORS.danger,
     borderRadius: 16,
     width: 100,
   },
@@ -332,7 +328,6 @@ const styles = StyleSheet.create({
   },
   ruleStatsDivider: {
     height: 1,
-    backgroundColor: '#F0F1F3',
     marginTop: 8,
     marginBottom: 6,
   },
@@ -354,7 +349,6 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: CONFIG.COLORS.success,
     borderRadius: 16,
     width: 100,
   },
@@ -380,7 +374,6 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 10,
-    color: CONFIG.THEME.gray,
     marginLeft: 4,
     fontWeight: '500',
     flexShrink: 1,
