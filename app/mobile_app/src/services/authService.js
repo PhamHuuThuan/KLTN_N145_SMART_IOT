@@ -65,7 +65,29 @@ class AuthService {
         data: error.response?.data
       });
       
-      const errorMessage = error.response?.data?.error || error.message || 'Registration failed';
+      let errorMessage = 'Đăng ký thất bại';
+      
+      if (error.response?.status === 400 || error.response?.status === 409) {
+        const backendError = error.response?.data?.error || error.response?.data?.message || '';
+        const errorLower = backendError.toLowerCase();
+        
+        if (errorLower.includes('email') && (errorLower.includes('already') || errorLower.includes('exists') || errorLower.includes('duplicate'))) {
+          errorMessage = 'Email này đã được sử dụng';
+        } else if (errorLower.includes('email') && errorLower.includes('required')) {
+          errorMessage = 'Vui lòng nhập email';
+        } else if (errorLower.includes('password') && errorLower.includes('required')) {
+          errorMessage = 'Vui lòng nhập mật khẩu';
+        } else if (errorLower.includes('name') && errorLower.includes('required')) {
+          errorMessage = 'Vui lòng nhập họ và tên';
+        } else if (backendError) {
+          errorMessage = backendError;
+        }
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return { success: false, error: errorMessage };
     }
   }
@@ -163,8 +185,33 @@ class AuthService {
       this.log.info('Password changed successfully');
       return { success: true, message: response.data.message };
     } catch (error) {
-      this.log.error('Failed to change password:', error.message);
-      const errorMessage = error.response?.data?.error || 'Failed to change password';
+      this.log.error('Failed to change password:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      
+      let errorMessage = 'Đổi mật khẩu thất bại';
+      
+      if (error.response?.status === 400) {
+        const backendError = error.response?.data?.error;
+        if (backendError === 'current_password_incorrect') {
+          errorMessage = 'Mật khẩu hiện tại không đúng';
+        } else if (backendError === 'new_password_must_be_at_least_6_characters') {
+          errorMessage = 'Mật khẩu mới phải có ít nhất 6 ký tự';
+        } else if (backendError === 'current_password and new_password are required') {
+          errorMessage = 'Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới';
+        } else if (backendError) {
+          errorMessage = backendError;
+        }
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại';
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return { success: false, error: errorMessage };
     }
   }
