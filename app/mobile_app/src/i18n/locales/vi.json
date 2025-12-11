@@ -474,7 +474,9 @@
       "normal": "Bình thường",
       "high": "Cao",
       "veryHigh": "Rất cao"
-    }
+    },
+    "smokeSafe": "An toàn",
+    "smokeDetected": "Có khói"
   },
   "charts": {
     "title": "Biểu đồ cảm biến",

@@ -473,7 +473,9 @@
       "normal": "Normal",
       "high": "High",
       "veryHigh": "Very High"
-    }
+    },
+    "smokeSafe": "Safe",
+    "smokeDetected": "Smoke detected"
   },
   "charts": {
     "title": "Sensor Charts",
