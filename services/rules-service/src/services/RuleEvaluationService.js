@@ -706,7 +706,7 @@ class RuleEvaluationService {
     };
   }
 
-  async fetchMlSupport(deviceId, sensorData) {
+async fetchMlSupport(deviceId, sensorData) {
     if (!this.mlSupportEnabled) {
       return null;
     }
@@ -745,48 +745,34 @@ class RuleEvaluationService {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          let errorDetail = `ML service ${response.status}`;
-          try {
-            const errorBody = await response.text();
-            if (errorBody) {
-              errorDetail += `: ${errorBody}`;
-            }
-          } catch (e) {
-
-          }
-          throw new Error(errorDetail);
+          const errorText = await response.text().catch(() => '');
+          throw new Error(`ML service ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
+        
         sensorData.__mlSupportCache.result = {
           device: data.device,
-          predictions: data.predictions || {}
+          predictions: data.details || {}
         };
+        
         sensorData.__mlSupportCache.fetched = true;
         return sensorData.__mlSupportCache.result;
+
       } catch (error) {
-        clearTimeout(timeoutId);
-        lastError = error;
-        
-        if (attempt < maxRetries && (
-          error.message.includes('ECONNREFUSED') ||
-          error.message.includes('fetch failed') ||
-          error.name === 'AbortError'
-        )) {
-          continue;
-        }
-        
-        throw error;
+         clearTimeout(timeoutId);
+         lastError = error;
+         if (attempt < maxRetries && (error.name === 'AbortError' || error.message.includes('fetch failed'))) {
+             continue;
+         }
+         break;
       }
     }
     
-    if (lastError) {
-      if (lastError.name === 'AbortError') {
-        logger.warn(`ML support timeout for ${deviceId}`);
-      } else {
+    if (lastError && typeof logger !== 'undefined') {
         logger.warn(`ML support request failed for ${deviceId}: ${lastError.message}`);
-      }
     }
+
     sensorData.__mlSupportCache.result = null;
     sensorData.__mlSupportCache.fetched = true;
     return null;
@@ -816,51 +802,34 @@ class RuleEvaluationService {
       }
 
       const mlResult = await this.fetchMlSupport(deviceId, sensorData);
-      if (!mlResult || !mlResult.predictions) {
+      if (!mlResult || !mlResult.device) {
         return;
       }
 
-      const deviceScore = mlResult.device?.overall_score;
-      const deviceAlertLevel = mlResult.device?.alert_level;
-      
-      const shouldAlert = deviceScore >= this.mlSupportThreshold && 
-                         (deviceAlertLevel === 'high' || deviceAlertLevel === 'critical');
+      const deviceScore = mlResult.device.overall_score;
+      const deviceAlertLevel = mlResult.device.alert_level;
+      const isDanger = mlResult.device.is_danger;
+      const primarySensor = mlResult.device.primary_cause;
+
+      const shouldAlert = isDanger || 
+                         (deviceScore >= this.mlSupportThreshold && 
+                         (deviceAlertLevel === 'high' || deviceAlertLevel === 'critical'));
 
       if (!shouldAlert) {
         return;
       }
 
-      let maxScore = 0;
-      let maxSensor = null;
+      const maxSensor = primarySensor || 'unknown';
       let maxSensorValue = null;
-
-      for (const [sensor, prediction] of Object.entries(mlResult.predictions)) {
-        const score = prediction.prediction_score || 0;
-        if (score > maxScore) {
-          maxScore = score;
-          maxSensor = sensor;
-          
-          if (prediction.value !== undefined && prediction.value !== null) {
-            maxSensorValue = prediction.value;
-          } else {
-            switch (sensor) {
-              case 'temperature':
-                maxSensorValue = sensorData.temp;
-                break;
-              case 'humidity':
-                maxSensorValue = sensorData.humid;
-                break;
-              case 'gas_ppm':
-                maxSensorValue = sensorData.gas_ppm;
-                break;
-              case 'smoke':
-                maxSensorValue = sensorData.smoke;
-                break;
-              default:
-                maxSensorValue = null;
-            }
-          }
-        }
+      
+      if (mlResult.predictions && mlResult.predictions[maxSensor]) {
+          maxSensorValue = mlResult.predictions[maxSensor].value;
+      }
+      
+      if (maxSensorValue === null || maxSensorValue === undefined) {
+         const keyMap = { 'gas_ppm': 'gas_ppm', 'gas': 'gas_ppm', 'temperature': 'temp', 'humidity': 'humid', 'smoke': 'smoke' };
+         const dataKey = keyMap[maxSensor] || maxSensor;
+         maxSensorValue = sensorData[dataKey];
       }
 
       const ownerId = sensorData.ownerId;
@@ -868,14 +837,11 @@ class RuleEvaluationService {
         return;
       }
 
-      const isCritical = deviceAlertLevel === 'critical' || 
-                        ((maxSensor === 'gas' || maxSensor === 'gas_ppm') && maxSensorValue > 1000) ||
-                        (maxSensor === 'flame' && maxSensorValue) ||
-                        (maxSensor === 'smoke' && maxSensorValue > 1.5);
+      const isCritical = deviceAlertLevel === 'critical';
 
       const title = isCritical 
-        ? `🚨 CẢNH BÁO KHẨN CẤP: Phát hiện bất thường từ hệ thống nhận diện thông minh`
-        : `⚠️ Cảnh báo: Phát hiện bất thường từ hệ thống nhận diện thông minh`;
+        ? `🚨 CẢNH BÁO KHẨN CẤP: AI phát hiện nguy cơ cao!`
+        : `⚠️ Cảnh báo thông minh: Phát hiện bất thường`;
 
       const sensorNameMap = {
         'temperature': 'Nhiệt độ',
@@ -887,12 +853,14 @@ class RuleEvaluationService {
       };
 
       const sensorName = sensorNameMap[maxSensor] || maxSensor;
-      const message = `Hệ thống nhận diện thông minh đã phát hiện dữ liệu bất thường từ cảm biến ${sensorName}.\n\n` +
-                     `Giá trị: ${maxSensorValue !== null ? maxSensorValue : 'N/A'}\n` +
-                     `Độ tin cậy: ${(maxScore * 100).toFixed(1)}%\n` +
-                     `Mức độ: ${deviceAlertLevel === 'critical' ? 'Nghiêm trọng' : deviceAlertLevel === 'high' ? 'Cao' : 'Trung bình'}\n` +
-                     `Thời gian: ${new Date().toLocaleString('vi-VN')}\n\n` +
-                     `${isCritical ? '🚨 Cần kiểm tra ngay lập tức!' : '⚠️ Vui lòng kiểm tra thiết bị.'}`;
+      
+      const message = `Hệ thống AI đã phát hiện mẫu dữ liệu bất thường.\n` +
+                      `Nguyên nhân chính: Cảm biến ${sensorName}\n\n` +
+                      `Giá trị đo được: ${maxSensorValue !== null && maxSensorValue !== undefined ? maxSensorValue : 'N/A'}\n` +
+                      `Điểm bất thường: ${(deviceScore * 100).toFixed(1)}%\n` +
+                      `Mức độ cảnh báo: ${deviceAlertLevel === 'critical' ? 'RẤT NGUY HIỂM' : deviceAlertLevel === 'high' ? 'Cao' : 'Trung bình'}\n` +
+                      `Thời gian: ${new Date().toLocaleString('vi-VN')}\n\n` +
+                      `${isCritical ? '🚨 AI nhận định đây là sự cố nghiêm trọng. Kiểm tra ngay!' : '⚠️ Có dấu hiệu lạ, vui lòng để ý thiết bị.'}`;
 
       const alertMessage = {
         userId: ownerId,
@@ -904,16 +872,12 @@ class RuleEvaluationService {
         metadata: {
           deviceId: deviceId,
           deviceName: `Device ${deviceId}`,
-          source: 'ml_anomaly_detection',
+          source: 'ml_multivariate_isolation_forest',
           mlData: {
             overallScore: deviceScore,
             alertLevel: deviceAlertLevel,
-            predictions: mlResult.predictions,
-            primaryAnomaly: {
-              sensor: maxSensor,
-              value: maxSensorValue,
-              score: maxScore
-            }
+            primaryCause: maxSensor,
+            predictions: mlResult.predictions
           },
           sensorData: sensorData
         }
@@ -924,6 +888,7 @@ class RuleEvaluationService {
       this.lastMlAlertTime.set(deviceId, now);
       
     } catch (error) {
+       
     }
   }
 
