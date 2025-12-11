@@ -1,28 +1,20 @@
-// Configuration constants for Smart IoT Kitchen Mobile App
 import environment from '../config/environment';
 
 export const CONFIG = {
-  // API Configuration
-  API_BASE_URL: environment.getApiUrl(), // Dynamic API URL based on environment
-  
-  // Refresh intervals (in milliseconds)
-  AUTO_REFRESH_INTERVAL: 5000, // 5 seconds
-  
-  // API Endpoints - Updated for devices-service
+  API_BASE_URL: environment.getApiUrl(),
+  AUTO_REFRESH_INTERVAL: 5000,
   ENDPOINTS: {
-    DEVICES: '/api/devices',                    // GET all devices
-    DEVICE_STATUS: '/api/devices/:deviceId/status', // GET device status
-    DEVICE_DETAIL: '/api/devices/:deviceId',    // GET device by id (full info)
-    OUTLET_TOGGLE: '/api/devices/:deviceId/outlets/:outletId/toggle', // PUT toggle outlet
-    OUTLET_UPDATE: '/api/devices/:deviceId/outlets/:outletId', // PUT update outlet settings
-    BUZZER_TEST: '/api/devices/:deviceId/buzzer/test', // PUT test buzzer
-    BUZZER_ON: '/api/devices/:deviceId/buzzer/on', // PUT turn on buzzer
-    BUZZER_OFF: '/api/devices/:deviceId/buzzer/off', // PUT turn off buzzer
-    EMERGENCY_ENTER: '/api/devices/:deviceId/emergency/enter', // PUT enter emergency mode
-    EMERGENCY_EXIT: '/api/devices/:deviceId/emergency/exit',   // PUT exit emergency mode
+    DEVICES: '/api/devices',
+    DEVICE_STATUS: '/api/devices/:deviceId/status',
+    DEVICE_DETAIL: '/api/devices/:deviceId',
+    OUTLET_TOGGLE: '/api/devices/:deviceId/outlets/:outletId/toggle',
+    OUTLET_UPDATE: '/api/devices/:deviceId/outlets/:outletId',
+    BUZZER_TEST: '/api/devices/:deviceId/buzzer/test',
+    BUZZER_ON: '/api/devices/:deviceId/buzzer/on',
+    BUZZER_OFF: '/api/devices/:deviceId/buzzer/off',
+    EMERGENCY_ENTER: '/api/devices/:deviceId/emergency/enter',
+    EMERGENCY_EXIT: '/api/devices/:deviceId/emergency/exit',
   },
-  
-  // UI Configuration
   COLORS: {
     primary: '#2C3E50',
     secondary: '#3498DB',
@@ -35,23 +27,18 @@ export const CONFIG = {
     white: '#FFFFFF',
     gray: '#6C757D',
   },
-
-  // Theme colors will be provided by ThemeContext
-  // This is kept for backward compatibility
   THEME: {
-    primary: '#2563EB',      // blue-600
-    secondary: '#14B8A6',    // teal-500
-    success: '#22C55E',      // green-500
-    danger: '#EF4444',       // red-500
-    info: '#8B5CF6',         // violet-500
-    gray: '#94A3B8',         // slate-400
-    grayLight: '#CBD5E1',    // slate-300
-    surface: '#FFFFFF',      // white
-    background: '#F1F5F9',   // slate-100
-    border: '#E2E8F0',       // slate-200
+    primary: '#2563EB',
+    secondary: '#14B8A6',
+    success: '#22C55E',
+    danger: '#EF4444',
+    info: '#8B5CF6',
+    gray: '#94A3B8',
+    grayLight: '#CBD5E1',
+    surface: '#FFFFFF',
+    background: '#F1F5F9',
+    border: '#E2E8F0',
   },
-  
-  // Sensor thresholds
   THRESHOLDS: {
     temperature: {
       min: 0,
@@ -74,8 +61,6 @@ export const CONFIG = {
       warning: 2,
     },
   },
-  
-  // UI Dimensions
   DIMENSIONS: {
     borderRadius: 12,
     cardPadding: 15,

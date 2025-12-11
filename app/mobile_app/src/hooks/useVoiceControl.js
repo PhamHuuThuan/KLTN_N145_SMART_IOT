@@ -74,7 +74,6 @@ const useVoiceControl = () => {
     let location = null;
     let outletName = null;
     
-    // Extract action - check for multi-word actions first
     const actionPhrases = ['turn on', 'turn off'];
     for (const phrase of actionPhrases) {
       if (lowerTranscript.includes(phrase)) {
@@ -83,7 +82,6 @@ const useVoiceControl = () => {
       }
     }
     
-    // If no multi-word action found, check single words
     if (!action) {
       const words = lowerTranscript.split(/\s+/);
       for (const word of words) {
@@ -94,7 +92,6 @@ const useVoiceControl = () => {
       }
     }
     
-    // Extract target type
     const words = lowerTranscript.split(/\s+/);
     for (const word of words) {
       if (voiceCommands[word] === 'outlet' || voiceCommands[word] === 'device') {
@@ -103,7 +100,6 @@ const useVoiceControl = () => {
       }
     }
     
-    // Extract device/appliance name - check for multi-word devices first
     const devicePhrases = ['tủ lạnh', 'lò vi sóng', 'máy giặt', 'bình nóng lạnh', 'điều hòa'];
     for (const phrase of devicePhrases) {
       if (lowerTranscript.includes(phrase)) {
@@ -112,7 +108,6 @@ const useVoiceControl = () => {
       }
     }
     
-    // If no multi-word device found, check single words
     if (!location) {
       for (const word of words) {
         if (voiceCommands[word] === 'fan' || voiceCommands[word] === 'light' || 
@@ -126,7 +121,6 @@ const useVoiceControl = () => {
       }
     }
     
-    // Extract number
     for (const word of words) {
       if (voiceCommands[word] && !isNaN(voiceCommands[word])) {
         number = voiceCommands[word];
@@ -164,9 +158,7 @@ const useVoiceControl = () => {
     
     try {
       if (command.target === 'outlet') {
-        // For outlet control
         if (command.outletName) {
-          // Specific outlet by name (e.g., kitchen_1, bedroom_2)
           const result = await onOutletControl(command.action, command.outletName);
           const displayName = command.location && command.number 
             ? `${command.location} ${command.number}` 
@@ -183,7 +175,6 @@ const useVoiceControl = () => {
             outlet: result.outlet || null
           };
         } else if (command.number) {
-          // Specific outlet by number only
           const outletId = `o${command.number}`;
           const result = await onOutletControl(command.action, outletId);
           return {
@@ -197,7 +188,6 @@ const useVoiceControl = () => {
             outlet: result.outlet || null
           };
         } else {
-          // All outlets
           const result = await onOutletControl(command.action, 'all');
           return {
             success: result.success || result,

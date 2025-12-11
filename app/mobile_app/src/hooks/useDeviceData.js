@@ -14,12 +14,8 @@ export const useDeviceData = () => {
   const [error, setError] = useState(null);
   const [deviceDetail, setDeviceDetail] = useState(null);
   const socketRef = useRef(null);
-  
-  // Refs để giữ state mới nhất cho socket handlers
   const devicesListRef = useRef([]);
   const selectedDeviceRef = useRef(null);
-  
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -62,7 +58,6 @@ export const useDeviceData = () => {
     return date.toISOString();
   };
 
-  // Đồng bộ state vào refs để socket handlers có thể truy cập state mới nhất
   useEffect(() => {
     devicesListRef.current = devicesList;
   }, [devicesList]);
@@ -70,8 +65,6 @@ export const useDeviceData = () => {
   useEffect(() => {
     selectedDeviceRef.current = selectedDevice;
   }, [selectedDevice]);
-
-  // Fetch device status
   const fetchDeviceStatus = useCallback(async (deviceId) => {
     if (!deviceId) {
       setDeviceData(null);
@@ -79,9 +72,7 @@ export const useDeviceData = () => {
     }
 
     try {
-      log.debug('fetch status', deviceId);
       const response = await apiService.getDeviceStatus(deviceId);
-      log.debug('status received');
 
       const payload = response?.data || response || {};
       const device = payload?.data || payload;
@@ -137,7 +128,6 @@ export const useDeviceData = () => {
         .map(normalizeDeviceSummary)
         .filter(Boolean);
 
-      log.info('devices loaded', normalizedDevices.length, 'page:', page);
 
       if (page === 1) {
         setDevicesList(normalizedDevices);
@@ -164,7 +154,6 @@ export const useDeviceData = () => {
       if (page === 1 && normalizedDevices.length > 0) {
         const firstDevice = normalizedDevices[0]?.deviceId;
         if (firstDevice && (!selectedDevice || !normalizedDevices.some((d) => d.deviceId === selectedDevice))) {
-          log.info('auto-selected device', firstDevice);
           setSelectedDevice(firstDevice);
           await fetchDeviceStatus(firstDevice);
         }
@@ -177,7 +166,6 @@ export const useDeviceData = () => {
     }
   }, [selectedDevice, fetchDeviceStatus]);
 
-  // Fetch full device detail for UI (e.g., modal)
   const fetchDeviceDetail = useCallback(async (deviceId) => {
     if (!deviceId) return;
     try {
@@ -188,15 +176,12 @@ export const useDeviceData = () => {
     }
   }, []);
 
-  // Load more devices
   const loadMoreDevices = useCallback(async () => {
     if (loadingMore || !hasMore) {
-      log.debug('Skipping load more:', { loadingMore, hasMore });
       return;
     }
 
     const nextPage = currentPage + 1;
-    log.info(`Loading more devices - page ${nextPage}`);
 
     try {
       setLoadingMore(true);
@@ -208,7 +193,6 @@ export const useDeviceData = () => {
     }
   }, [loadingMore, hasMore, currentPage, fetchDevices]);
 
-  // Select device
   const selectDevice = useCallback(async (deviceId) => {
     setSelectedDevice(deviceId);
     if (!deviceId) {
@@ -220,7 +204,6 @@ export const useDeviceData = () => {
     await fetchDeviceStatus(deviceId);
   }, [fetchDeviceStatus]);
 
-  // Initial load and socket subscription for real-time updates
   useEffect(() => {
     fetchDevices();
 
@@ -237,22 +220,17 @@ export const useDeviceData = () => {
 
     socketRef.current = socket;
 
-    socket.on('connect', () => {
-      log.info('socket connected via gateway');
-    });
+    socket.on('connect', () => {});
 
     socket.on('device.telemetry', ({ deviceId, payload }) => {
       try {
         if (!payload) return;
 
-        // CHECK QUAN TRỌNG: Thiết bị có còn trong danh sách không?
         const currentList = devicesListRef.current;
         const currentSelected = selectedDeviceRef.current;
         const deviceExists = currentList.some(d => d.deviceId === deviceId);
         
-        // Nếu thiết bị không còn trong list (đã bị remove), bỏ qua
         if (!deviceExists) {
-          log.debug('Ignored telemetry for removed device:', deviceId);
           return;
         }
 
@@ -276,7 +254,6 @@ export const useDeviceData = () => {
           ts: payload.ts ?? Date.now(),
         };
 
-        // Update List (An toàn vì đã check deviceExists)
         setDevicesList((prev) => {
           if (!Array.isArray(prev) || !prev.length) return prev;
           return prev.map((item) => (item.deviceId === (deviceId || item.deviceId)
@@ -289,7 +266,6 @@ export const useDeviceData = () => {
             : item));
         });
 
-        // CHỈ update nếu deviceId trùng khớp với thiết bị ĐANG ĐƯỢC CHỌN
         if (currentSelected === deviceId) {
           setDeviceData((prev) => ({
             ...(prev || {}),
@@ -309,13 +285,10 @@ export const useDeviceData = () => {
     });
 
     socket.on('device.outlet', ({ deviceId: dId, outletId, status }) => {
-      // CHECK: Thiết bị có còn trong danh sách không?
       const currentList = devicesListRef.current;
       const isExist = currentList.some(d => d.deviceId === dId);
       
-      // Nếu thiết bị không còn trong list (đã bị remove), bỏ qua
       if (!isExist) {
-        log.debug('Ignored outlet update for removed device:', dId);
         return;
       }
 
@@ -332,7 +305,6 @@ export const useDeviceData = () => {
           : item));
       });
 
-      // Chỉ update detail nếu đang chọn đúng thiết bị đó
       const currentSelected = selectedDeviceRef.current;
       if (currentSelected === dId) {
         setDeviceData((prev) => {
@@ -352,7 +324,6 @@ export const useDeviceData = () => {
     });
 
     socket.on('ack', () => {
-      // Optional: could set lastUpdate timestamp to indicate activity
       const nowIso = new Date().toISOString();
       setDeviceData((prev) => (prev ? {
         ...prev,
@@ -375,21 +346,17 @@ export const useDeviceData = () => {
 
     socket.on('device.status', ({ deviceId, status, isOnline, lastSeenAt }) => {
       try {
-        // CHECK: Thiết bị có còn trong danh sách không?
         const currentList = devicesListRef.current;
         const currentSelected = selectedDeviceRef.current;
         const deviceExists = currentList.some(d => d.deviceId === deviceId);
         
-        // Nếu thiết bị không còn trong list (đã bị remove), bỏ qua
         if (!deviceExists) {
-          log.debug('Ignored status update for removed device:', deviceId);
           return;
         }
 
         const statusValue = status === 'online' ? 'online' : 'offline';
         const deviceIsOnline = isOnline === true || status === 'online';
 
-        // Update devicesList
         setDevicesList((prev) => {
           if (!Array.isArray(prev) || !prev.length) return prev;
           return prev.map((item) => (item.deviceId === deviceId
@@ -402,7 +369,6 @@ export const useDeviceData = () => {
             : item));
         });
 
-        // CHỈ update deviceData nếu device đang được chọn
         if (currentSelected === deviceId) {
           setDeviceData((prev) => (prev ? {
             ...prev,
@@ -416,9 +382,7 @@ export const useDeviceData = () => {
       }
     });
 
-    socket.on('disconnect', () => {
-      log.warn('socket disconnected');
-    });
+    socket.on('disconnect', () => {});
 
     return () => {
       try {
@@ -427,18 +391,14 @@ export const useDeviceData = () => {
       } catch {}
         socketRef.current = null;
     };
-  }, [fetchDevices]); // Bỏ selectedDevice ra khỏi dependency array để tránh socket reconnect liên tục
-
-  // Remove device from list (when device ownership is removed)
+  }, [fetchDevices]);
   const removeDevice = useCallback((deviceId, newSelectedDevice = null) => {
     setDevicesList(prev => (Array.isArray(prev) ? prev.filter(device => device.deviceId !== deviceId) : prev));
     if (selectedDevice === deviceId) {
       if (newSelectedDevice) {
-        // Auto-select the new device
         setSelectedDevice(newSelectedDevice);
         fetchDeviceStatus(newSelectedDevice);
       } else {
-        // No devices left, clear selection
         setSelectedDevice(null);
         setDeviceData(null);
         setDeviceDetail(null);
@@ -455,12 +415,10 @@ export const useDeviceData = () => {
     selectedDevice,
     loading,
     error,
-    // Pagination state
     currentPage,
     hasMore,
     loadingMore,
     totalPages,
-    // Functions
     fetchDevices,
     loadMoreDevices,
     selectDevice,
