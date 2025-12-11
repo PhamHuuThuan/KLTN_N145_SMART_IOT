@@ -15,6 +15,10 @@ export const useDeviceData = () => {
   const [deviceDetail, setDeviceDetail] = useState(null);
   const socketRef = useRef(null);
   
+  // Refs để giữ state mới nhất cho socket handlers
+  const devicesListRef = useRef([]);
+  const selectedDeviceRef = useRef(null);
+  
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -57,6 +61,15 @@ export const useDeviceData = () => {
     }
     return date.toISOString();
   };
+
+  // Đồng bộ state vào refs để socket handlers có thể truy cập state mới nhất
+  useEffect(() => {
+    devicesListRef.current = devicesList;
+  }, [devicesList]);
+
+  useEffect(() => {
+    selectedDeviceRef.current = selectedDevice;
+  }, [selectedDevice]);
 
   // Fetch device status
   const fetchDeviceStatus = useCallback(async (deviceId) => {
@@ -232,6 +245,17 @@ export const useDeviceData = () => {
       try {
         if (!payload) return;
 
+        // CHECK QUAN TRỌNG: Thiết bị có còn trong danh sách không?
+        const currentList = devicesListRef.current;
+        const currentSelected = selectedDeviceRef.current;
+        const deviceExists = currentList.some(d => d.deviceId === deviceId);
+        
+        // Nếu thiết bị không còn trong list (đã bị remove), bỏ qua
+        if (!deviceExists) {
+          log.debug('Ignored telemetry for removed device:', deviceId);
+          return;
+        }
+
         const nowIso = new Date().toISOString();
         const payloadTsIso = toIso(payload.ts) || nowIso;
 
@@ -252,6 +276,7 @@ export const useDeviceData = () => {
           ts: payload.ts ?? Date.now(),
         };
 
+        // Update List (An toàn vì đã check deviceExists)
         setDevicesList((prev) => {
           if (!Array.isArray(prev) || !prev.length) return prev;
           return prev.map((item) => (item.deviceId === (deviceId || item.deviceId)
@@ -264,7 +289,8 @@ export const useDeviceData = () => {
             : item));
         });
 
-        if (!selectedDevice || deviceId === selectedDevice) {
+        // CHỈ update nếu deviceId trùng khớp với thiết bị ĐANG ĐƯỢC CHỌN
+        if (currentSelected === deviceId) {
           setDeviceData((prev) => ({
             ...(prev || {}),
             deviceId: deviceId || prev?.deviceId,
@@ -283,6 +309,16 @@ export const useDeviceData = () => {
     });
 
     socket.on('device.outlet', ({ deviceId: dId, outletId, status }) => {
+      // CHECK: Thiết bị có còn trong danh sách không?
+      const currentList = devicesListRef.current;
+      const isExist = currentList.some(d => d.deviceId === dId);
+      
+      // Nếu thiết bị không còn trong list (đã bị remove), bỏ qua
+      if (!isExist) {
+        log.debug('Ignored outlet update for removed device:', dId);
+        return;
+      }
+
       const nowIso = new Date().toISOString();
       setDevicesList((prev) => {
         if (!Array.isArray(prev) || !prev.length) return prev;
@@ -296,20 +332,23 @@ export const useDeviceData = () => {
           : item));
       });
 
-      if (selectedDevice && dId !== selectedDevice) return;
-      setDeviceData((prev) => {
-        if (!prev) return prev;
-        const o = { ...(prev.latestTelemetry?.o || {}) };
-        if (outletId) o[outletId] = status;
-        return {
-          ...prev,
-          latestTelemetry: { ...(prev.latestTelemetry || {}), o },
-          lastUpdate: nowIso,
-          lastSeenAt: nowIso,
-          status: 'online',
-          isOnline: true,
-        };
-      });
+      // Chỉ update detail nếu đang chọn đúng thiết bị đó
+      const currentSelected = selectedDeviceRef.current;
+      if (currentSelected === dId) {
+        setDeviceData((prev) => {
+          if (!prev) return prev;
+          const o = { ...(prev.latestTelemetry?.o || {}) };
+          if (outletId) o[outletId] = status;
+          return {
+            ...prev,
+            latestTelemetry: { ...(prev.latestTelemetry || {}), o },
+            lastUpdate: nowIso,
+            lastSeenAt: nowIso,
+            status: 'online',
+            isOnline: true,
+          };
+        });
+      }
     });
 
     socket.on('ack', () => {
@@ -343,9 +382,9 @@ export const useDeviceData = () => {
         socket.removeAllListeners();
         socket.disconnect();
       } catch {}
-      socketRef.current = null;
+        socketRef.current = null;
     };
-  }, [fetchDevices, selectedDevice]);
+  }, [fetchDevices]); // Bỏ selectedDevice ra khỏi dependency array để tránh socket reconnect liên tục
 
   // Remove device from list (when device ownership is removed)
   const removeDevice = useCallback((deviceId, newSelectedDevice = null) => {
