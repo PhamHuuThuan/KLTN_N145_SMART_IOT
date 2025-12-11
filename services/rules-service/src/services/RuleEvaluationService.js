@@ -402,11 +402,9 @@ class RuleEvaluationService {
         promoted: mlPromoted,
         thresholdMet,
       });
-      logger.info(`ML support promoted condition for ${sensorData.deviceId}:${sensor} (score=${supportScore}) and promoted=${mlPromoted}`);
 
       return thresholdMet || mlPromoted;
     } catch (error) {
-      logger.warn(`ML support check failed: ${error.message}`);
       return thresholdMet;
     }
   }
@@ -867,7 +865,6 @@ class RuleEvaluationService {
 
       const ownerId = sensorData.ownerId;
       if (!ownerId) {
-        logger.warn(`ML anomaly detected for ${deviceId} but no ownerId available, skipping alert`);
         return;
       }
 
@@ -927,7 +924,6 @@ class RuleEvaluationService {
       this.lastMlAlertTime.set(deviceId, now);
       
     } catch (error) {
-      logger.warn(`ML anomaly evaluation failed for ${deviceId}: ${error.message}`);
     }
   }
 
