@@ -81,11 +81,6 @@ deviceSchema.index({ ownerId: 1 });
 deviceSchema.index({ status: 1 });
 deviceSchema.index({ lastSeenAt: 1 });
 
-deviceSchema.methods.isOnline = function() {
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-  return this.lastSeenAt > fiveMinutesAgo;
-};
-
 deviceSchema.methods.toggleOutlet = function(outletId, status) {
   const outlet = this.outlets.find(o => o.id === outletId);
   if (outlet) {

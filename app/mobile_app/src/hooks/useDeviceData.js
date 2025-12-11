@@ -14,8 +14,8 @@ export const useDeviceData = () => {
   const [error, setError] = useState(null);
   const [deviceDetail, setDeviceDetail] = useState(null);
   const socketRef = useRef(null);
-  
-  // Pagination state
+  const devicesListRef = useRef([]);
+  const selectedDeviceRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -58,7 +58,13 @@ export const useDeviceData = () => {
     return date.toISOString();
   };
 
-  // Fetch device status
+  useEffect(() => {
+    devicesListRef.current = devicesList;
+  }, [devicesList]);
+
+  useEffect(() => {
+    selectedDeviceRef.current = selectedDevice;
+  }, [selectedDevice]);
   const fetchDeviceStatus = useCallback(async (deviceId) => {
     if (!deviceId) {
       setDeviceData(null);
@@ -66,9 +72,7 @@ export const useDeviceData = () => {
     }
 
     try {
-      log.debug('fetch status', deviceId);
       const response = await apiService.getDeviceStatus(deviceId);
-      log.debug('status received');
 
       const payload = response?.data || response || {};
       const device = payload?.data || payload;
@@ -124,7 +128,6 @@ export const useDeviceData = () => {
         .map(normalizeDeviceSummary)
         .filter(Boolean);
 
-      log.info('devices loaded', normalizedDevices.length, 'page:', page);
 
       if (page === 1) {
         setDevicesList(normalizedDevices);
@@ -151,7 +154,6 @@ export const useDeviceData = () => {
       if (page === 1 && normalizedDevices.length > 0) {
         const firstDevice = normalizedDevices[0]?.deviceId;
         if (firstDevice && (!selectedDevice || !normalizedDevices.some((d) => d.deviceId === selectedDevice))) {
-          log.info('auto-selected device', firstDevice);
           setSelectedDevice(firstDevice);
           await fetchDeviceStatus(firstDevice);
         }
@@ -164,7 +166,6 @@ export const useDeviceData = () => {
     }
   }, [selectedDevice, fetchDeviceStatus]);
 
-  // Fetch full device detail for UI (e.g., modal)
   const fetchDeviceDetail = useCallback(async (deviceId) => {
     if (!deviceId) return;
     try {
@@ -175,15 +176,12 @@ export const useDeviceData = () => {
     }
   }, []);
 
-  // Load more devices
   const loadMoreDevices = useCallback(async () => {
     if (loadingMore || !hasMore) {
-      log.debug('Skipping load more:', { loadingMore, hasMore });
       return;
     }
 
     const nextPage = currentPage + 1;
-    log.info(`Loading more devices - page ${nextPage}`);
 
     try {
       setLoadingMore(true);
@@ -195,7 +193,6 @@ export const useDeviceData = () => {
     }
   }, [loadingMore, hasMore, currentPage, fetchDevices]);
 
-  // Select device
   const selectDevice = useCallback(async (deviceId) => {
     setSelectedDevice(deviceId);
     if (!deviceId) {
@@ -207,7 +204,6 @@ export const useDeviceData = () => {
     await fetchDeviceStatus(deviceId);
   }, [fetchDeviceStatus]);
 
-  // Initial load and socket subscription for real-time updates
   useEffect(() => {
     fetchDevices();
 
@@ -224,13 +220,19 @@ export const useDeviceData = () => {
 
     socketRef.current = socket;
 
-    socket.on('connect', () => {
-      log.info('socket connected via gateway');
-    });
+    socket.on('connect', () => {});
 
     socket.on('device.telemetry', ({ deviceId, payload }) => {
       try {
         if (!payload) return;
+
+        const currentList = devicesListRef.current;
+        const currentSelected = selectedDeviceRef.current;
+        const deviceExists = currentList.some(d => d.deviceId === deviceId);
+        
+        if (!deviceExists) {
+          return;
+        }
 
         const nowIso = new Date().toISOString();
         const payloadTsIso = toIso(payload.ts) || nowIso;
@@ -264,7 +266,7 @@ export const useDeviceData = () => {
             : item));
         });
 
-        if (!selectedDevice || deviceId === selectedDevice) {
+        if (currentSelected === deviceId) {
           setDeviceData((prev) => ({
             ...(prev || {}),
             deviceId: deviceId || prev?.deviceId,
@@ -283,6 +285,13 @@ export const useDeviceData = () => {
     });
 
     socket.on('device.outlet', ({ deviceId: dId, outletId, status }) => {
+      const currentList = devicesListRef.current;
+      const isExist = currentList.some(d => d.deviceId === dId);
+      
+      if (!isExist) {
+        return;
+      }
+
       const nowIso = new Date().toISOString();
       setDevicesList((prev) => {
         if (!Array.isArray(prev) || !prev.length) return prev;
@@ -296,24 +305,25 @@ export const useDeviceData = () => {
           : item));
       });
 
-      if (selectedDevice && dId !== selectedDevice) return;
-      setDeviceData((prev) => {
-        if (!prev) return prev;
-        const o = { ...(prev.latestTelemetry?.o || {}) };
-        if (outletId) o[outletId] = status;
-        return {
-          ...prev,
-          latestTelemetry: { ...(prev.latestTelemetry || {}), o },
-          lastUpdate: nowIso,
-          lastSeenAt: nowIso,
-          status: 'online',
-          isOnline: true,
-        };
-      });
+      const currentSelected = selectedDeviceRef.current;
+      if (currentSelected === dId) {
+        setDeviceData((prev) => {
+          if (!prev) return prev;
+          const o = { ...(prev.latestTelemetry?.o || {}) };
+          if (outletId) o[outletId] = status;
+          return {
+            ...prev,
+            latestTelemetry: { ...(prev.latestTelemetry || {}), o },
+            lastUpdate: nowIso,
+            lastSeenAt: nowIso,
+            status: 'online',
+            isOnline: true,
+          };
+        });
+      }
     });
 
     socket.on('ack', () => {
-      // Optional: could set lastUpdate timestamp to indicate activity
       const nowIso = new Date().toISOString();
       setDeviceData((prev) => (prev ? {
         ...prev,
@@ -334,29 +344,61 @@ export const useDeviceData = () => {
       });
     });
 
-    socket.on('disconnect', () => {
-      log.warn('socket disconnected');
+    socket.on('device.status', ({ deviceId, status, isOnline, lastSeenAt }) => {
+      try {
+        const currentList = devicesListRef.current;
+        const currentSelected = selectedDeviceRef.current;
+        const deviceExists = currentList.some(d => d.deviceId === deviceId);
+        
+        if (!deviceExists) {
+          return;
+        }
+
+        const statusValue = status === 'online' ? 'online' : 'offline';
+        const deviceIsOnline = isOnline === true || status === 'online';
+
+        setDevicesList((prev) => {
+          if (!Array.isArray(prev) || !prev.length) return prev;
+          return prev.map((item) => (item.deviceId === deviceId
+            ? {
+                ...item,
+                status: statusValue,
+                isOnline: deviceIsOnline,
+                ...(lastSeenAt && { lastSeenAt }),
+              }
+            : item));
+        });
+
+        if (currentSelected === deviceId) {
+          setDeviceData((prev) => (prev ? {
+            ...prev,
+            status: statusValue,
+            isOnline: deviceIsOnline,
+            ...(lastSeenAt && { lastSeenAt }),
+          } : prev));
+        }
+      } catch (e) {
+        log.error('device.status handler error', e?.message || e);
+      }
     });
+
+    socket.on('disconnect', () => {});
 
     return () => {
       try {
         socket.removeAllListeners();
         socket.disconnect();
       } catch {}
-      socketRef.current = null;
+        socketRef.current = null;
     };
-  }, [fetchDevices, selectedDevice]);
-
-  // Remove device from list (when device ownership is removed)
+  }, [fetchDevices]);
   const removeDevice = useCallback((deviceId, newSelectedDevice = null) => {
     setDevicesList(prev => (Array.isArray(prev) ? prev.filter(device => device.deviceId !== deviceId) : prev));
     if (selectedDevice === deviceId) {
       if (newSelectedDevice) {
-        // Auto-select the new device
         setSelectedDevice(newSelectedDevice);
         fetchDeviceStatus(newSelectedDevice);
       } else {
-        // No devices left, clear selection
         setSelectedDevice(null);
         setDeviceData(null);
         setDeviceDetail(null);
@@ -373,12 +415,10 @@ export const useDeviceData = () => {
     selectedDevice,
     loading,
     error,
-    // Pagination state
     currentPage,
     hasMore,
     loadingMore,
     totalPages,
-    // Functions
     fetchDevices,
     loadMoreDevices,
     selectDevice,

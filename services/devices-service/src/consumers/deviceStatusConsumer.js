@@ -59,13 +59,6 @@ async function startDeviceStatusConsumer() {
           }
         } catch (error) {
           logger.error('Error processing device status message:', error);
-          logger.error('Error details:', {
-            message: error.message,
-            stack: error.stack,
-            topic,
-            partition,
-            messageValue: message.value.toString()
-          });
           
           try {
             await consumer.commitOffsets([{
@@ -104,11 +97,6 @@ async function handleDeviceStatusUpdate(data) {
     }
   } catch (error) {
     logger.error('Error handling device status update:', error);
-    logger.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      data
-    });
   }
 }
 
@@ -132,11 +120,6 @@ async function handleOutletToggle(data) {
     }
   } catch (error) {
     logger.error('Error handling outlet toggle:', error);
-    logger.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      data
-    });
   }
 }
 
