@@ -7,7 +7,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempEmergency.name',
       description: 'rules.templates.tempEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',
@@ -30,19 +30,26 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempHigh.name',
       description: 'rules.templates.tempHigh.description',
       priority: 'high',
-      cooldownPeriod: 300000, // 5 phút
+      cooldownPeriod: 60000, // 1 phút
       conditions: [
         {
           type: 'sensor',
           sensor: 'temperature',
-          operator: '>',
-          value: 31,
+          operator: '>=',
+          value: 35,
+          unit: '°C'
+        },
+        {
+          type: 'sensor',
+          sensor: 'temperature',
+          operator: '<=',
+          value: 40,
           unit: '°C'
         }
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.tempHigh.message'
         }
       ]
@@ -53,19 +60,19 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempLow.name',
       description: 'rules.templates.tempLow.description',
       priority: 'low',
-      cooldownPeriod: 900000, // 15 phút
+      cooldownPeriod: 180000, // 3 phút
       conditions: [
         {
           type: 'sensor',
           sensor: 'temperature',
           operator: '<',
-          value: 15,
+          value: 25,
           unit: '°C'
         }
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.tempLow.message'
         }
       ]
@@ -77,13 +84,13 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityEmergency.name',
       description: 'rules.templates.humidityEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',
           sensor: 'humidity',
           operator: '>',
-          value: 80,
+          value: 70,
           unit: '%'
         }
       ],
@@ -100,19 +107,26 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityHigh.name',
       description: 'rules.templates.humidityHigh.description',
       priority: 'high',
-      cooldownPeriod: 300000, // 5 phút
+      cooldownPeriod: 60000, // 1 phút
       conditions: [
         {
           type: 'sensor',
           sensor: 'humidity',
-          operator: '>',
-          value: 61,
+          operator: '>=',
+          value: 55,
+          unit: '%'
+        },
+        {
+          type: 'sensor',
+          sensor: 'humidity',
+          operator: '<=',
+          value: 70,
           unit: '%'
         }
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.humidityHigh.message'
         }
       ]
@@ -123,7 +137,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityLow.name',
       description: 'rules.templates.humidityLow.description',
       priority: 'low',
-      cooldownPeriod: 900000, // 15 phút
+      cooldownPeriod: 180000, // 3 phút
       conditions: [
         {
           type: 'sensor',
@@ -135,7 +149,7 @@ export const RULE_TEMPLATES = {
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.humidityLow.message'
         }
       ]
@@ -147,7 +161,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.gasEmergency.name',
       description: 'rules.templates.gasEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',
@@ -170,43 +184,27 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.gasHigh.name',
       description: 'rules.templates.gasHigh.description',
       priority: 'high',
-      cooldownPeriod: 300000, // 5 phút
+      cooldownPeriod: 60000, // 1 phút
       conditions: [
         {
           type: 'sensor',
           sensor: 'gas_ppm',
-          operator: '>',
-          value: 401,
+          operator: '>=',
+          value: 701,
+          unit: 'ppm'
+        },
+        {
+          type: 'sensor',
+          sensor: 'gas_ppm',
+          operator: '<=',
+          value: 1000,
           unit: 'ppm'
         }
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.gasHigh.message'
-        }
-      ]
-    },
-    
-    // 🟢 MEDIUM - Trung bình
-    gas_medium: {
-      name: 'rules.templates.gasMedium.name',
-      description: 'rules.templates.gasMedium.description',
-      priority: 'medium',
-      cooldownPeriod: 600000, // 10 phút
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'gas_ppm',
-          operator: '>',
-          value: 200,
-          unit: 'ppm'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_alert',
-          message: 'rules.templates.gasMedium.message'
         }
       ]
     },
@@ -217,14 +215,14 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.smokeEmergency.name',
       description: 'rules.templates.smokeEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',
           sensor: 'smoke',
-          operator: '>',
-          value: 700,
-          unit: 'ppm'
+          operator: '==',
+          value: 1,
+          unit: ''
         }
       ],
       actions: [
@@ -235,58 +233,12 @@ export const RULE_TEMPLATES = {
       ]
     },
     
-    // 🟠 HIGH - Cao
-    smoke_high: {
-      name: 'rules.templates.smokeHigh.name',
-      description: 'rules.templates.smokeHigh.description',
-      priority: 'high',
-      cooldownPeriod: 300000, // 5 phút
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '>',
-          value: 301,
-          unit: 'ppm'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_alert',
-          message: 'rules.templates.smokeHigh.message'
-        }
-      ]
-    },
-    
-    // 🟢 MEDIUM - Trung bình
-    smoke_medium: {
-      name: 'rules.templates.smokeMedium.name',
-      description: 'rules.templates.smokeMedium.description',
-      priority: 'medium',
-      cooldownPeriod: 600000, // 10 phút
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '>',
-          value: 100,
-          unit: 'ppm'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_alert',
-          message: 'rules.templates.smokeMedium.message'
-        }
-      ]
-    },
-    
     // 🔥 FLAME - LỬA
     flame_detected: {
       name: 'rules.templates.flameDetected.name',
       description: 'rules.templates.flameDetected.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',
@@ -310,7 +262,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempEmergency.name',
       description: 'rules.templates.tempEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',
@@ -332,19 +284,26 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempHigh.name',
       description: 'rules.templates.tempHigh.description',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000, // 1 minute
       conditions: [
         {
           type: 'sensor',
           sensor: 'temperature',
-          operator: '>',
-          value: 31,
+          operator: '>=',
+          value: 35,
+          unit: '°C'
+        },
+        {
+          type: 'sensor',
+          sensor: 'temperature',
+          operator: '<=',
+          value: 40,
           unit: '°C'
         }
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.tempHigh.message'
         }
       ]
@@ -354,19 +313,19 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.tempLow.name',
       description: 'rules.templates.tempLow.description',
       priority: 'low',
-      cooldownPeriod: 900000,
+      cooldownPeriod: 180000, // 3 minutes
       conditions: [
         {
           type: 'sensor',
           sensor: 'temperature',
           operator: '<',
-          value: 15,
+          value: 25,
           unit: '°C'
         }
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.tempLow.message'
         }
       ]
@@ -377,13 +336,13 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityEmergency.name',
       description: 'rules.templates.humidityEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',
           sensor: 'humidity',
           operator: '>',
-          value: 80,
+          value: 70,
           unit: '%'
         }
       ],
@@ -399,19 +358,26 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityHigh.name',
       description: 'rules.templates.humidityHigh.description',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000, // 1 minute
       conditions: [
         {
           type: 'sensor',
           sensor: 'humidity',
-          operator: '>',
-          value: 61,
+          operator: '>=',
+          value: 55,
+          unit: '%'
+        },
+        {
+          type: 'sensor',
+          sensor: 'humidity',
+          operator: '<=',
+          value: 70,
           unit: '%'
         }
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.humidityHigh.message'
         }
       ]
@@ -421,7 +387,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.humidityLow.name',
       description: 'rules.templates.humidityLow.description',
       priority: 'low',
-      cooldownPeriod: 900000,
+      cooldownPeriod: 180000, // 3 minutes
       conditions: [
         {
           type: 'sensor',
@@ -433,7 +399,7 @@ export const RULE_TEMPLATES = {
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.humidityLow.message'
         }
       ]
@@ -444,7 +410,7 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.gasEmergency.name',
       description: 'rules.templates.gasEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',
@@ -466,42 +432,27 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.gasHigh.name',
       description: 'rules.templates.gasHigh.description',
       priority: 'high',
-      cooldownPeriod: 300000,
+      cooldownPeriod: 60000, // 1 minute
       conditions: [
         {
           type: 'sensor',
           sensor: 'gas_ppm',
-          operator: '>',
-          value: 401,
+          operator: '>=',
+          value: 701,
+          unit: 'ppm'
+        },
+        {
+          type: 'sensor',
+          sensor: 'gas_ppm',
+          operator: '<=',
+          value: 1000,
           unit: 'ppm'
         }
       ],
       actions: [
         {
-          type: 'send_alert',
+          type: 'send_notification',
           message: 'rules.templates.gasHigh.message'
-        }
-      ]
-    },
-    
-    gas_medium: {
-      name: 'rules.templates.gasMedium.name',
-      description: 'rules.templates.gasMedium.description',
-      priority: 'medium',
-      cooldownPeriod: 600000,
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'gas_ppm',
-          operator: '>',
-          value: 200,
-          unit: 'ppm'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_alert',
-          message: 'rules.templates.gasMedium.message'
         }
       ]
     },
@@ -511,14 +462,14 @@ export const RULE_TEMPLATES = {
       name: 'rules.templates.smokeEmergency.name',
       description: 'rules.templates.smokeEmergency.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',
           sensor: 'smoke',
-          operator: '>',
-          value: 700,
-          unit: 'ppm'
+          operator: '==',
+          value: 1,
+          unit: ''
         }
       ],
       actions: [
@@ -529,55 +480,11 @@ export const RULE_TEMPLATES = {
       ]
     },
     
-    smoke_high: {
-      name: 'rules.templates.smokeHigh.name',
-      description: 'rules.templates.smokeHigh.description',
-      priority: 'high',
-      cooldownPeriod: 300000,
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '>',
-          value: 301,
-          unit: 'ppm'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_alert',
-          message: 'rules.templates.smokeHigh.message'
-        }
-      ]
-    },
-    
-    smoke_medium: {
-      name: 'rules.templates.smokeMedium.name',
-      description: 'rules.templates.smokeMedium.description',
-      priority: 'medium',
-      cooldownPeriod: 600000,
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '>',
-          value: 100,
-          unit: 'ppm'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_alert',
-          message: 'rules.templates.smokeMedium.message'
-        }
-      ]
-    },
-    
     flame_detected: {
       name: 'rules.templates.flameDetected.name',
       description: 'rules.templates.flameDetected.description',
       priority: 'urgent',
-      cooldownPeriod: 30000, // 30 giây
+      cooldownPeriod: 0, // Không có thời gian chờ cho chế độ khẩn cấp
       conditions: [
         {
           type: 'sensor',

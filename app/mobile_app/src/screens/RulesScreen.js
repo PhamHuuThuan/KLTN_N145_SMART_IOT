@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../contexts/ThemeContext';
 import DeviceSelector from '../components/DeviceSelector';
 import RuleCard from '../components/RuleCard';
 import TemplateCard from '../components/RuleTemplateCard';
 import RuleDetailModal from '../components/RuleDetailModal';
 import CustomizeModal from '../components/RuleCustomizeModal';
+import ActionFeedback from '../components/ActionFeedback';
 import { useRulesData } from '../hooks/useRulesData';
 import { useRuleActions } from '../hooks/useRuleActions';
-import CONFIG from '../constants/config';
 
 const RulesScreen = () => {
   const { t } = useTranslation();
+  const { colors } = useTheme();
   const templatesListRef = useRef(null);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
@@ -34,6 +36,8 @@ const RulesScreen = () => {
     isActive: true,
     cooldownPeriod: 300000,
   });
+  const [feedback, setFeedback] = useState({ visible: false, type: 'error', message: '' });
+  const [templatesModalFeedback, setTemplatesModalFeedback] = useState({ visible: false, type: 'error', message: '' });
   const { rules, templates, devices, loading, refreshing, loadRules, onRefresh } = useRulesData();
   const { creatingRule, creatingTemplateId, toggleRuleStatus, deleteRule, createRuleFromTemplate, updateRule } = useRuleActions(loadRules);
 
@@ -87,6 +91,16 @@ const RulesScreen = () => {
     setCustomizeVisible(true);
   };
 
+  const isDuplicateRule = (template, deviceId, overrides = {}) => {
+    const targetName = overrides.name || t(template.name) || template.name;
+    return rules.some(
+      (rule) =>
+        rule.deviceId === deviceId &&
+        rule.name === targetName &&
+        !rule.deletedAt
+    );
+  };
+
   const handleCreateRuleFromTemplate = async (template, overrides = {}) => {
     // Ensure we pass device ID string, not device object
     const deviceId = typeof selectedDevice === 'string' ? selectedDevice : selectedDevice?.deviceId || selectedDevice?._id;
@@ -94,12 +108,20 @@ const RulesScreen = () => {
     if (!deviceId) {
       return;
     }
+
+    if (isDuplicateRule(template, deviceId, overrides)) {
+      setCustomizeVisible(false);
+      setShowTemplatesModal(true);
+      setTemplatesModalFeedback({ visible: true, type: 'error', message: t('rules.duplicateRuleForDevice') });
+      return false;
+    }
     
     const success = await createRuleFromTemplate(template, deviceId, overrides);
     if (success) {
       setShowTemplatesModal(false);
       setCustomizeVisible(false);
     }
+    return success;
   };
 
   const openRuleDetail = (rule) => {
@@ -153,16 +175,17 @@ const RulesScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>{t('rules.loading')}</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('rules.loading')}</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('rules.rulesManagement')}</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.primary }]}>{t('rules.rulesManagement')}</Text>
       </View>
 
       {/* Device selector for scoping rules to a device */}
@@ -186,7 +209,7 @@ const RulesScreen = () => {
       {/* Add Rule Button */}
       <View style={styles.addRuleContainer}>
         <TouchableOpacity
-          style={styles.actionButton}
+          style={[styles.actionButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
           onPress={() => {
             setShowTemplatesModal(true);
             // Reset scroll position when opening templates modal
@@ -197,16 +220,16 @@ const RulesScreen = () => {
             }, 200);
           }}
         >
-          <MaterialIcons name="add" size={18} color={CONFIG.THEME.surface} />
-          <Text style={styles.actionButtonText}>{t('rules.addRule')}</Text>
+          <MaterialIcons name="add" size={18} color={colors.surface} />
+          <Text style={[styles.actionButtonText, { color: colors.surface }]}>{t('rules.addRule')}</Text>
         </TouchableOpacity>
       </View>
 
       {/* Rules section */}
-      <View style={styles.rulesCard}>
+      <View style={[styles.rulesCard, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 0.5 }]}>
         <View style={styles.rulesHeader}>
-          <MaterialIcons name="rule" size={20} color={CONFIG.THEME.primary} />
-          <Text style={styles.sectionTitle}>{t('rules.ruleData')}</Text>
+          <MaterialIcons name="rule" size={20} color={colors.primary} />
+          <Text style={[styles.sectionTitle, { color: colors.primary }]}>{t('rules.ruleData')}</Text>
         </View>
 
         <FlatList
@@ -221,9 +244,9 @@ const RulesScreen = () => {
           showsVerticalScrollIndicator={true}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <MaterialIcons name="rule" size={48} color={CONFIG.THEME.gray} />
-              <Text style={styles.emptyText}>{t('rules.noRulesYet')}</Text>
-              <Text style={styles.emptySubtext}>
+              <MaterialIcons name="rule" size={48} color={colors.gray} />
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('rules.noRulesYet')}</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
                 {t('rules.createFirstRule')}
               </Text>
             </View>
@@ -237,22 +260,22 @@ const RulesScreen = () => {
         animationType="fade"
         onRequestClose={() => setShowTemplatesModal(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t('rules.ruleTemplates')}</Text>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.primary }]}>{t('rules.ruleTemplates')}</Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowTemplatesModal(false)}
             >
-              <MaterialIcons name="close" size={24} color={CONFIG.THEME.gray} />
+              <MaterialIcons name="close" size={24} color={colors.gray} />
             </TouchableOpacity>
           </View>
           
           {templates.length === 0 ? (
             <View style={[styles.emptyContainer, { paddingTop: 48, paddingBottom: 40 }]}>
-              <MaterialIcons name="library-books" size={64} color={CONFIG.THEME.gray} />
-              <Text style={styles.emptyText}>{t('rules.noTemplatesAvailable')}</Text>
-              <Text style={styles.emptySubtext}>
+              <MaterialIcons name="library-books" size={64} color={colors.gray} />
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('rules.noTemplatesAvailable')}</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
                 {t('rules.templatesNotLoaded')}
               </Text>
             </View>
@@ -280,10 +303,16 @@ const RulesScreen = () => {
             />
           )}
           {creatingRule && (
-            <View style={styles.loadingOverlay}>
-              <Text style={styles.loadingText}>{t('rules.creating')}</Text>
+            <View style={[styles.loadingOverlay, { backgroundColor: colors.background }]}>
+              <Text style={[styles.loadingText, { color: colors.text }]}>{t('rules.creating')}</Text>
             </View>
           )}
+          <ActionFeedback 
+            visible={templatesModalFeedback.visible} 
+            type={templatesModalFeedback.type} 
+            message={templatesModalFeedback.message} 
+            onHide={() => setTemplatesModalFeedback({ ...templatesModalFeedback, visible: false })} 
+          />
         </View>
       </Modal>
       {/* Rule Detail Modal */}
@@ -301,8 +330,8 @@ const RulesScreen = () => {
           onSave={saveRuleEdits}
         />
         {busyAction === 'save' && (
-          <View style={styles.loadingOverlay}>
-            <Text style={styles.loadingText}>{t('common.saving')}</Text>
+          <View style={[styles.loadingOverlay, { backgroundColor: colors.background }]}>
+            <Text style={[styles.loadingText, { color: colors.text }]}>{t('common.saving')}</Text>
           </View>
         )}
       </Modal>
@@ -340,6 +369,12 @@ const RulesScreen = () => {
           }}
         />
       </Modal>
+      <ActionFeedback 
+        visible={feedback.visible} 
+        type={feedback.type} 
+        message={feedback.message} 
+        onHide={() => setFeedback({ ...feedback, visible: false })} 
+      />
     </View>
   );
 };
@@ -347,16 +382,16 @@ const RulesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: CONFIG.THEME.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 12,
   },
   loadingText: {
     fontSize: 16,
-    color: CONFIG.THEME.gray,
+    marginTop: 12,
   },
   header: {
     flexDirection: 'row',
@@ -364,14 +399,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 56,
     paddingHorizontal: 16,
-    backgroundColor: CONFIG.THEME.surface,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.THEME.border,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: CONFIG.THEME.primary,
   },
   addRuleContainer: {
     paddingHorizontal: 16,
@@ -384,16 +416,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: CONFIG.THEME.primary,
     borderWidth: 1,
-    borderColor: CONFIG.THEME.primary,
     minWidth: 120,
   },
   actionButtonText: {
     marginLeft: 6,
     fontSize: 14,
     fontWeight: '600',
-    color: CONFIG.THEME.surface,
   },
   rulesList: {
     padding: 12,
@@ -408,19 +437,16 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: CONFIG.THEME.gray,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: CONFIG.THEME.gray,
     textAlign: 'center',
     marginTop: 8,
     paddingHorizontal: 32,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: CONFIG.THEME.background,
     marginTop: 20,
     marginBottom: 10,
   },
@@ -429,14 +455,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: CONFIG.THEME.surface,
     borderBottomWidth: 1,
-    borderBottomColor: CONFIG.THEME.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: CONFIG.THEME.primary,
   },
   closeButton: {
     padding: 4,
@@ -452,17 +475,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: CONFIG.THEME.primary,
     textAlign: 'center',
     marginLeft: 8,
   },
   rulesCard: {
     marginHorizontal: 12,
     marginTop: 2,
-    backgroundColor: CONFIG.THEME.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: CONFIG.THEME.border,
     paddingBottom: 8,
     flex: 1,
   },
@@ -475,6 +495,16 @@ const styles = StyleSheet.create({
   },
   rulesListView: {
     flex: 1,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 });
 

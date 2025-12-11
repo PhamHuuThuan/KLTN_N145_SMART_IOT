@@ -90,7 +90,19 @@
     "chartTemperature": "Temperature",
     "chartHumidity": "Humidity",
     "chartGas": "Gas",
-    "chartSmoke": "Smoke"
+    "chartSmoke": "Smoke",
+    "chartSelectedPoint": "Selected Point",
+    "chartTime": "Time",
+    "chartValue": "Value",
+    "chartLevel": "Level",
+    "smokeDetected": "Smoke detected",
+    "smokeSafe": "Safe",
+    "legend": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High",
+      "veryHigh": "Very High"
+    }
   },
   "deviceEditor": {
     "createTitle": "Add New Device",
@@ -150,6 +162,7 @@
     "createRuleConfirm": "Create rule",
     "createSuccess": "Rule created successfully!",
     "createError": "Failed to create rule, please try again",
+    "duplicateRuleForDevice": "A rule from this template already exists for the selected device.",
     "noActiveTemplates": "No active templates available. Please create them first in Templates.",
     "singleMode": "Create Single",
     "bulkMode": "Bulk Create",
@@ -314,8 +327,8 @@
     "description": "Description",
     "device": "Device *",
     "selectDevice": "Select Device",
-    "owner": "Owner (User ID)",
-    "ownerHint": "Leave empty to use admin ID",
+    "owner": "Owner",
+    "selectOwner": "Select Owner",
     "priority": "Priority Level",
     "cooldown": "Cooldown Period (ms)",
     "isActive": "Activate immediately",

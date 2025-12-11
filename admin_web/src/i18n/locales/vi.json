@@ -90,7 +90,19 @@
     "chartTemperature": "Nhiệt độ",
     "chartHumidity": "Độ ẩm",
     "chartGas": "Gas",
-    "chartSmoke": "Khói"
+    "chartSmoke": "Khói",
+    "chartSelectedPoint": "Điểm được chọn",
+    "chartTime": "Thời gian",
+    "chartValue": "Giá trị",
+    "chartLevel": "Mức độ",
+    "smokeDetected": "Có khói",
+    "smokeSafe": "An toàn",
+    "legend": {
+      "low": "Thấp",
+      "normal": "Bình thường",
+      "high": "Cao",
+      "veryHigh": "Rất cao"
+    }
   },
   "deviceEditor": {
     "createTitle": "Thêm thiết bị mới",
@@ -150,6 +162,7 @@
     "createRuleConfirm": "Tạo quy tắc",
     "createSuccess": "Tạo quy tắc thành công!",
     "createError": "Không thể tạo quy tắc, vui lòng thử lại",
+    "duplicateRuleForDevice": "Quy tắc từ mẫu này đã tồn tại cho thiết bị đã chọn.",
     "noActiveTemplates": "Không có mẫu hoạt động. Hãy tạo trong mục Mẫu quy tắc trước.",
     "singleMode": "Tạo từng cái",
     "bulkMode": "Tạo hàng loạt",
@@ -314,8 +327,8 @@
     "description": "Mô tả",
     "device": "Thiết bị *",
     "selectDevice": "Chọn thiết bị",
-    "owner": "Người sở hữu (User ID)",
-    "ownerHint": "Để trống để dùng admin ID",
+    "owner": "Chủ sở hữu",
+    "selectOwner": "Chọn chủ sở hữu",
     "priority": "Mức độ ưu tiên",
     "cooldown": "Thời gian chờ (ms)",
     "isActive": "Kích hoạt ngay",

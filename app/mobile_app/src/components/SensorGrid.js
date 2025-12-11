@@ -62,21 +62,21 @@ const SensorGrid = ({ deviceData, onViewChart }) => {
     return 'veryHigh';
   };
 
-  // Smoke threshold: 1.6V (based on firmware SMOKE_AO_ON_V)
-  const SMOKE_THRESHOLD = 1.6;
-  const smokeVoltage = latestTelemetry.smoke !== null && latestTelemetry.smoke !== undefined 
+  // Smoke is binary: 0 = Safe, 1 = Smoke detected
+  const smokeValue = latestTelemetry.smoke !== null && latestTelemetry.smoke !== undefined 
     ? Number(latestTelemetry.smoke) 
     : null;
-  const smokeDetected = smokeVoltage !== null && smokeVoltage >= SMOKE_THRESHOLD;
-  const smokeDisplay = smokeVoltage !== null 
-    ? `${smokeVoltage.toFixed(2)} V` 
+  const hasSmoke = smokeValue !== null && smokeValue >= 1;
+  const smokeDisplay = smokeValue !== null 
+    ? (hasSmoke ? t('sensors.smokeDetected') : t('sensors.smokeSafe'))
     : '--';
 
   // Calculate levels for each sensor
   const tempLevel = getSensorLevel(latestTelemetry.temp, THRESHOLDS.temperature);
   const humidLevel = getSensorLevel(latestTelemetry.humid, THRESHOLDS.humidity);
   const gasLevel = getSensorLevel(latestTelemetry.gas_ppm, THRESHOLDS.gas);
-  const smokeLevel = getSensorLevel(smokeVoltage, THRESHOLDS.smoke);
+  // Smoke is binary: 0 = normal, 1 = veryHigh
+  const smokeLevel = hasSmoke ? 'veryHigh' : 'normal';
 
   const sensorData = [
     {
@@ -114,8 +114,8 @@ const SensorGrid = ({ deviceData, onViewChart }) => {
       label: t('sensors.labels.smoke'),
       value: smokeDisplay,
       icon: 'smoke-detector',
-      color: smokeDetected ? CONFIG.COLORS.danger : CONFIG.COLORS.success,
-      unit: 'V',
+      color: hasSmoke ? CONFIG.COLORS.danger : CONFIG.COLORS.success,
+      unit: '',
       level: smokeLevel,
       backgroundColor: LEVEL_COLORS[smokeLevel],
     }

@@ -5,7 +5,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🚨 Nhiệt độ khẩn cấp',
       description: 'Cảnh báo khẩn cấp khi nhiệt độ > 40°C',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
         { type: 'sensor', sensor: 'temperature', operator: '>', value: 40, unit: '°C' }
       ],
@@ -16,11 +16,11 @@ export const DEFAULT_TEMPLATES = {
 
     temp_high: {
       name: '🌡️ Nhiệt độ cao',
-      description: 'Cảnh báo khi nhiệt độ 31–40°C',
+      description: 'Cảnh báo khi nhiệt độ 35–40°C',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'temperature', operator: '>=', value: 31, unit: '°C' },
+        { type: 'sensor', sensor: 'temperature', operator: '>=', value: 35, unit: '°C' },
         { type: 'sensor', sensor: 'temperature', operator: '<=', value: 40, unit: '°C' }
       ],
       actions: [
@@ -30,11 +30,11 @@ export const DEFAULT_TEMPLATES = {
 
     temp_low: {
       name: '❄️ Nhiệt độ thấp',
-      description: 'Cảnh báo khi nhiệt độ < 15°C',
+      description: 'Cảnh báo khi nhiệt độ < 25°C',
       priority: 'low',
       cooldownPeriod: 180000,
       conditions: [
-        { type: 'sensor', sensor: 'temperature', operator: '<', value: 15, unit: '°C' }
+        { type: 'sensor', sensor: 'temperature', operator: '<', value: 25, unit: '°C' }
       ],
       actions: [
         { type: 'send_notification', message: '❄️ Cảnh báo: Nhiệt độ thấp! Kiểm tra hệ thống sưởi hoặc môi trường lưu trữ.' }
@@ -43,11 +43,11 @@ export const DEFAULT_TEMPLATES = {
 
     humidity_emergency: {
       name: '🚨 Độ ẩm khẩn cấp',
-      description: 'Cảnh báo khẩn cấp khi độ ẩm > 80%',
+      description: 'Cảnh báo khẩn cấp khi độ ẩm > 70%',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
-        { type: 'sensor', sensor: 'humidity', operator: '>', value: 80, unit: '%' }
+        { type: 'sensor', sensor: 'humidity', operator: '>', value: 70, unit: '%' }
       ],
       actions: [
         { type: 'send_alert', message: '🚨 CẢNH BÁO KHẨN CẤP: Độ ẩm quá cao! Nguy cơ chập điện hoặc hư hại thiết bị!' }
@@ -56,12 +56,12 @@ export const DEFAULT_TEMPLATES = {
 
     humidity_high: {
       name: '💧 Độ ẩm cao',
-      description: 'Cảnh báo khi độ ẩm 61–80%',
+      description: 'Cảnh báo khi độ ẩm 55–70%',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'humidity', operator: '>=', value: 61, unit: '%' },
-        { type: 'sensor', sensor: 'humidity', operator: '<=', value: 80, unit: '%' }
+        { type: 'sensor', sensor: 'humidity', operator: '>=', value: 55, unit: '%' },
+        { type: 'sensor', sensor: 'humidity', operator: '<=', value: 70, unit: '%' }
       ],
       actions: [
         { type: 'send_notification', message: '💧 Cảnh báo: Độ ẩm cao! Có thể gây nấm mốc, ảnh hưởng linh kiện.' }
@@ -85,7 +85,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🚨 Khí gas khẩn cấp',
       description: 'Cảnh báo khẩn cấp khi khí gas > 1000 ppm',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
         { type: 'sensor', sensor: 'gas_ppm', operator: '>', value: 1000, unit: 'ppm' }
       ],
@@ -96,11 +96,11 @@ export const DEFAULT_TEMPLATES = {
 
     gas_high: {
       name: '💨 Khí gas cao',
-      description: 'Cảnh báo khi khí gas 401–1000 ppm',
+      description: 'Cảnh báo khi khí gas 701–1000 ppm',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 401, unit: 'ppm' },
+        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 701, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 1000, unit: 'ppm' }
       ],
       actions: [
@@ -108,58 +108,16 @@ export const DEFAULT_TEMPLATES = {
       ]
     },
 
-    gas_medium: {
-      name: '💨 Khí gas trung bình',
-      description: 'Cảnh báo khi khí gas 200–400 ppm',
-      priority: 'medium',
-      cooldownPeriod: 120000,
-      conditions: [
-        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 200, unit: 'ppm' },
-        { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 400, unit: 'ppm' }
-      ],
-      actions: [
-        { type: 'send_notification', message: '💨 Cảnh báo: Phát hiện khí gas nhẹ. Theo dõi và kiểm tra định kỳ.' }
-      ]
-    },
-
     smoke_emergency: {
-      name: '🚨 Khói khẩn cấp',
-      description: 'Cảnh báo khẩn cấp khi khói > 700 ppm',
+      name: '🚨 Phát hiện khói',
+      description: 'Cảnh báo khẩn cấp khi phát hiện khói (giá trị = 1)',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>', value: 700, unit: 'ppm' }
+        { type: 'sensor', sensor: 'smoke', operator: '==', value: 1, unit: '' }
       ],
       actions: [
-        { type: 'send_alert', message: '🚨 CẢNH BÁO KHẨN CẤP: Nồng độ khói đậm! Nguy cơ cháy hoặc khí CO cao!' }
-      ]
-    },
-
-    smoke_high: {
-      name: '🔥 Khói cao',
-      description: 'Cảnh báo khi khói 301–700 ppm',
-      priority: 'high',
-      cooldownPeriod: 60000,
-      conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>=', value: 301, unit: 'ppm' },
-        { type: 'sensor', sensor: 'smoke', operator: '<=', value: 700, unit: 'ppm' }
-      ],
-      actions: [
-        { type: 'send_notification', message: '🔥 Cảnh báo: Phát hiện khói đậm! Kiểm tra ngay để phòng cháy.' }
-      ]
-    },
-
-    smoke_medium: {
-      name: '💨 Khói trung bình',
-      description: 'Cảnh báo khi khói 100–300 ppm',
-      priority: 'medium',
-      cooldownPeriod: 120000,
-      conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>=', value: 100, unit: 'ppm' },
-        { type: 'sensor', sensor: 'smoke', operator: '<=', value: 300, unit: 'ppm' }
-      ],
-      actions: [
-        { type: 'send_notification', message: '💨 Cảnh báo: Phát hiện khói nhẹ. Có thể do bụi hoặc hơi nóng.' }
+        { type: 'send_alert', message: '🚨 CẢNH BÁO KHẨN CẤP: Phát hiện khói! Nguy cơ cháy hoặc khí CO cao!' }
       ]
     },
 
@@ -167,7 +125,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🔥 Phát hiện lửa',
       description: 'Cảnh báo khẩn cấp khi cảm biến lửa kích hoạt',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
         { type: 'sensor', sensor: 'flame', operator: '==', value: 1, unit: '' }
       ],
@@ -184,7 +142,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🚨 Temperature Emergency',
       description: 'Emergency alert when temperature > 40°C',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
         { type: 'sensor', sensor: 'temperature', operator: '>', value: 40, unit: '°C' }
       ],
@@ -195,11 +153,11 @@ export const DEFAULT_TEMPLATES = {
 
     temp_high: {
       name: '🌡️ High Temperature',
-      description: 'Alert when temperature is between 31–40°C',
+      description: 'Alert when temperature is between 35–40°C',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'temperature', operator: '>=', value: 31, unit: '°C' },
+        { type: 'sensor', sensor: 'temperature', operator: '>=', value: 35, unit: '°C' },
         { type: 'sensor', sensor: 'temperature', operator: '<=', value: 40, unit: '°C' }
       ],
       actions: [
@@ -209,11 +167,11 @@ export const DEFAULT_TEMPLATES = {
 
     temp_low: {
       name: '❄️ Low Temperature',
-      description: 'Alert when temperature < 15°C',
+      description: 'Alert when temperature < 25°C',
       priority: 'low',
       cooldownPeriod: 180000,
       conditions: [
-        { type: 'sensor', sensor: 'temperature', operator: '<', value: 15, unit: '°C' }
+        { type: 'sensor', sensor: 'temperature', operator: '<', value: 25, unit: '°C' }
       ],
       actions: [
         { type: 'send_notification', message: '❄️ Notice: Low temperature detected! Check heating or storage conditions.' }
@@ -222,11 +180,11 @@ export const DEFAULT_TEMPLATES = {
 
     humidity_emergency: {
       name: '🚨 Humidity Emergency',
-      description: 'Emergency alert when humidity > 80%',
+      description: 'Emergency alert when humidity > 70%',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
-        { type: 'sensor', sensor: 'humidity', operator: '>', value: 80, unit: '%' }
+        { type: 'sensor', sensor: 'humidity', operator: '>', value: 70, unit: '%' }
       ],
       actions: [
         { type: 'send_alert', message: '🚨 EMERGENCY ALERT: Excessive humidity! Risk of short circuit or equipment damage!' }
@@ -235,12 +193,12 @@ export const DEFAULT_TEMPLATES = {
 
     humidity_high: {
       name: '💧 High Humidity',
-      description: 'Alert when humidity is between 61–80%',
+      description: 'Alert when humidity is between 55–70%',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'humidity', operator: '>=', value: 61, unit: '%' },
-        { type: 'sensor', sensor: 'humidity', operator: '<=', value: 80, unit: '%' }
+        { type: 'sensor', sensor: 'humidity', operator: '>=', value: 55, unit: '%' },
+        { type: 'sensor', sensor: 'humidity', operator: '<=', value: 70, unit: '%' }
       ],
       actions: [
         { type: 'send_notification', message: '💧 Warning: High humidity level! May cause mold or component corrosion.' }
@@ -264,7 +222,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🚨 Gas Emergency',
       description: 'Emergency alert when gas concentration > 1000 ppm',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
         { type: 'sensor', sensor: 'gas_ppm', operator: '>', value: 1000, unit: 'ppm' }
       ],
@@ -275,11 +233,11 @@ export const DEFAULT_TEMPLATES = {
 
     gas_high: {
       name: '💨 High Gas Level',
-      description: 'Alert when gas concentration is between 401–1000 ppm',
+      description: 'Alert when gas concentration is between 701–1000 ppm',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 401, unit: 'ppm' },
+        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 701, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 1000, unit: 'ppm' }
       ],
       actions: [
@@ -287,58 +245,16 @@ export const DEFAULT_TEMPLATES = {
       ]
     },
 
-    gas_medium: {
-      name: '💨 Medium Gas Level',
-      description: 'Alert when gas concentration is between 200–400 ppm',
-      priority: 'medium',
-      cooldownPeriod: 120000,
-      conditions: [
-        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 200, unit: 'ppm' },
-        { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 400, unit: 'ppm' }
-      ],
-      actions: [
-        { type: 'send_notification', message: '💨 Notice: Mild gas detected. Monitor and inspect regularly.' }
-      ]
-    },
-
     smoke_emergency: {
-      name: '🚨 Smoke Emergency',
-      description: 'Emergency alert when smoke > 700 ppm',
+      name: '🚨 Smoke Detected',
+      description: 'Emergency alert when smoke is detected (value = 1)',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>', value: 700, unit: 'ppm' }
+        { type: 'sensor', sensor: 'smoke', operator: '==', value: 1, unit: '' }
       ],
       actions: [
-        { type: 'send_alert', message: '🚨 EMERGENCY ALERT: Dense smoke detected! High risk of fire or CO exposure!' }
-      ]
-    },
-
-    smoke_high: {
-      name: '🔥 High Smoke Level',
-      description: 'Alert when smoke 301–700 ppm',
-      priority: 'high',
-      cooldownPeriod: 60000,
-      conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>=', value: 301, unit: 'ppm' },
-        { type: 'sensor', sensor: 'smoke', operator: '<=', value: 700, unit: 'ppm' }
-      ],
-      actions: [
-        { type: 'send_notification', message: '🔥 Warning: Heavy smoke detected! Possible fire, check immediately.' }
-      ]
-    },
-
-    smoke_medium: {
-      name: '💨 Medium Smoke Level',
-      description: 'Alert when smoke 100–300 ppm',
-      priority: 'medium',
-      cooldownPeriod: 120000,
-      conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>=', value: 100, unit: 'ppm' },
-        { type: 'sensor', sensor: 'smoke', operator: '<=', value: 300, unit: 'ppm' }
-      ],
-      actions: [
-        { type: 'send_notification', message: '💨 Notice: Light smoke detected. Could be dust or mild vapor.' }
+        { type: 'send_alert', message: '🚨 EMERGENCY ALERT: Smoke detected! High risk of fire or CO exposure!' }
       ]
     },
 
@@ -346,7 +262,7 @@ export const DEFAULT_TEMPLATES = {
       name: '🔥 Flame Detected',
       description: 'Emergency alert when flame sensor is triggered',
       priority: 'urgent',
-      cooldownPeriod: 30000,
+      cooldownPeriod: 0,
       conditions: [
         { type: 'sensor', sensor: 'flame', operator: '==', value: 1, unit: '' }
       ],

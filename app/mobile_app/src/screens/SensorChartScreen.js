@@ -632,8 +632,11 @@ const SensorChartScreen = ({ navigation, route }) => {
                         {t('charts.current')}
                       </Text>
                       <Text style={[styles.statValue, { color: sensorColor }]}>
-                        {chartData.values[chartData.values.length - 1]?.toFixed(1)}
-                        {sensorConfig.unit}
+                        {selectedSensor === 'smoke' 
+                          ? (chartData.values[chartData.values.length - 1] >= 1 
+                              ? t('sensors.smokeDetected') 
+                              : t('sensors.smokeSafe'))
+                          : chartData.values[chartData.values.length - 1]?.toFixed(1) + sensorConfig.unit}
                       </Text>
                     </View>
                   )}
@@ -647,7 +650,7 @@ const SensorChartScreen = ({ navigation, route }) => {
                     onPointSelect={handlePointSelect}
                     rawData={telemetryData}
                     timeRange={chartTimeRange}
-                    isBinary={false}
+                    isBinary={selectedSensor === 'smoke'}
                     sensorType={selectedSensor}
                   />
                 )}
@@ -701,7 +704,11 @@ const SensorChartScreen = ({ navigation, route }) => {
                     <Text style={[styles.logDetailValue, { color: sensorColor, fontWeight: 'bold' }]}>
                       {selectedLog.isGapPoint 
                         ? (t('charts.noData') || 'Không có thông tin')
-                        : (selectedLog.selectedValue?.toFixed(1) || '0') + sensorConfig.unit}
+                        : selectedSensor === 'smoke'
+                          ? (selectedLog.selectedValue >= 1 
+                              ? t('sensors.smokeDetected') 
+                              : t('sensors.smokeSafe'))
+                          : (selectedLog.selectedValue?.toFixed(1) || '0') + sensorConfig.unit}
                     </Text>
                   </View>
                 </View>
