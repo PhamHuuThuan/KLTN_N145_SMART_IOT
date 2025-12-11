@@ -96,7 +96,7 @@
     "chartValue": "Giá trị",
     "chartLevel": "Mức độ",
     "smokeDetected": "Có khói",
-    "smokeNotDetected": "Không có khói",
+    "smokeSafe": "An toàn",
     "legend": {
       "low": "Thấp",
       "normal": "Bình thường",
@@ -328,7 +328,7 @@
     "device": "Thiết bị *",
     "selectDevice": "Chọn thiết bị",
     "owner": "Chủ sở hữu",
-    "ownerHint": "Để trống để dùng admin ID",
+    "selectOwner": "Chọn chủ sở hữu",
     "priority": "Mức độ ưu tiên",
     "cooldown": "Thời gian chờ (ms)",
     "isActive": "Kích hoạt ngay",

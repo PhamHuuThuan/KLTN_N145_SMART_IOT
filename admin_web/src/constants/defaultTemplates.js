@@ -96,11 +96,11 @@ export const DEFAULT_TEMPLATES = {
 
     gas_high: {
       name: '💨 Khí gas cao',
-      description: 'Cảnh báo khi khí gas 601–1000 ppm',
+      description: 'Cảnh báo khi khí gas 701–1000 ppm',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 600, unit: 'ppm' },
+        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 701, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 1000, unit: 'ppm' }
       ],
       actions: [
@@ -184,7 +184,7 @@ export const DEFAULT_TEMPLATES = {
       priority: 'urgent',
       cooldownPeriod: 0,
       conditions: [
-        { type: 'sensor', sensor: 'humidity', operator: '>', value: 80, unit: '%' }
+        { type: 'sensor', sensor: 'humidity', operator: '>', value: 70, unit: '%' }
       ],
       actions: [
         { type: 'send_alert', message: '🚨 EMERGENCY ALERT: Excessive humidity! Risk of short circuit or equipment damage!' }
@@ -233,11 +233,11 @@ export const DEFAULT_TEMPLATES = {
 
     gas_high: {
       name: '💨 High Gas Level',
-      description: 'Alert when gas concentration is between 601–1000 ppm',
+      description: 'Alert when gas concentration is between 701–1000 ppm',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 601, unit: 'ppm' },
+        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 701, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 1000, unit: 'ppm' }
       ],
       actions: [

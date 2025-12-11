@@ -238,7 +238,7 @@ function Templates() {
 
   const formatCondition = (condition) => {
     const sensor = t(`templates.sensor.${condition.sensor}`, { defaultValue: condition.sensor });
-    const operator = t(`templates.operator.${condition.operator}`, { defaultValue: condition.operator });
+    const operator = condition.operator; // Use operator symbol directly instead of text
     const unit = condition.unit || '';
     
     return `${sensor} ${operator} ${condition.value}${unit}`;
@@ -342,7 +342,7 @@ function Templates() {
                     backgroundColor: template.isActive ? '#27AE60' : '#95A5A6'
                   }}
                 >
-                  {template.isActive ? 'Hoạt động' : 'Tạm dừng'}
+                  {template.isActive ? t('common.active') : t('common.inactive')}
                 </span>
               </div>
             </div>

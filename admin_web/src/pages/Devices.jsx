@@ -552,7 +552,13 @@ function Devices() {
                   <div style={styles.telemetryItem}>
                     <span style={styles.telemetryLabel}>🚬 {t('devices.smoke')}:</span>
                     <span style={styles.telemetryValue}>
-                      {device.latestTelemetry.smoke || 'N/A'} V
+                      {device.latestTelemetry.smoke !== null && device.latestTelemetry.smoke !== undefined 
+                        ? (() => {
+                            const smokeValue = Number(device.latestTelemetry.smoke);
+                            const hasSmoke = smokeValue >= 1;
+                            return hasSmoke ? t('devices.smokeDetected') : t('devices.smokeSafe');
+                          })()
+                        : 'N/A'}
                     </span>
                   </div>
                   <div style={styles.telemetryItem}>
@@ -759,7 +765,7 @@ function Devices() {
                                 if (isSmoke) {
                                   const hasSmoke = Number(value) >= 1;
                                   levelLabel = hasSmoke ? t('devices.legend.veryHigh') : t('devices.legend.normal');
-                                  displayValue = hasSmoke ? `1V (${t('devices.smokeDetected')})` : `0V (${t('devices.smokeNotDetected')})`;
+                                  displayValue = hasSmoke ? t('devices.smokeDetected') : t('devices.smokeSafe');
                                 } else {
                                   const level = getSensorLevel(value, thresholds);
                                   levelLabel = t(`devices.legend.${level}`);
@@ -782,7 +788,7 @@ function Devices() {
                             formatter={(value) => {
                               if (isSmoke) {
                                 const hasSmoke = Number(value) >= 1;
-                                return hasSmoke ? `1V (${t('devices.smokeDetected')})` : `0V (${t('devices.smokeNotDetected')})`;
+                                return hasSmoke ? t('devices.smokeDetected') : t('devices.smokeSafe');
                               }
                               return `${Number(value).toFixed(2)} ${unit}`;
                             }}
