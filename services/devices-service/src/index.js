@@ -34,20 +34,17 @@ async function startDeviceWatchdog() {
     try {
       const cutoff = new Date(Date.now() - OFFLINE_THRESHOLD_MS);
       
-      // Tìm các devices cần update thành offline
       const devicesToUpdate = await Device.find({
         lastSeenAt: { $lte: cutoff },
         status: { $ne: 'offline' }
       });
 
       if (devicesToUpdate.length > 0) {
-        // Update status trong database
         await Device.updateMany(
           { lastSeenAt: { $lte: cutoff }, status: { $ne: 'offline' } },
           { $set: { status: 'offline' } }
         );
 
-        // Emit socket event cho mỗi device đã offline
         for (const device of devicesToUpdate) {
           try {
             emitDeviceStatus(device.deviceId, 'offline', {
