@@ -90,7 +90,19 @@
     "chartTemperature": "Nhiệt độ",
     "chartHumidity": "Độ ẩm",
     "chartGas": "Gas",
-    "chartSmoke": "Khói"
+    "chartSmoke": "Khói",
+    "chartSelectedPoint": "Điểm được chọn",
+    "chartTime": "Thời gian",
+    "chartValue": "Giá trị",
+    "chartLevel": "Mức độ",
+    "smokeDetected": "Có khói",
+    "smokeNotDetected": "Không có khói",
+    "legend": {
+      "low": "Thấp",
+      "normal": "Bình thường",
+      "high": "Cao",
+      "veryHigh": "Rất cao"
+    }
   },
   "deviceEditor": {
     "createTitle": "Thêm thiết bị mới",
