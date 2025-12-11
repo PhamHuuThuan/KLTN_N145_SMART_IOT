@@ -27,3 +27,14 @@ export function emitDeviceTelemetry(deviceId, telemetryPayload, deviceData = nul
     payload,
   });
 }
+
+export function emitDeviceStatus(deviceId, status, deviceData = null) {
+  if (!ioInstance) return;
+  ioInstance.emit('device.status', {
+    deviceId,
+    status,
+    isOnline: status === 'online',
+    lastSeenAt: deviceData?.lastSeenAt || new Date().toISOString(),
+    ...(deviceData && { deviceName: deviceData.name }),
+  });
+}

@@ -373,6 +373,49 @@ export const useDeviceData = () => {
       });
     });
 
+    socket.on('device.status', ({ deviceId, status, isOnline, lastSeenAt }) => {
+      try {
+        // CHECK: Thiết bị có còn trong danh sách không?
+        const currentList = devicesListRef.current;
+        const currentSelected = selectedDeviceRef.current;
+        const deviceExists = currentList.some(d => d.deviceId === deviceId);
+        
+        // Nếu thiết bị không còn trong list (đã bị remove), bỏ qua
+        if (!deviceExists) {
+          log.debug('Ignored status update for removed device:', deviceId);
+          return;
+        }
+
+        const statusValue = status === 'online' ? 'online' : 'offline';
+        const deviceIsOnline = isOnline === true || status === 'online';
+
+        // Update devicesList
+        setDevicesList((prev) => {
+          if (!Array.isArray(prev) || !prev.length) return prev;
+          return prev.map((item) => (item.deviceId === deviceId
+            ? {
+                ...item,
+                status: statusValue,
+                isOnline: deviceIsOnline,
+                ...(lastSeenAt && { lastSeenAt }),
+              }
+            : item));
+        });
+
+        // CHỈ update deviceData nếu device đang được chọn
+        if (currentSelected === deviceId) {
+          setDeviceData((prev) => (prev ? {
+            ...prev,
+            status: statusValue,
+            isOnline: deviceIsOnline,
+            ...(lastSeenAt && { lastSeenAt }),
+          } : prev));
+        }
+      } catch (e) {
+        log.error('device.status handler error', e?.message || e);
+      }
+    });
+
     socket.on('disconnect', () => {
       log.warn('socket disconnected');
     });

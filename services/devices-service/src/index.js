@@ -1,7 +1,7 @@
 import app from './app.js';
 import http from 'http';
 import { setupSocket } from './realtime/socket.js';
-import { emitDeviceTelemetry } from './realtime/socket.js';
+import { emitDeviceTelemetry, emitDeviceStatus } from './realtime/socket.js';
 import connectDB from './config/database.js';
 import { producer } from './config/kafka.js';
 import { startLogConsumer, stopLogConsumer } from './consumers/logConsumer.js';
@@ -10,8 +10,8 @@ import Device from './models/Device.js';
 import logger from './utils/logger.js';
 
 const PORT = process.env.PORT || 3001;
-const OFFLINE_THRESHOLD_MS = Number(process.env.DEVICE_OFFLINE_THRESHOLD_MS || 5 * 60 * 1000);
-const WATCHDOG_INTERVAL_MS = Number(process.env.DEVICE_WATCHDOG_INTERVAL_MS || 60 * 1000);
+const OFFLINE_THRESHOLD_MS = Number(process.env.DEVICE_OFFLINE_THRESHOLD_MS || 60 * 1000);
+const WATCHDOG_INTERVAL_MS = Number(process.env.DEVICE_WATCHDOG_INTERVAL_MS || 20 * 1000);
 const EMERGENCY_AUTO_DISABLE_MS = Number(process.env.EMERGENCY_AUTO_DISABLE_MS || 60 * 60 * 1000);
 
 let watchdogTimer = null;
@@ -33,10 +33,33 @@ async function startDeviceWatchdog() {
   async function runOnce() {
     try {
       const cutoff = new Date(Date.now() - OFFLINE_THRESHOLD_MS);
-      await Device.updateMany(
-        { lastSeenAt: { $lte: cutoff }, status: { $ne: 'offline' } },
-        { $set: { status: 'offline' } }
-      );
+      
+      // Tìm các devices cần update thành offline
+      const devicesToUpdate = await Device.find({
+        lastSeenAt: { $lte: cutoff },
+        status: { $ne: 'offline' }
+      });
+
+      if (devicesToUpdate.length > 0) {
+        // Update status trong database
+        await Device.updateMany(
+          { lastSeenAt: { $lte: cutoff }, status: { $ne: 'offline' } },
+          { $set: { status: 'offline' } }
+        );
+
+        // Emit socket event cho mỗi device đã offline
+        for (const device of devicesToUpdate) {
+          try {
+            emitDeviceStatus(device.deviceId, 'offline', {
+              name: device.name,
+              lastSeenAt: device.lastSeenAt,
+            });
+            logger.debug(`Emitted offline status for device: ${device.deviceId}`);
+          } catch (emitError) {
+            logger.error(`Failed to emit offline status for device ${device.deviceId}:`, emitError);
+          }
+        }
+      }
     } catch (err) {
       logger.error('Watchdog error:', err.message);
     }
