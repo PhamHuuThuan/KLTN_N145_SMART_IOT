@@ -9,16 +9,12 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
-// Do NOT parse JSON globally to avoid interfering with proxying request bodies
-// Proxied requests will stream the original body; fixRequestBody handles parsed bodies if any
 
-// Simple request logging middleware
 app.use((req, res, next) => {
   const startTimeMs = Date.now();
   const { method, originalUrl } = req;
   const ip = req.ip || req.connection?.remoteAddress || '';
 
-  // Capture basic user info if token present (non-blocking)
   let userId = '';
   let userRole = '';
   const authHeader = req.headers.authorization || '';
@@ -29,12 +25,11 @@ app.use((req, res, next) => {
       userId = payload?.sub || '';
       userRole = payload?.role || '';
     } catch (_) {
-      // ignore token errors in logger
+
     }
   }
 
   res.setHeader('Cache-Control', 'no-store');
-  // Minimal logging; detailed request body logs removed
   res.on('finish', () => {
     const durationMs = Date.now() - startTimeMs;
     const status = res.statusCode;
@@ -59,8 +54,7 @@ const DEVICES_SERVICE_URL = process.env.DEVICES_SERVICE_URL || 'http://localhost
 const RULES_SERVICE_URL = process.env.RULES_SERVICE_URL || 'http://localhost:3003';
 const ALERTS_SERVICE_URL = process.env.ALERTS_SERVICE_URL || 'http://localhost:3004';
 
-// JWT verification middleware
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const JWT_SECRET = process.env.JWT_SECRET;
 function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -74,10 +68,8 @@ function authenticateToken(req, res, next) {
   }
 }
 
-// Health
 app.get('/health', (_req, res) => res.json({ ok: true, message: 'API Gateway running' }));
 
-// Public routes → auth-service (preserve path)
 app.use(
   '/auth',
   createProxyMiddleware({
@@ -86,19 +78,15 @@ app.use(
       logLevel: 'silent',
       pathRewrite: (path, req) => req.originalUrl,
     onProxyReq: (proxyReq, req, res) => {
-        // Forward Authorization header/token to downstream service if present
         const incomingAuthHeader = req.headers.authorization;
         if (incomingAuthHeader) {
           proxyReq.setHeader('authorization', incomingAuthHeader);
-          // Also provide the raw token (without Bearer prefix) for services that expect it
           const rawToken = incomingAuthHeader.startsWith('Bearer ')
             ? incomingAuthHeader.slice(7)
             : incomingAuthHeader;
           proxyReq.setHeader('x-access-token', rawToken);
         }
-      // Ensure JSON body is forwarded for POST/PUT/PATCH
       fixRequestBody(proxyReq, req);
-        // Track destination for summary logging
         try { req.proxiedUrl = new URL(req.originalUrl, AUTH_SERVICE_URL).toString(); } catch (_) {}
     },
     onError: (err, req, res) => {
@@ -111,7 +99,6 @@ app.use(
   })
 );
 
-// Protected proxies
 function secureProxy(targetBaseUrl) {
   return [
     authenticateToken,
@@ -121,7 +108,6 @@ function secureProxy(targetBaseUrl) {
       logLevel: 'silent',
       pathRewrite: (path, req) => req.originalUrl,
       onProxyReq: (proxyReq, req, res) => {
-        // Always forward the original Authorization header/token downstream
         const incomingAuthHeader = req.headers.authorization;
         if (incomingAuthHeader) {
           proxyReq.setHeader('authorization', incomingAuthHeader);
@@ -130,14 +116,11 @@ function secureProxy(targetBaseUrl) {
             : incomingAuthHeader;
           proxyReq.setHeader('x-access-token', rawToken);
         }
-        // Forward user info as headers for downstream services if they want it
         if (req.user) {
           proxyReq.setHeader('x-user-id', req.user.sub || '');
           proxyReq.setHeader('x-user-role', req.user.role || 'user');
         }
-        // Ensure JSON body is forwarded for POST/PUT/PATCH
         fixRequestBody(proxyReq, req);
-        // Track destination for summary logging
         try { req.proxiedUrl = new URL(req.originalUrl, targetBaseUrl).toString(); } catch (_) {}
       },
       onError: (err, req, res) => {
@@ -151,11 +134,8 @@ function secureProxy(targetBaseUrl) {
   ];
 }
 
-// Devices service (preserve '/api/devices' path for downstream)
 app.use('/api/devices', ...secureProxy(DEVICES_SERVICE_URL));
 
-// Logs service (part of devices-service, preserve '/api/logs' path)
-// Use optional auth proxy since devices-service uses optionalAuth for logs
 function optionalAuthProxy(targetBaseUrl) {
   return [
     createProxyMiddleware({
@@ -176,7 +156,7 @@ function optionalAuthProxy(targetBaseUrl) {
             proxyReq.setHeader('x-user-id', payload?.sub || '');
             proxyReq.setHeader('x-user-role', payload?.role || 'user');
           } catch (_) {
-            // Token invalid or missing - allow request to proceed (optional auth)
+
           }
         }
         fixRequestBody(proxyReq, req);
@@ -195,27 +175,19 @@ function optionalAuthProxy(targetBaseUrl) {
 
 app.use('/api/logs', ...optionalAuthProxy(DEVICES_SERVICE_URL));
 
-// Rules service (preserve '/api/rules')
 app.use('/api/rules', ...secureProxy(RULES_SERVICE_URL));
 
-// Templates service (public endpoint, optional auth - forward if present)
 app.use('/api/templates', ...optionalAuthProxy(RULES_SERVICE_URL));
 
-// Admin rules routes (preserve '/api/admin/rules')
 app.use('/api/admin/rules', ...secureProxy(RULES_SERVICE_URL));
 
-// Admin templates routes (preserve '/api/admin/templates')
 app.use('/api/admin/templates', ...secureProxy(RULES_SERVICE_URL));
 
-// Support chat routes (user & admin)
 app.use('/api/support', ...secureProxy(RULES_SERVICE_URL));
 app.use('/api/admin/support', ...secureProxy(RULES_SERVICE_URL));
 
-// Alerts/notifications service (preserve '/api/notifications')
 app.use('/api/notifications', ...secureProxy(ALERTS_SERVICE_URL));
 
-// WebSocket proxies
-// Create proxy instances so we can handle upgrade events explicitly
 const devicesWsProxy = createProxyMiddleware({
   target: DEVICES_SERVICE_URL,
   changeOrigin: true,
@@ -240,7 +212,6 @@ const server = app.listen(PORT, () => {
   logger.info('proxy_targets', { AUTH_SERVICE_URL, DEVICES_SERVICE_URL, RULES_SERVICE_URL, ALERTS_SERVICE_URL });
 });
 
-// Explicitly proxy upgrade requests for socket.io
 server.on('upgrade', (req, socket, head) => {
   try {
     const url = req.url || '';

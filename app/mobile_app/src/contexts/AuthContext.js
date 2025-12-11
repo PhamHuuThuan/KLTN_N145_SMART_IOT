@@ -83,12 +83,11 @@ export const AuthProvider = ({ children }) => {
       if (result.success) {
         const profile = await authService.getProfile();
         const currentUser = profile?.success && profile.user ? profile.user : result.user;
-        setUser(currentUser);
-        setIsAuthenticated(true);
         setToken(result.token);
-        // Set token for all services
         notificationService.setAuthToken(result.token);
         setAuthToken(result.token);
+        setUser(currentUser);
+        setIsAuthenticated(true);
         
         // Initialize chat session for the logged-in user
         if (currentUser?.id) {
