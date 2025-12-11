@@ -8,7 +8,7 @@ const PADDING_X = 50;
 const PADDING_Y = 40; 
 const PADDING_BOTTOM = 20;
 const PADDING_LEFT = 10;
-const MAX_POINTS = 800;
+const MAX_POINTS = 5000;
 const MIN_HEIGHT = 120;
 const TOUCH_TOLERANCE = 30;
 const Y_AXIS_LABELS = 5;
@@ -151,7 +151,7 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
         return { points: [], minTime: Date.now(), maxTime: Date.now(), minValue: 0, maxValue: 1 };
       }
 
-      const pxPerPoint = Platform.OS === 'web' ? 8 : 15;
+      const pxPerPoint = Platform.OS === 'web' ? 3 : 5;
       const maxPointsForWidth = Math.min(MAX_POINTS, Math.floor(chartAreaWidth / pxPerPoint));
 
       let finalValues = values;
