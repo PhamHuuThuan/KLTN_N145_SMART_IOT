@@ -190,7 +190,7 @@ export const RULE_TEMPLATES = {
           type: 'sensor',
           sensor: 'gas_ppm',
           operator: '>=',
-          value: 401,
+          value: 701,
           unit: 'ppm'
         },
         {
@@ -438,7 +438,7 @@ export const RULE_TEMPLATES = {
           type: 'sensor',
           sensor: 'gas_ppm',
           operator: '>=',
-          value: 401,
+          value: 701,
           unit: 'ppm'
         },
         {

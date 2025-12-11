@@ -251,13 +251,8 @@
       },
       "gasHigh": {
         "name": "💨 High Gas Level",
-        "description": "Alert when gas concentration is between 401–1000 ppm",
+        "description": "Alert when gas concentration is between 701–1000 ppm",
         "message": "💨 Warning: High gas concentration detected! Check for leaks immediately."
-      },
-      "gasMedium": {
-        "name": "💨 Medium Gas Level",
-        "description": "Alert when gas concentration is between 200–400 ppm",
-        "message": "💨 Notice: Mild gas detected. Monitor and inspect regularly."
       },
       "smokeEmergency": {
         "name": "🚨 Smoke Emergency",
@@ -271,22 +266,22 @@
       },
       "tempHigh": {
         "name": "🌡️ High Temperature",
-        "description": "Alert when temperature is between 31–40°C",
+        "description": "Alert when temperature is between 35–40°C",
         "message": "🌡️ Warning: High temperature detected! Check cooling or ventilation systems."
       },
       "tempLow": {
         "name": "❄️ Low Temperature",
-        "description": "Alert when temperature < 15°C",
+        "description": "Alert when temperature < 25°C",
         "message": "❄️ Notice: Low temperature detected! Check heating or storage conditions."
       },
       "humidityEmergency": {
         "name": "🚨 Humidity Emergency",
-        "description": "Emergency alert when humidity > 80%",
+        "description": "Emergency alert when humidity > 70%",
         "message": "🚨 EMERGENCY ALERT: Excessive humidity! Risk of short circuit or equipment damage!"
       },
       "humidityHigh": {
         "name": "💧 High Humidity",
-        "description": "Alert when humidity is between 61–80%",
+        "description": "Alert when humidity is between 55–70%",
         "message": "💧 Warning: High humidity level! May cause mold or component corrosion."
       },
       "humidityLow": {

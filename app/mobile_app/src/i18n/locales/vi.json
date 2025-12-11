@@ -251,13 +251,8 @@
       },
       "gasHigh": {
         "name": "💨 Khí gas cao",
-        "description": "Cảnh báo khi khí gas 401–1000 ppm",
+        "description": "Cảnh báo khi khí gas 701–1000 ppm",
         "message": "💨 Cảnh báo: Nồng độ khí gas cao! Kiểm tra nguồn rò rỉ ngay."
-      },
-      "gasMedium": {
-        "name": "💨 Khí gas trung bình",
-        "description": "Cảnh báo khi khí gas 200–400 ppm",
-        "message": "💨 Cảnh báo: Phát hiện khí gas nhẹ. Theo dõi và kiểm tra định kỳ."
       },
       "smokeEmergency": {
         "name": "🚨 Khói khẩn cấp",
@@ -271,22 +266,22 @@
       },
       "tempHigh": {
         "name": "🌡️ Nhiệt độ cao",
-        "description": "Cảnh báo khi nhiệt độ 31–40°C",
+        "description": "Cảnh báo khi nhiệt độ 35–40°C",
         "message": "🌡️ Cảnh báo: Nhiệt độ cao! Kiểm tra hệ thống làm mát hoặc thông gió."
       },
       "tempLow": {
         "name": "❄️ Nhiệt độ thấp",
-        "description": "Cảnh báo khi nhiệt độ < 15°C",
+        "description": "Cảnh báo khi nhiệt độ < 25°C",
         "message": "❄️ Cảnh báo: Nhiệt độ thấp! Kiểm tra hệ thống sưởi hoặc môi trường lưu trữ."
       },
       "humidityEmergency": {
         "name": "🚨 Độ ẩm khẩn cấp",
-        "description": "Cảnh báo khẩn cấp khi độ ẩm > 80%",
+        "description": "Cảnh báo khẩn cấp khi độ ẩm > 70%",
         "message": "🚨 CẢNH BÁO KHẨN CẤP: Độ ẩm quá cao! Nguy cơ chập điện hoặc hư hại thiết bị!"
       },
       "humidityHigh": {
         "name": "💧 Độ ẩm cao",
-        "description": "Cảnh báo khi độ ẩm 61–80%",
+        "description": "Cảnh báo khi độ ẩm 55-70%",
         "message": "💧 Cảnh báo: Độ ẩm cao! Có thể gây nấm mốc, ảnh hưởng linh kiện."
       },
       "humidityLow": {
