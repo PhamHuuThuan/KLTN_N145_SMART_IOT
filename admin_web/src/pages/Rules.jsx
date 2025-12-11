@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '../hooks/useLanguage';
 import rulesService from '../services/rulesService';
 import devicesService from '../services/devicesService';
 import templatesService from '../services/templatesService';
 
 function Rules() {
   const { t } = useTranslation();
+  const { currentLanguage } = useLanguage();
   const [allRules, setAllRules] = useState([]); // All rules for counting
   const [rules, setRules] = useState([]); // Filtered rules for display
   const [loading, setLoading] = useState(true);
@@ -81,6 +83,7 @@ function Rules() {
       setTemplatesLoading(true);
       const response = await templatesService.getAllTemplates({
         isActive: 'true',
+        language: currentLanguage, // Filter by current language from menu
         limit: 1000
       });
       // Sort templates by priority: urgent > high > medium > low
@@ -102,9 +105,7 @@ function Rules() {
 
   const openCreateModal = () => {
     setShowCreateModal(true);
-    if (!templates.length) {
-      fetchTemplatesList();
-    }
+    fetchTemplatesList(); // Always fetch to get templates for current language
   };
 
   const closeCreateModal = () => {
@@ -166,14 +167,9 @@ function Rules() {
       isActive: template.isActive !== undefined ? template.isActive : true
     };
     
-    // Priority: Use device owner's ID first, fallback to admin ID if no owner
+    // Always use device ownerId if available
     if (targetDevice?.ownerId) {
-      const isObjectId = /^[0-9a-fA-F]{24}$/.test(String(targetDevice.ownerId));
-      if (isObjectId) {
-        payload.createdBy = targetDevice.ownerId;
-      } else if (createdByObjectId) {
-        payload.createdBy = createdByObjectId;
-      }
+      payload.createdBy = targetDevice.ownerId;
     } else if (createdByObjectId) {
       payload.createdBy = createdByObjectId;
     }
@@ -340,7 +336,7 @@ function Rules() {
 
   const formatCondition = (condition) => {
     const sensor = t(`rules.sensor.${condition.sensor}`, { defaultValue: condition.sensor });
-    const operator = t(`rules.operator.${condition.operator}`, { defaultValue: condition.operator });
+    const operator = condition.operator; // Use operator symbol directly instead of text
     const unit = condition.unit || '';
     
     return `${sensor} ${operator} ${condition.value}${unit}`;
@@ -545,7 +541,7 @@ function Rules() {
                             key={`${template.templateKey}-${template.language}`}
                             value={`${template.templateKey}::${template.language}`}
                           >
-                            {template.name} ({template.language.toUpperCase()}) - {template.priority}
+                            {template.name} ({template.language.toUpperCase()}) - {t(`templateEditor.priorities.${template.priority}`, { defaultValue: template.priority })}
                           </option>
                         ));
                       })()}
@@ -586,7 +582,7 @@ function Rules() {
                         <h4 style={styles.previewSubtitle}>{t('rules.templateActions')}</h4>
                         {selectedTemplate.actions?.map((action, idx) => (
                           <div key={idx} style={styles.previewItem}>
-                            {action.type} - {action.message}
+                            {action.message}
                           </div>
                         ))}
                       </div>
@@ -611,8 +607,8 @@ function Rules() {
                       </button>
                     </div>
                     <div style={styles.checkboxList}>
-                      {/* Group by language */}
-                      {['vi', 'en'].map((lang) => {
+                      {/* Group by language - only show current language */}
+                      {[currentLanguage].map((lang) => {
                         const langTemplates = templates.filter(t => t.language === lang);
                         if (langTemplates.length === 0) return null;
                         
@@ -668,7 +664,7 @@ function Rules() {
                                       style={styles.checkbox}
                                     />
                                     <span>
-                                      {template.name} - {template.priority}
+                                      {template.name} - {t(`templateEditor.priorities.${template.priority}`, { defaultValue: template.priority })}
                                     </span>
                                   </label>
                                 );

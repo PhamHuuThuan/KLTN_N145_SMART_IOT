@@ -15,12 +15,16 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import CONFIG from '../constants/config';
 import OverlayLoader from '../components/OverlayLoader';
 import ActionFeedback from '../components/ActionFeedback';
 
 const ProfileScreen = ({ navigation }) => {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const { user, updateProfile, logout, isLoading } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -45,7 +49,11 @@ const ProfileScreen = ({ navigation }) => {
     if (!isEditing) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow photo access to select an avatar.');
+      setFeedback({
+        visible: true,
+        type: 'error',
+        message: t('profile.allowPhotoAccess')
+      });
       return;
     }
 
@@ -65,7 +73,32 @@ const ProfileScreen = ({ navigation }) => {
   const [showLoader, setShowLoader] = useState(false);
   const [feedback, setFeedback] = useState({ visible: false, type: 'success', message: '' });
 
+  const isValidPhoneNumber = (phone) => {
+    if (!phone || !phone.trim()) {
+      return true; // Phone is optional
+    }
+    const trimmedPhone = phone.trim();
+    // Phone regex: 
+    // - Vietnamese format: 0xxxxxxxxx (10-11 digits, starting with 0)
+    // - International format: +84xxxxxxxxx (starting with +84 and 9-10 digits after)
+    const vietnamesePhoneRegex = /^0\d{9,10}$/; // 0 followed by 9-10 digits
+    const internationalPhoneRegex = /^\+84\d{9,10}$/; // +84 followed by 9-10 digits
+    
+    return vietnamesePhoneRegex.test(trimmedPhone) || internationalPhoneRegex.test(trimmedPhone);
+  };
+
   const handleSaveProfile = async () => {
+    // Validation
+    if (!formData.name.trim()) {
+      setFeedback({ visible: true, type: 'error', message: t('profile.fullNameRequired') });
+      return;
+    }
+
+    if (formData.phone && formData.phone.trim() && !isValidPhoneNumber(formData.phone)) {
+      setFeedback({ visible: true, type: 'error', message: t('profile.invalidPhoneNumber') });
+      return;
+    }
+
     try {
       setShowLoader(true);
       const result = await updateProfile(
@@ -75,7 +108,7 @@ const ProfileScreen = ({ navigation }) => {
       );
       
       if (result.success) {
-        setFeedback({ visible: true, type: 'success', message: 'Profile updated' });
+        setFeedback({ visible: true, type: 'success', message: t('profile.profileUpdated') });
         const updatedUser = result.user || {};
         setFormData({
           name: updatedUser.name || formData.name,
@@ -85,10 +118,10 @@ const ProfileScreen = ({ navigation }) => {
         });
         setIsEditing(false);
       } else {
-        setFeedback({ visible: true, type: 'error', message: result.error || 'Failed to update profile' });
+        setFeedback({ visible: true, type: 'error', message: result.error || t('profile.profileUpdateError') });
       }
     } catch (error) {
-      setFeedback({ visible: true, type: 'error', message: 'Failed to update profile' });
+      setFeedback({ visible: true, type: 'error', message: t('profile.profileUpdateError') });
     }
     finally {
       setShowLoader(false);
@@ -97,12 +130,12 @@ const ProfileScreen = ({ navigation }) => {
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      t('profile.logoutConfirm'),
+      t('profile.logoutConfirmMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         { 
-          text: 'Logout', 
+          text: t('common.logout'), 
           style: 'destructive',
           onPress: async () => {
             await logout();
@@ -113,46 +146,49 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const renderProfileInfo = () => (
-    <View style={[styles.section, styles.card]}> 
-      <Text style={styles.sectionTitle}>Profile Information</Text>
+    <View style={[styles.section, styles.card, { backgroundColor: colors.surface }]}> 
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('profile.personalInfo')}</Text>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Full Name</Text>
-        <View style={[styles.inputRow, !isEditing && styles.inputRowDisabled]}> 
-          <Ionicons name="person-outline" size={20} color={CONFIG.COLORS.gray} style={styles.inputIcon} />
+        <Text style={[styles.label, { color: colors.text }]}>{t('profile.fullName')}</Text>
+        <View style={[styles.inputRow, !isEditing && styles.inputRowDisabled, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+          <Ionicons name="person-outline" size={20} color={colors.gray} style={styles.inputIcon} />
           <TextInput
-            style={styles.inputInner}
+            style={[styles.inputInner, { color: colors.text }]}
             value={formData.name}
             onChangeText={(text) => setFormData({ ...formData, name: text })}
             editable={isEditing}
-            placeholder="Enter your full name"
+            placeholder={t('profile.enterFullName')}
+            placeholderTextColor={colors.textTertiary}
           />
         </View>
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Email</Text>
-        <View style={[styles.inputRow, styles.inputRowDisabled]}> 
-          <Ionicons name="mail-outline" size={20} color={CONFIG.COLORS.gray} style={styles.inputIcon} />
+        <Text style={[styles.label, { color: colors.text }]}>{t('common.email')}</Text>
+        <View style={[styles.inputRow, styles.inputRowDisabled, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}> 
+          <Ionicons name="mail-outline" size={20} color={colors.gray} style={styles.inputIcon} />
           <TextInput
-            style={styles.inputInner}
+            style={[styles.inputInner, { color: colors.textSecondary }]}
             value={formData.email}
             editable={false}
-            placeholder="Email address"
+            placeholder={t('profile.emailAddress')}
+            placeholderTextColor={colors.textTertiary}
           />
         </View>
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Phone Number</Text>
-        <View style={[styles.inputRow, !isEditing && styles.inputRowDisabled]}> 
-          <Ionicons name="call-outline" size={20} color={CONFIG.COLORS.gray} style={styles.inputIcon} />
+        <Text style={[styles.label, { color: colors.text }]}>{t('profile.phoneNumber')}</Text>
+        <View style={[styles.inputRow, !isEditing && styles.inputRowDisabled, { borderColor: colors.border, backgroundColor: colors.surface }]}> 
+          <Ionicons name="call-outline" size={20} color={colors.gray} style={styles.inputIcon} />
           <TextInput
-            style={styles.inputInner}
+            style={[styles.inputInner, { color: colors.text }]}
             value={formData.phone}
             onChangeText={(text) => setFormData({ ...formData, phone: text })}
             editable={isEditing}
-            placeholder="Enter your phone number"
+            placeholder={t('profile.enterPhoneNumber')}
+            placeholderTextColor={colors.textTertiary}
             keyboardType="phone-pad"
           />
         </View>
@@ -162,18 +198,18 @@ const ProfileScreen = ({ navigation }) => {
         {isEditing ? (
           <>
             <TouchableOpacity
-              style={[styles.ctaButton, styles.saveButton]}
+              style={[styles.ctaButton, { backgroundColor: colors.success }]}
               onPress={handleSaveProfile}
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color={CONFIG.COLORS.white} />
+                <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={styles.ctaText}>Save Changes</Text>
+                <Text style={styles.ctaText}>{t('profile.saveChanges')}</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.ctaButton, styles.cancelButton]}
+              style={[styles.ctaButton, { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border }]}
               onPress={() => {
                 setIsEditing(false);
                 setFormData({
@@ -184,15 +220,15 @@ const ProfileScreen = ({ navigation }) => {
                 });
               }}
             >
-              <Text style={[styles.ctaText, styles.cancelButtonText]}>Cancel</Text>
+              <Text style={[styles.ctaText, { color: colors.text }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </>
         ) : (
           <TouchableOpacity
-            style={[styles.ctaButton, styles.editButton]}
+            style={[styles.ctaButton, { backgroundColor: colors.primary }]}
             onPress={() => setIsEditing(true)}
           >
-            <Text style={styles.ctaText}>Edit Profile</Text>
+            <Text style={styles.ctaText}>{t('profile.editProfile')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -200,24 +236,24 @@ const ProfileScreen = ({ navigation }) => {
   );
 
   const renderAccountActions = () => (
-    <View style={[styles.section, styles.card]}>
-      <Text style={styles.sectionTitle}>Account</Text>
+    <View style={[styles.section, styles.card, { backgroundColor: colors.surface }]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('profile.account')}</Text>
       
       <TouchableOpacity
-        style={[styles.ctaButton, styles.logoutButton]}
+        style={[styles.ctaButton, { backgroundColor: colors.danger }]}
         onPress={handleLogout}
       >
-        <Text style={styles.ctaText}>Logout</Text>
+        <Text style={styles.ctaText}>{t('common.logout')}</Text>
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={CONFIG.THEME.primary} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
       
       <LinearGradient
-        colors={[CONFIG.THEME.primary, CONFIG.THEME.secondary]}
+        colors={[colors.primary, colors.secondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradientHeader}
@@ -227,7 +263,7 @@ const ProfileScreen = ({ navigation }) => {
             style={styles.backButton} 
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={24} color={CONFIG.COLORS.white} />
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
           </TouchableOpacity>
           <View style={styles.headerRight} />
         </View>
@@ -238,7 +274,7 @@ const ProfileScreen = ({ navigation }) => {
               onPress={handlePickAvatar}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="Change avatar"
+              accessibilityLabel={t('profile.changeAvatar')}
             >
               {formData.avatar ? (
                 <Image source={{ uri: formData.avatar }} style={styles.bigAvatarImage} />
@@ -252,30 +288,30 @@ const ProfileScreen = ({ navigation }) => {
             </TouchableOpacity>
             {isEditing && (
               <TouchableOpacity
-                style={styles.cameraBadge}
+                style={[styles.cameraBadge, { backgroundColor: colors.primary }]}
                 onPress={handlePickAvatar}
                 accessibilityRole="button"
-                accessibilityLabel="Pick avatar"
+                accessibilityLabel={t('profile.selectAvatar')}
               >
-                <Ionicons name="camera" size={16} color={CONFIG.COLORS.white} />
+                <Ionicons name="camera" size={16} color={colors.white} />
               </TouchableOpacity>
             )}
           </View>
           <View style={styles.headerUserInfo}>
-            <Text style={styles.userName}>{formData.name || 'User'}</Text>
+            <Text style={styles.userName}>{formData.name || t('profile.user')}</Text>
             <Text style={styles.userEmail}>{formData.email}</Text>
             {isEditing && (
-              <Text style={styles.editHint}>Tap avatar to change</Text>
+              <Text style={styles.editHint}>{t('profile.tapAvatarToChange')}</Text>
             )}
           </View>
         </View>
       </LinearGradient>
       
-      <ScrollView style={styles.content}>
+      <ScrollView style={[styles.content, { backgroundColor: colors.background }]}>
         {renderProfileInfo()}
         {renderAccountActions()}
       </ScrollView>
-      <OverlayLoader visible={showLoader} message={isEditing ? 'Saving...' : 'Loading...'} onCancel={() => setShowLoader(false)} />
+      <OverlayLoader visible={showLoader} message={isEditing ? t('common.saving') : t('common.loading')} onCancel={() => setShowLoader(false)} />
       <ActionFeedback visible={feedback.visible} type={feedback.type} message={feedback.message} onHide={() => setFeedback({ ...feedback, visible: false })} />
     </SafeAreaView>
   );
@@ -284,7 +320,6 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: CONFIG.THEME.background,
   },
   gradientHeader: {
     paddingTop: 32,
@@ -385,7 +420,6 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   section: {
-    backgroundColor: CONFIG.THEME.surface,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
     padding: CONFIG.DIMENSIONS.cardPadding,
     marginBottom: 16,
@@ -400,7 +434,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: CONFIG.COLORS.dark,
     marginBottom: 12,
   },
   inputGroup: {
@@ -409,19 +442,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: CONFIG.COLORS.dark,
     marginBottom: 5,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: CONFIG.THEME.border,
     borderRadius: CONFIG.DIMENSIONS.borderRadius,
-    backgroundColor: CONFIG.THEME.surface,
   },
   inputRowDisabled: {
-    backgroundColor: CONFIG.THEME.background,
   },
   inputIcon: {
     paddingLeft: 12,
@@ -460,27 +489,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 5,
   },
-  editButton: {
-    backgroundColor: CONFIG.THEME.primary,
-  },
-  saveButton: {
-    backgroundColor: CONFIG.THEME.success,
-  },
-  cancelButton: {
-    backgroundColor: CONFIG.THEME.background,
-    borderWidth: 1,
-    borderColor: CONFIG.THEME.border,
-  },
-  logoutButton: {
-    backgroundColor: CONFIG.THEME.danger,
-  },
   ctaText: {
     color: CONFIG.COLORS.white,
     fontSize: 16,
     fontWeight: '600',
-  },
-  cancelButtonText: {
-    color: CONFIG.COLORS.dark,
   },
 });
 

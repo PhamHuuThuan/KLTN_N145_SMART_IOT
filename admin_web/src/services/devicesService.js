@@ -57,15 +57,33 @@ class DevicesService {
   }
 
   // Get device telemetry history
-  async getTelemetryHistory(deviceId, hours = 24) {
+  async getTelemetryHistory(deviceId, hours = 24, sensorType = null) {
     try {
+      const params = { hours };
+      if (sensorType) {
+        params.sensorType = sensorType;
+      }
+      
       const response = await api.get(`/api/logs/${deviceId}/history`, {
-        params: { hours }
+        params
       });
       return response.data;
     } catch (error) {
       console.error('Error fetching telemetry history:', error);
-      throw error;
+      if (error.response?.data) {
+        return {
+          success: false,
+          message: error.response.data.message || error.response.data.error || 'Server error',
+          error: error.response.data.error || error.response.data.message,
+          status: error.response.status
+        };
+      }
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch telemetry history',
+        error: error.message || 'Network error',
+        status: error.response?.status || 0
+      };
     }
   }
 }

@@ -2,10 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../contexts/ThemeContext';
 import CONFIG from '../constants/config';
 
 const TemplateCard = ({ template, onPress, isCreating }) => {
   const { t } = useTranslation();
+  const { colors } = useTheme();
   
   const getPriorityInfo = (priority) => {
     const priorityMap = {
@@ -28,31 +30,31 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
   const priorityInfo = getPriorityInfo(template.priority);
 
   return (
-    <View style={styles.templateCard}>
+    <View style={[styles.templateCard, { backgroundColor: colors.surface, borderLeftColor: colors.border }]}>
       <View style={styles.templateHeader}>
-        <Text style={styles.templateName}>{t(template.name)}</Text>
+        <Text style={[styles.templateName, { color: colors.primary }]}>{t(template.name)}</Text>
         <View style={[styles.priorityBadge, { backgroundColor: priorityInfo.color }]}>
           <MaterialIcons name={priorityInfo.icon} size={12} color="white" />
           <Text style={styles.priorityText}>{priorityInfo.label}</Text>
         </View>
       </View>
-      <Text style={styles.templateDescription}>{t(template.description)}</Text>
+      <Text style={[styles.templateDescription, { color: colors.textSecondary }]}>{t(template.description)}</Text>
       
       {/* Template Stats */}
       <View style={styles.templateMeta}>
-        <View style={styles.templateStats}>
+        <View style={[styles.templateStats, { borderTopColor: colors.border }]}>
           {template.priority !== 'urgent' && (
             <View style={styles.statItem}>
-              <MaterialIcons name="timer" size={12} color={CONFIG.THEME.gray} />
-              <Text style={styles.statText}>
+              <MaterialIcons name="timer" size={12} color={colors.gray} />
+              <Text style={[styles.statText, { color: colors.textSecondary }]}>
                 {t('rules.cooldown')} {formatCooldown(template.cooldownPeriod)}
               </Text>
             </View>
           )}
           {template.priority !== 'urgent' && (
             <View style={styles.statItem}>
-              <MaterialIcons name="repeat" size={12} color={CONFIG.THEME.gray} />
-              <Text style={styles.statText}>
+              <MaterialIcons name="repeat" size={12} color={colors.gray} />
+              <Text style={[styles.statText, { color: colors.textSecondary }]}>
                 {t('rules.unlimitedAlerts')}
               </Text>
             </View>
@@ -71,7 +73,8 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
       <TouchableOpacity
         style={[
           styles.createButton,
-          isCreating && styles.createButtonDisabled
+          { backgroundColor: colors.primary },
+          isCreating && { backgroundColor: colors.gray }
         ]}
         onPress={onPress}
         disabled={isCreating}
@@ -79,9 +82,9 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
         <MaterialIcons 
           name={isCreating ? "hourglass-empty" : "tune"} 
           size={20} 
-          color={CONFIG.THEME.surface} 
+          color={colors.white} 
         />
-        <Text style={styles.createButtonText}>
+        <Text style={[styles.createButtonText, { color: colors.white }]}>
           {isCreating ? t('rules.creatingLabel') : t('rules.customizeAndCreate')}
         </Text>
       </TouchableOpacity>
@@ -91,7 +94,6 @@ const TemplateCard = ({ template, onPress, isCreating }) => {
 
 const styles = StyleSheet.create({
   templateCard: {
-    backgroundColor: CONFIG.THEME.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -101,7 +103,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderLeftWidth: 4,
-    borderLeftColor: '#E8F5E8',
   },
   templateHeader: {
     flexDirection: 'row',
@@ -111,7 +112,6 @@ const styles = StyleSheet.create({
   templateName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: CONFIG.THEME.primary,
     marginLeft: 12,
     flex: 1,
   },
@@ -124,14 +124,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   priorityText: {
-    color: CONFIG.THEME.surface,
+    color: CONFIG.COLORS.white,
     fontSize: 11,
     fontWeight: 'bold',
     marginLeft: 4,
   },
   templateDescription: {
     fontSize: 12,
-    color: CONFIG.THEME.gray,
     marginBottom: 8,
     lineHeight: 18,
   },
@@ -143,7 +142,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F5F5F5',
   },
   statItem: {
     flexDirection: 'row',
@@ -152,7 +150,6 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 9,
-    color: CONFIG.THEME.gray,
     marginLeft: 4,
     fontWeight: '500',
   },
@@ -160,17 +157,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: CONFIG.THEME.primary,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
     marginTop: 12,
   },
-  createButtonDisabled: {
-    backgroundColor: CONFIG.THEME.gray,
-  },
   createButtonText: {
-    color: CONFIG.THEME.white || '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 8,

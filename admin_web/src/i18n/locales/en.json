@@ -90,7 +90,19 @@
     "chartTemperature": "Temperature",
     "chartHumidity": "Humidity",
     "chartGas": "Gas",
-    "chartSmoke": "Smoke"
+    "chartSmoke": "Smoke",
+    "chartSelectedPoint": "Selected Point",
+    "chartTime": "Time",
+    "chartValue": "Value",
+    "chartLevel": "Level",
+    "smokeDetected": "Smoke detected",
+    "smokeSafe": "Safe",
+    "legend": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High",
+      "veryHigh": "Very High"
+    }
   },
   "deviceEditor": {
     "createTitle": "Add New Device",
@@ -315,8 +327,8 @@
     "description": "Description",
     "device": "Device *",
     "selectDevice": "Select Device",
-    "owner": "OwnerId",
-    "ownerHint": "Leave empty to use admin ID",
+    "owner": "Owner",
+    "selectOwner": "Select Owner",
     "priority": "Priority Level",
     "cooldown": "Cooldown Period (ms)",
     "isActive": "Activate immediately",
