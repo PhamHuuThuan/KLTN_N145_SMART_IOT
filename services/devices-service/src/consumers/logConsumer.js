@@ -2,7 +2,6 @@ import { Kafka } from 'kafkajs';
 import DeviceLog from '../models/DeviceLog.js';
 import Device from '../models/Device.js';
 import { DEVICE_STATUS } from '../constants/deviceStatus.js';
-import MessageCount from '../models/MessageCount.js';
 import { emitDeviceTelemetry } from '../realtime/socket.js';
 import dotenv from 'dotenv';
 import logger from '../utils/logger.js'; 
@@ -89,7 +88,7 @@ async function updateDeviceStatus(data) {
         smoke: hasValue(payload.smoke) ? payload.smoke : prev.smoke,
         gas_ppm: hasValue(payload.gas_ppm) ? payload.gas_ppm : prev.gas_ppm,
         flame: hasValue(payload.flame) ? payload.flame : prev.flame,
-        o: (payload.o || payload.outlets || prev.o || {})
+        o: (payload.o || prev.o || {})
       };
       emitDeviceTelemetry(deviceId, device.latestTelemetry, device);
     } else if (type === 'event' && payload.o) {
@@ -109,12 +108,6 @@ async function updateDeviceStatus(data) {
     
   } catch (error) {
     logger.error(`Error updating device status:`, error);
-    logger.error(`Error details:`, {
-      message: error.message,
-      stack: error.stack,
-      deviceId: data?.deviceId,
-      payload: data?.payload
-    });
   }
 }
 
@@ -145,35 +138,6 @@ async function startLogConsumer() {
             } catch (parseErr) {
               logger.error(`Invalid JSON message, skipping: ${parseErr.message}`);
               return;
-            }
-
-            try {
-              const date = new Date().toISOString().slice(0, 10);
-              await swallowError('MessageCount topic increment', () =>
-                MessageCount.increment({ kind: 'topic', topic, date })
-              );
-              if (logData.deviceId) {
-                await swallowError('MessageCount device increment', () =>
-                  MessageCount.increment({ kind: 'device', deviceId: logData.deviceId, date })
-                );
-              }
-
-              try {
-                const topicKey = [ 'topic', topic, date ].join('|');
-                const topicDoc = await swallowError('MessageCount topic read', () =>
-                  MessageCount.findOne({ key: topicKey }).lean()
-                );
-                if (logData.deviceId) {
-                  const deviceKey = [ 'device', logData.deviceId, date ].join('|');
-                  await swallowError('MessageCount device read', () =>
-                    MessageCount.findOne({ key: deviceKey }).lean()
-                  );
-                }
-              } catch (readErr) {
-                logger.warn(`Could not read message counters after increment: ${readErr.message}`);
-              }
-            } catch (incErr) {
-              logger.error(`Failed to increment message counters: ${incErr.message}`);
             }
 
             const shouldSaveLog = async (logData) => {
