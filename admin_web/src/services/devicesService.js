@@ -57,8 +57,6 @@ class DevicesService {
   }
 
   // Get device telemetry history
-  // Note: When sensorType is not provided, backend may have issues with path collision
-  // So we'll try to get all data by calling without sensorType, but handle errors gracefully
   async getTelemetryHistory(deviceId, hours = 24, sensorType = null) {
     try {
       const params = { hours };
@@ -69,14 +67,10 @@ class DevicesService {
       const response = await api.get(`/api/logs/${deviceId}/history`, {
         params
       });
-      // Return the full response data, which should include success flag and data array
       return response.data;
     } catch (error) {
       console.error('Error fetching telemetry history:', error);
-      // Always return an object, never throw
-      // This allows the component to handle errors gracefully
       if (error.response?.data) {
-        // Server returned an error response with data
         return {
           success: false,
           message: error.response.data.message || error.response.data.error || 'Server error',
@@ -84,7 +78,6 @@ class DevicesService {
           status: error.response.status
         };
       }
-      // Network error or other error without response
       return {
         success: false,
         message: error.message || 'Failed to fetch telemetry history',
