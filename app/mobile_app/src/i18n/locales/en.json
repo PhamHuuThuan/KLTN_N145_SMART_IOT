@@ -261,18 +261,8 @@
       },
       "smokeEmergency": {
         "name": "🚨 Smoke Emergency",
-        "description": "Emergency alert when smoke concentration > 700 ppm",
+        "description": "Emergency alert when smoke concentration",
         "message": "🚨 EMERGENCY ALERT: Dense smoke detected! High risk of fire or CO exposure!"
-      },
-      "smokeHigh": {
-        "name": "🔥 High Smoke Level",
-        "description": "Alert when smoke concentration is between 301–700 ppm",
-        "message": "🔥 Warning: Heavy smoke detected! Possible fire, check immediately."
-      },
-      "smokeMedium": {
-        "name": "💨 Medium Smoke Level",
-        "description": "Alert when smoke concentration is between 100–300 ppm",
-        "message": "💨 Notice: Light smoke detected. Could be dust or mild vapor."
       },
       "tempEmergency": {
         "name": "🚨 Temperature Emergency",

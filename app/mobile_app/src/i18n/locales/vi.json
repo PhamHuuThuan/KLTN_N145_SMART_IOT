@@ -261,18 +261,8 @@
       },
       "smokeEmergency": {
         "name": "🚨 Khói khẩn cấp",
-        "description": "Cảnh báo khẩn cấp khi khói > 700 ppm",
+        "description": "Cảnh báo khẩn cấp phát hiện có khói",
         "message": "🚨 CẢNH BÁO KHẨN CẤP: Nồng độ khói đậm! Nguy cơ cháy hoặc khí CO cao!"
-      },
-      "smokeHigh": {
-        "name": "🔥 Khói cao",
-        "description": "Cảnh báo khi khói 301–700 ppm",
-        "message": "🔥 Cảnh báo: Phát hiện khói đậm! Kiểm tra ngay để phòng cháy."
-      },
-      "smokeMedium": {
-        "name": "💨 Khói trung bình",
-        "description": "Cảnh báo khi khói 100–300 ppm",
-        "message": "💨 Cảnh báo: Phát hiện khói nhẹ. Có thể do bụi hoặc hơi nóng."
       },
       "tempEmergency": {
         "name": "🚨 Nhiệt độ khẩn cấp",
@@ -306,7 +296,7 @@
       },
       "flameDetected": {
         "name": "🔥 Phát hiện lửa",
-        "description": "Cảnh báo khẩn cấp khi cảm biến lửa kích hoạt",
+        "description": "Cảnh báo khẩn cấp phát hiện có lửa",
         "message": "🔥 CẢNH BÁO KHẨN CẤP: Phát hiện ngọn lửa! Dừng thiết bị và xử lý ngay lập tức!"
       }
     },
