@@ -19,11 +19,18 @@ class RuleEvaluationService {
     });
     this.producer = this.kafka.producer();
     this.producerConnected = false;
-    
     this.priorityService = new RulePriorityService();
     
     this.lastEvaluationTime = new Map();
-    this.evaluationCooldown = 5000; // 5 seconds minimum between evaluations
+    // Emergency alert spam control
+    const rawResendInterval = Number(process.env.EMERGENCY_ALERT_RESEND_INTERVAL_MS || '30000'); // 30s
+    const rawCooldownAfterExit = Number(process.env.EMERGENCY_ALERT_COOLDOWN_AFTER_EXIT_MS || String(30 * 60 * 1000)); // 30m
+    this.emergencyResendIntervalMs = Number.isFinite(rawResendInterval) && rawResendInterval > 0 ? rawResendInterval : 30000;
+    const minCooldown = 30 * 60 * 1000;
+    const maxCooldown = 60 * 60 * 1000;
+    const sanitizedCooldown = Number.isFinite(rawCooldownAfterExit) ? rawCooldownAfterExit : minCooldown;
+    this.emergencyCooldownAfterExitMs = Math.min(Math.max(sanitizedCooldown, minCooldown), maxCooldown);
+    this.lastEmergencyAlertTime = new Map();
 
     // ML support configuration
     this.mlSupportEnabled = process.env.ML_SUPPORT_ENABLED !== 'false';
@@ -104,9 +111,6 @@ class RuleEvaluationService {
       }
       const now = Date.now();
       const lastTime = this.lastEvaluationTime.get(deviceId);
-      // if (lastTime && (now - lastTime) < this.evaluationCooldown) {
-      //   return;
-      // }
       
       this.lastEvaluationTime.set(deviceId, now);
 
@@ -129,6 +133,26 @@ class RuleEvaluationService {
             }
           })
         ).then(results => results.filter(Boolean));
+      }
+
+      // Throttle emergency (urgent) alerts to avoid spamming users
+      if (triggeredRules.length > 0) {
+        const throttled = [];
+        triggeredRules = triggeredRules.filter(rule => {
+          const { allowed, reason, nextAllowedAt } = this.shouldAllowEmergencyAlert(deviceId, sensorData, rule);
+          if (!allowed) {
+            throttled.push({ ruleName: rule.name, reason, nextAllowedAt });
+          }
+          return allowed;
+        });
+
+        if (throttled.length > 0) {
+          throttled.forEach(item => {
+            const waitMs = item.nextAllowedAt ? item.nextAllowedAt - Date.now() : null;
+            const waitSec = waitMs && waitMs > 0 ? Math.ceil(waitMs / 1000) : null;
+            logger.info(`Throttled emergency alert for rule ${item.ruleName} (${item.reason})${waitSec ? ` - next in ~${waitSec}s` : ''}`);
+          });
+        }
       }
   
       // 📢 Xử lý kết quả theo priority
@@ -217,6 +241,37 @@ class RuleEvaluationService {
       logger.error(`evaluateRule() error for ${rule.name}:`, err);
       return false;
     }
+  }
+
+  // Kiểm soát spam cảnh báo khẩn cấp dựa trên emergencyMode/lastEmergencyAt
+  shouldAllowEmergencyAlert(deviceId, sensorData, rule) {
+    if (!rule || rule.priority !== 'urgent') {
+      return { allowed: true };
+    }
+
+    const now = Date.now();
+    const emergencyMode = Boolean(sensorData?.emergencyMode);
+    const lastEmergencyAtValue = sensorData?.lastEmergencyAt;
+    const lastEmergencyAtMs = lastEmergencyAtValue ? new Date(lastEmergencyAtValue).getTime() : null;
+
+    if (emergencyMode) {
+      const lastSent = this.lastEmergencyAlertTime.get(deviceId);
+      if (lastSent && (now - lastSent) < this.emergencyResendIntervalMs) {
+        return { allowed: false, reason: 'emergency_mode_resend_interval', nextAllowedAt: lastSent + this.emergencyResendIntervalMs };
+      }
+      this.lastEmergencyAlertTime.set(deviceId, now);
+      return { allowed: true };
+    }
+
+    if (lastEmergencyAtMs && Number.isFinite(lastEmergencyAtMs)) {
+      const cooldownUntil = lastEmergencyAtMs + this.emergencyCooldownAfterExitMs;
+      if (now < cooldownUntil) {
+        return { allowed: false, reason: 'post_emergency_cooldown', nextAllowedAt: cooldownUntil };
+      }
+    }
+
+    this.lastEmergencyAlertTime.set(deviceId, now);
+    return { allowed: true };
   }
 
   // Kiểm tra rule có thể trigger với escalation logic
