@@ -71,6 +71,14 @@ const ruleSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  dailyTriggerCount: {
+    type: Number,
+    default: 0
+  },
+  lastTriggerDate: {
+    type: Date,
+    default: null
+  },
   lastTriggeredAt: {
     type: Date,
     default: null
@@ -190,8 +198,18 @@ ruleSchema.methods.shouldEscalate = function(currentValue, sensorType) {
 
 // Increment trigger count
 ruleSchema.methods.incrementTriggerCount = function() {
+  const now = new Date();
+  const todayKey = now.toDateString();
+  const lastKey = this.lastTriggerDate ? new Date(this.lastTriggerDate).toDateString() : null;
+
+  if (todayKey !== lastKey) {
+    this.dailyTriggerCount = 0;
+  }
+
   this.triggerCount++;
-  this.lastTriggeredAt = new Date();
+  this.dailyTriggerCount++;
+  this.lastTriggerDate = now;
+  this.lastTriggeredAt = now;
   return this.save();
 };
 
