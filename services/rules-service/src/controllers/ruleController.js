@@ -83,7 +83,8 @@ export const createRule = async (req, res) => {
       actions,
       cooldownPeriod: cooldownPeriod || 300000,
       isActive: isActive !== undefined ? isActive : true,
-      triggerCount: 0
+      triggerCount: 0,
+      dailyTriggerCount: 0
     });
 
     await rule.save();

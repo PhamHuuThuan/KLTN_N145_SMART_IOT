@@ -10,11 +10,11 @@ class RulePriorityService {
     return rules.sort((a, b) => {
       const priorityA = this.priorityOrder.indexOf(a.priority);
       const priorityB = this.priorityOrder.indexOf(b.priority);
-      
+
       if (priorityA !== priorityB) {
         return priorityA - priorityB; // urgent (0) trước, low (3) sau
       }
-      
+
       // Nếu cùng priority, sắp xếp theo thời gian tạo
       return new Date(a.createdAt) - new Date(b.createdAt);
     });
@@ -29,12 +29,15 @@ class RulePriorityService {
       timestamp: new Date(),
       deviceId: sensorData.deviceId,
       severity: this.getIncidentSeverity(rules),
+
       rules: rules.map(r => ({
         id: r._id,
         name: r.name,
         priority: r.priority,
-        category: r.category
+        category: r.category,
+        conditions: r.conditions || []
       })),
+
       summary: this.buildIncidentSummary(rules)
     };
 
@@ -58,21 +61,21 @@ class RulePriorityService {
     const urgentRules = rules.filter(r => r.priority === 'urgent');
     const highRules = rules.filter(r => r.priority === 'high');
     const normalRules = rules.filter(r => ['medium', 'low'].includes(r.priority));
-    
+
     const summaries = [];
-    
+
     if (urgentRules.length > 0) {
       summaries.push(`🚨 CRITICAL: ${urgentRules.map(r => r.name).join(', ')}`);
     }
-    
+
     if (highRules.length > 0) {
       summaries.push(`⚠️ Safety: ${highRules.map(r => r.name).join(', ')}`);
     }
-    
+
     if (normalRules.length > 0) {
       summaries.push(`ℹ️ Normal: ${normalRules.map(r => r.name).join(', ')}`);
     }
-    
+
     return summaries.join(' | ');
   }
 
@@ -86,13 +89,13 @@ class RulePriorityService {
       medium: [],
       low: []
     };
-    
+
     rules.forEach(rule => {
       if (groups[rule.priority]) {
         groups[rule.priority].push(rule);
       }
     });
-    
+
     // Chỉ trả về các nhóm có rules
     return Object.fromEntries(
       Object.entries(groups).filter(([priority, rules]) => rules.length > 0)
@@ -104,9 +107,9 @@ class RulePriorityService {
    */
   buildDetailedConsolidatedNotification(incident, userId, sensorData) {
     const { severity, rules, deviceId } = incident;
-    
+
     let title, message;
-    
+
     if (severity === 'critical') {
       title = '🚨 EMERGENCY ALERT';
     } else if (severity === 'high') {
@@ -114,14 +117,18 @@ class RulePriorityService {
     } else {
       title = '📊 MULTIPLE ALERTS';
     }
-    
+
     // Tạo message chi tiết cho từng rule
     const detailedMessages = rules.map(rule => {
+      if (!rule.conditions || rule.conditions.length === 0) {
+        return `📌 ${rule.name}: (No condition details available)`;
+      }
+
       const condition = rule.conditions[0];
       const sensorType = condition.sensor;
       const threshold = condition.value;
       const operator = condition.operator;
-      
+
       // Lấy giá trị sensor hiện tại
       let sensorValue;
       switch (sensorType) {
@@ -146,7 +153,7 @@ class RulePriorityService {
         default:
           sensorValue = 'N/A';
       }
-      
+
       // Tạo message cho từng rule
       switch (sensorType) {
         case 'temperature':
@@ -165,9 +172,9 @@ class RulePriorityService {
           return `📊 ${rule.name}: ${sensorType} ${operator} ${threshold}`;
       }
     });
-    
+
     message = detailedMessages.join('\n\n');
-    
+
     // Map severity to priority
     const priorityMap = {
       'critical': 'urgent',
