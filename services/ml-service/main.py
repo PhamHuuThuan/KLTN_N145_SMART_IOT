@@ -7,14 +7,12 @@ from contextlib import asynccontextmanager
 from services.ml_service import MLService
 from controllers.ml_controller import setup_routes
 
-# Load env var
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except Exception:
     pass
 
-# Logging setup
 log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
 log_level = getattr(logging, log_level_name, logging.INFO)
 logging.basicConfig(
@@ -23,11 +21,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Reduce noise from uvicorn
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
-# Global service instance
 ml_service_instance = None
 
 @asynccontextmanager
@@ -38,17 +34,14 @@ async def lifespan(app: FastAPI):
     logger.info("Starting ML Service (Multivariate Isolation Forest)...")
     
     try:
-        # Khởi tạo Service (Tự động load model và init cache)
         ml_service_instance = MLService()
         
-        # Inject service vào controller
         router = setup_routes(ml_service_instance)
         app.include_router(router)
         
         logger.info("ML Service initialized successfully")
     except Exception as e:
         logger.error(f"Error during startup: {e}")
-        # Không raise error để container không crash loop, nhưng service sẽ không chạy đúng
     
     yield
     
@@ -57,7 +50,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ML Service",
     description="Multivariate Anomaly Detection Service for Smart IoT",
-    version="2.0.0", # Bump version
+    version="2.0.0",
     lifespan=lifespan
 )
 

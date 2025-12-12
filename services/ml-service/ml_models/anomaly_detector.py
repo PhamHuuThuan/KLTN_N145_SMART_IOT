@@ -24,8 +24,6 @@ class AnomalyDetector:
         self.default_device_id = "__global__"
         self.device_states: Dict[str, Dict] = {}
         
-        # Cache lưu giá trị mới nhất của từng sensor để ghép thành vector đa biến
-        # Cấu trúc: { 'device_id': { 'temperature': 30, 'gas_ppm': 300, ... } }
         self.latest_sensor_values: Dict[str, Dict[str, float]] = {}
         
         self.is_trained = False
@@ -33,15 +31,14 @@ class AnomalyDetector:
     def _new_state(self) -> Dict:
         return {
             "model": IsolationForest(
-                contamination=0.02,     # 2% dữ liệu là bất thường (giảm báo ảo)
-                n_estimators=200,       # Nhiều cây hơn để chính xác hơn
+                contamination=0.02,
+                n_estimators=200,
                 max_samples='auto',
                 random_state=42,
                 n_jobs=-1
             ),
             "scaler": StandardScaler(),
             "is_trained": False,
-            # QUAN TRỌNG: Định nghĩa cứng thứ tự các đặc trưng trong vector
             "feature_names": ['temperature', 'humidity', 'gas_ppm', 'smoke'],
             "buffer": deque(maxlen=self.max_buffer_size),
             "last_retrain_at": datetime.min,
@@ -89,7 +86,6 @@ class AnomalyDetector:
             if not training_data:
                 return False
 
-            # 1. Gom nhóm dữ liệu theo Device ID
             groups = {}
             if device_id:
                 groups = {self._get_device_id(device_id): training_data}
@@ -107,14 +103,10 @@ class AnomalyDetector:
                 state = self._get_state(dev_id)
                 required_features = state["feature_names"]
 
-                # 2. Xử lý dữ liệu bằng Pandas
                 df = pd.DataFrame(samples)
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
-                # Làm tròn thời gian về giây để gom các sensor gửi gần nhau
                 df['ts_rounded'] = df['timestamp'].dt.round('1s')
 
-                # Pivot: Chuyển đổi từ dạng dọc sang dạng ngang (Vector)
-                # Mỗi dòng sẽ là: [Time, Temp, Humid, Gas, Smoke]
                 df_pivot = df.pivot_table(
                     index='ts_rounded',
                     columns='sensor_type',
@@ -122,23 +114,18 @@ class AnomalyDetector:
                     aggfunc='mean'
                 )
 
-                # Bổ sung các cột thiếu (nếu có)
                 for col in required_features:
                     if col not in df_pivot.columns:
                         df_pivot[col] = 0.0
                 
-                # Sắp xếp đúng thứ tự cột
                 df_pivot = df_pivot[required_features]
 
-                # Fill các giá trị NaN bằng giá trị trước đó (Forward Fill)
                 df_pivot = df_pivot.fillna(method='ffill').fillna(method='bfill').fillna(0)
 
                 X = df_pivot.values
 
                 if len(X) < 20: continue
 
-                # 3. Train Model
-                # Scale dữ liệu để các đơn vị (ppm, độ C) không lấn át nhau
                 try:
                     X_scaled = state["scaler"].fit_transform(X)
                 except Exception:
@@ -174,7 +161,6 @@ class AnomalyDetector:
         try:
             dev_id = self._get_device_id(device_id)
             
-            # 1. Lưu buffer để train sau này
             self._record_sample(dev_id, value, sensor_type)
             self._maybe_retrain(dev_id)
 
@@ -182,41 +168,32 @@ class AnomalyDetector:
             if not state["is_trained"]:
                 return 0.0, False
 
-            # 2. Cập nhật bộ nhớ đệm (Cache) giá trị mới nhất
             if dev_id not in self.latest_sensor_values:
-                # Giá trị khởi tạo an toàn nếu chưa có gì
                 self.latest_sensor_values[dev_id] = {
                     'temperature': 30.0, 'humidity': 60.0, 'gas_ppm': 300.0, 'smoke': 0.0
                 }
             
             self.latest_sensor_values[dev_id][sensor_type] = float(value)
 
-            # 3. Tạo Vector từ bộ nhớ đệm
             feature_order = state["feature_names"]
             vector = []
             for feature in feature_order:
-                # Lấy giá trị từ cache, nếu thiếu thì lấy 0
                 val = self.latest_sensor_values[dev_id].get(feature, 0.0)
                 vector.append(val)
             
             features = np.array([vector], dtype=float)
 
-            # 4. Predict
             try:
                 if hasattr(state["scaler"], "scale_"):
                     features = state["scaler"].transform(features)
             except Exception:
                 pass
 
-            # decision_function trả về số âm là bất thường, dương là bình thường
             raw_score = state["model"].decision_function(features)[0]
             
-            # Chuẩn hóa về thang 0.0 -> 1.0 (1.0 là RẤT BẤT THƯỜNG)
-            # Công thức này đảo ngược lại: score càng cao càng nguy hiểm
             normalized = 0.5 - (raw_score) 
             anomaly_score = float(max(0.0, min(1.0, normalized)))
             
-            # Ngưỡng phát hiện
             is_anomaly = anomaly_score > 0.75
             
             return anomaly_score, bool(is_anomaly)
@@ -229,7 +206,6 @@ class AnomalyDetector:
         state = self._get_state(device_id)
         buffer = state["buffer"]
         
-        # Chỉ retrain nếu đủ dữ liệu và đủ thời gian trôi qua
         if len(buffer) < self.retrain_min_samples:
             return
 
@@ -237,7 +213,6 @@ class AnomalyDetector:
         if now - state["last_retrain_at"] < self.retrain_interval:
             return
 
-        # Lấy data từ buffer ra train
         samples = list(buffer)
         success = self.train(samples, device_id=device_id)
         
@@ -245,7 +220,6 @@ class AnomalyDetector:
             buffer.clear()
             state["last_retrain_at"] = now
 
-    # --- Các hàm Load/Save giữ nguyên logic cũ nhưng cập nhật path ---
     def _save_device_state(self, device_id: str, state: Dict):
         try:
             device_dir = self._device_dir(device_id)
