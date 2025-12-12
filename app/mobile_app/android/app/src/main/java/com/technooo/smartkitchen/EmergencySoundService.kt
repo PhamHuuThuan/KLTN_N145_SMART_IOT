@@ -30,10 +30,10 @@ class EmergencySoundService : Service() {
     const val ACTION_STOP = "com.technooo.smartkitchen.action.STOP_EMERGENCY"
     
     // Escalation levels (in seconds)
-    private const val LEVEL_1_TIME = 30_000L   // 30s: Volume 50%
-    private const val LEVEL_2_TIME = 60_000L   // 60s: Volume 75%
-    private const val LEVEL_3_TIME = 90_000L   // 90s: Volume 100%
-    private const val MAX_DURATION = 300_000L  // 5 minutes max
+    private const val LEVEL_1_TIME = 10_000L
+    private const val LEVEL_2_TIME = 20_000L
+    private const val LEVEL_3_TIME = 30_000L
+    private const val MAX_DURATION = 300_000L
   }
 
   override fun onBind(intent: Intent?): IBinder? = null
