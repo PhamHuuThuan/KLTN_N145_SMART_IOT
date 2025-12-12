@@ -230,10 +230,8 @@ class RuleEvaluationService {
         return false;
       }
       
-      // Increment trigger count and update last triggered time (skip for urgent rules)
-      if (!isUrgent) {
-        await rule.incrementTriggerCount();
-      }
+      // Increment trigger count for all priorities
+      await rule.incrementTriggerCount();
       
       // Don't execute actions here - let evaluateRules handle it
       return true;
