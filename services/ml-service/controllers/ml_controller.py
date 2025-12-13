@@ -37,11 +37,11 @@ def setup_routes(ml_service: MLService):
             "device_id": pred.get("device_id"),
             "sensor_type": pred.get("sensor_type"),
             "prediction_score": pred.get("prediction_score"),
-            "raw_ai_score": pred.get("raw_ai_score"), # Thêm trường này để debug AI
+            "raw_ai_score": pred.get("raw_ai_score"),
             "alert_level": pred.get("alert_level"),
             "is_danger": pred.get("is_danger"),
             "timestamp": pred.get("timestamp"),
-            "trend": pred.get("trend") # Thêm trend info
+            "trend": pred.get("trend")
         }
 
     @router.post("/predict", response_model=Dict)
@@ -56,7 +56,6 @@ def setup_routes(ml_service: MLService):
                     "success": True,
                     "prediction": _compact_prediction(result) if compact else result
                 }
-            # Nếu result là None (do thiếu dữ liệu hoặc lỗi)
             raise HTTPException(status_code=400, detail="Failed to process prediction")
             
         except HTTPException:
@@ -109,14 +108,12 @@ def setup_routes(ml_service: MLService):
             device_id = doc.get('deviceId') or doc.get('device_id') or 'unknown'
             payload = doc.get('payload', {})
 
-            # Map các trường từ payload sang format chuẩn
             mapping = {
                 'temperature': payload.get('temp'),
                 'humidity': payload.get('humid'),
                 'smoke': payload.get('smoke'),
                 'gas_ppm': payload.get('gas_ppm') or payload.get('gas')
             }
-            # Lọc bỏ các giá trị None
             mapping = {k: v for k, v in mapping.items() if v is not None}
             
             if not mapping:
@@ -171,7 +168,6 @@ def setup_routes(ml_service: MLService):
 
             processed_results = []
             
-            # 1. Chạy predict cho từng sensor (Model tự động dùng Cache để tính toán đa biến)
             for sensor_type, value in mapping.items():
                 sensor_data = {
                     'device_id': device_id,
@@ -186,19 +182,16 @@ def setup_routes(ml_service: MLService):
             if not processed_results:
                 raise HTTPException(status_code=400, detail="Failed to process any sensor")
 
-            # 2. Tìm kết quả "tệ nhất" (Điểm cao nhất) để làm trạng thái chung cho thiết bị
-            # Sắp xếp giảm dần theo prediction_score
             processed_results.sort(key=lambda x: x['prediction_score'], reverse=True)
             
             worst_case = processed_results[0]
             
-            # 3. Tổng hợp kết quả
             device_summary = {
                 'device_id': device_id,
                 'overall_score': worst_case['prediction_score'],
                 'alert_level': worst_case['alert_level'],
                 'is_danger': worst_case['is_danger'],
-                'primary_cause': worst_case['sensor_type'], # Nguyên nhân chính gây báo động
+                'primary_cause': worst_case['sensor_type'],
                 'timestamp': worst_case['timestamp']
             }
 

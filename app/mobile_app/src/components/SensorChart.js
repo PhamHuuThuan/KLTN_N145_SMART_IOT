@@ -109,8 +109,8 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       let maxValue = Math.max(...values);
       
       if (isBinary) {
-        minValue = 0;
-        maxValue = 1;
+        minValue = -1;
+        maxValue = 2;
       } else {
         if (sensorType && THRESHOLDS[sensorType]) {
           const thresholds = THRESHOLDS[sensorType];
@@ -507,7 +507,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     const hasNegativeValues = minValue < 0;
     const hasPositiveValues = maxValue >= 0;
     
-    // Always show zero line if it's within or at the boundary of the chart
     if (hasNegativeValues || (minValue === 0 && hasPositiveValues)) {
       const zeroRatio = (0 - minValue) / valueRange;
       const zeroY = PADDING_Y + chartAreaHeight * (1 - zeroRatio);
@@ -524,11 +523,11 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     const { minValue, maxValue } = points;
     const valueRange = maxValue - minValue || 1;
     
-    if (isBinary) {
+    if (isBinary || sensorType === 'smoke') {
       const zeroY = PADDING_Y + chartAreaHeight;
       const oneY = PADDING_Y;
-      labels.push({ value: 0, y: zeroY, isZero: true });
-      labels.push({ value: 1, y: oneY, isZero: false });
+      labels.push({ value: 0, y: zeroY, isZero: true, labelText: '0' });
+      labels.push({ value: 1, y: oneY, isZero: false, labelText: '1' });
       return labels;
     }
     
@@ -571,7 +570,7 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
     }
     
     return labels;
-  }, [points, chartAreaHeight, isBinary]);
+  }, [points, chartAreaHeight, isBinary, sensorType]);
 
   const xAxisLabels = useMemo(() => {
     const labels = [];
@@ -595,7 +594,29 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
   }, [points, chartAreaWidth]);
 
   const levelRegions = useMemo(() => {
-    if (!sensorType || !THRESHOLDS[sensorType] || (isBinary && sensorType !== 'smoke')) {
+    if (isBinary || sensorType === 'smoke') {
+      const chartBottom = PADDING_Y + chartAreaHeight;
+      const chartTop = PADDING_Y;
+      const middleY = PADDING_Y + (chartAreaHeight / 2);
+
+      const safeRegion = {
+        level: 'binary_normal',
+        y: middleY,
+        height: chartBottom - middleY,
+        color: LEVEL_COLORS.low
+      };
+
+      const alarmRegion = {
+        level: 'binary_alarm',
+        y: chartTop,
+        height: middleY - chartTop,
+        color: LEVEL_COLORS.veryHigh
+      };
+
+      return [safeRegion, alarmRegion];
+    }
+
+    if (!sensorType || !THRESHOLDS[sensorType]) {
       return [];
     }
   
@@ -617,7 +638,6 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
       return Math.max(chartTop, Math.min(chartBottom, y));
     };
   
-
     const yMin    = getYForValue(displayMin);
     const yLow    = getYForValue(low);
     const yNormal = getYForValue(normal);
@@ -661,14 +681,16 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
             {region.height > 20 && (
               <SvgText
                 x={PADDING_X + chartAreaWidth / 2}
-                y={region.y + region.height / 2}
+                y={region.y + region.height / 2 + 4}
                 fontSize="11"
                 fill={colors.text || '#000000'}
                 textAnchor="middle"
                 fontWeight="600"
                 opacity={0.8}
               >
-                {region.level === 'low' ? t('sensors.legend.low', 'Thấp') :
+                {region.level === 'binary_alarm' ? t('sensors.legend.binary_alarm', 'CÓ KHÓI') :
+                 region.level === 'binary_normal' ? t('sensors.legend.binary_normal', 'AN TOÀN') :
+                 region.level === 'low' ? t('sensors.legend.low', 'Thấp') :
                  region.level === 'normal' ? t('sensors.legend.normal', 'Bình thường') :
                  region.level === 'high' ? t('sensors.legend.high', 'Cao') :
                  t('sensors.legend.veryHigh', 'Rất cao')}

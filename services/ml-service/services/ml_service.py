@@ -20,7 +20,6 @@ class MLService:
         )
         self.anomaly_detector.load_models()
         
-        # Lưu lịch sử 5 giá trị gần nhất để tính xu hướng (đạo hàm)
         self.history: Dict[str, Dict[str, deque]] = defaultdict(
             lambda: defaultdict(lambda: deque(maxlen=5))
         )
@@ -38,30 +37,21 @@ class MLService:
             if not all([device_id, sensor_type, value is not None]):
                 return None
             
-            # 1. Gọi Model AI để lấy điểm bất thường (0.0 -> 1.0)
-            # Model sẽ tự ghép value này với các sensor khác trong cache để phán đoán
             anomaly_score, is_anomaly = self.anomaly_detector.predict(
                 value, sensor_type, device_id=device_id
             )
             
-            # 2. Phân tích xu hướng (Trend)
-            # AI giỏi phát hiện điểm lạ, Trend giỏi phát hiện sự thay đổi nhanh (đạo hàm)
             trend_info = self._update_and_analyze_trend(device_id, sensor_type, float(value))
 
-            # 3. Tính điểm cuối cùng (Combined Score)
-            # Logic: Điểm gốc là điểm từ AI.
-            # Nếu có xu hướng tăng sốc (Spike) -> Cộng thêm điểm nguy hiểm
             final_score = anomaly_score
             
             if trend_info.get("sudden_spike"):
-                final_score = min(1.0, final_score + 0.3) # Tăng mạnh điểm nếu đột biến
+                final_score = min(1.0, final_score + 0.3) 
             elif trend_info.get("increasing"):
-                final_score = min(1.0, final_score + 0.1) # Tăng nhẹ nếu đang đà tăng
+                final_score = min(1.0, final_score + 0.1)
 
-            # 4. Xác định mức độ cảnh báo thuần túy dựa trên điểm số
             alert_level = self._determine_alert_level(final_score)
             
-            # Trigger alert nếu điểm > 0.7 (Ngưỡng mềm của AI, không phải ngưỡng cứng giá trị sensor)
             should_alert = final_score >= 0.7
             
             return {
@@ -95,20 +85,16 @@ class MLService:
             sudden_spike = False
             
             if len(values) >= 3:
-                # Tính trung bình trượt của các giá trị trước đó
                 prev_values = values[:-1]
                 avg_prev = sum(prev_values) / len(prev_values) if prev_values else 0
                 current = values[-1]
 
-                # 1. Phát hiện tăng liên tục
                 if values[-1] > values[-2] > values[-3]:
                     increasing = True
                     trend = "increasing"
                 elif values[-1] < values[-2] < values[-3]:
                     trend = "decreasing"
 
-                # 2. Phát hiện đột biến (Spike)
-                # Nếu giá trị hiện tại lớn hơn 30% so với trung bình các lần trước -> Spike
                 if avg_prev > 0 and current > avg_prev * 1.3:
                     sudden_spike = True
                     trend = "spike"
@@ -124,20 +110,20 @@ class MLService:
     def _determine_alert_level(self, score: float) -> str:
         """Map điểm số AI (0-1) sang mức độ cảnh báo."""
         if score >= 0.9:
-            return "critical" # Rất nguy hiểm
+            return "critical"
         elif score >= 0.75:
-            return "high"     # Cao
+            return "high" 
         elif score >= 0.5:
-            return "medium"   # Trung bình
+            return "medium"
         elif score >= 0.3:
-            return "low"      # Thấp
+            return "low" 
         else:
-            return "info"     # Bình thường
+            return "info"
 
     async def get_model_status(self) -> Dict:
         return {
             "anomaly_detector": {
                 "is_trained": self.anomaly_detector.is_trained,
-                "multivariate": True # Đánh dấu là hệ thống đa biến
+                "multivariate": True
             }
         }

@@ -472,7 +472,9 @@
       "low": "Low",
       "normal": "Normal",
       "high": "High",
-      "veryHigh": "Very High"
+      "veryHigh": "Very High",
+      "binary_normal": "Safe",
+      "binary_alarm": "Alarm"
     },
     "smokeSafe": "Safe",
     "smokeDetected": "Smoke detected"
