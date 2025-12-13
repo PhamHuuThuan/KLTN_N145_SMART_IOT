@@ -473,7 +473,9 @@
       "low": "Thấp",
       "normal": "Bình thường",
       "high": "Cao",
-      "veryHigh": "Rất cao"
+      "veryHigh": "Rất cao",
+      "binary_normal": "An toàn",
+      "binary_alarm": "Cảnh báo"
     },
     "smokeSafe": "An toàn",
     "smokeDetected": "Có khói"

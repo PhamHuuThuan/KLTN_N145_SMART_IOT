@@ -688,8 +688,8 @@ const SensorChart = memo(({ data, color, height = 160, onPointSelect, rawData = 
                 fontWeight="600"
                 opacity={0.8}
               >
-                {region.level === 'binary_alarm' ? 'CẢNH BÁO KHÓI' :
-                 region.level === 'binary_normal' ? 'AN TOÀN' :
+                {region.level === 'binary_alarm' ? t('sensors.legend.binary_alarm', 'CÓ KHÓI') :
+                 region.level === 'binary_normal' ? t('sensors.legend.binary_normal', 'AN TOÀN') :
                  region.level === 'low' ? t('sensors.legend.low', 'Thấp') :
                  region.level === 'normal' ? t('sensors.legend.normal', 'Bình thường') :
                  region.level === 'high' ? t('sensors.legend.high', 'Cao') :
