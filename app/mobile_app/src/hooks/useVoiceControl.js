@@ -6,62 +6,34 @@ const useVoiceControl = () => {
   const [isListening, setIsListening] = useState(false);
   const [lastCommand, setLastCommand] = useState('');
 
-  const voiceCommands = {
-    'bật': 'on',
-    'mở': 'on', 
-    'khởi động': 'on',
-    'kích hoạt': 'on',
-    'start': 'on',
-    'turn on': 'on',
-    'tắt': 'off',
-    'đóng': 'off',
-    'dừng': 'off',
-    'ngừng': 'off',
-    'stop': 'off',
-    'turn off': 'off',
-    'ổ cắm': 'outlet',
-    'socket': 'outlet',
-    'outlet': 'outlet',
-    'thiết bị': 'device',
-    'device': 'device',
+const voiceCommands = {
+    'bật': 'on', 'mở': 'on', 'khởi động': 'on', 'start': 'on', 'turn on': 'on',
+    'tắt': 'off', 'đóng': 'off', 'dừng': 'off', 'stop': 'off', 'turn off': 'off',
+    'ổ cắm': 'outlet', 'thiết bị': 'device',
     'một': '1', 'hai': '2', 'ba': '3', 'bốn': '4', 'năm': '5',
     'sáu': '6', 'bảy': '7', 'tám': '8', 'chín': '9', 'mười': '10',
     '1': '1', '2': '2', '3': '3', '4': '4', '5': '5',
-    '6': '6', '7': '7', '8': '8', '9': '9', '10': '10',
-    'quạt': 'fan',
-    'fan': 'fan',
-    'đèn': 'light',
-    'light': 'light',
-    'máy': 'machine',
-    'machine': 'machine',
-    'tivi': 'tv',
-    'tv': 'tv',
-    'điều hòa': 'ac',
-    'ac': 'ac',
-    'tủ': 'refrigerator',
-    'lạnh': 'refrigerator',
-    'tủ lạnh': 'refrigerator',
-    'refrigerator': 'refrigerator',
-    'lò': 'microwave',
-    'vi': 'microwave',
-    'sóng': 'microwave',
-    'lò vi sóng': 'microwave',
-    'microwave': 'microwave',
-    'giặt': 'washing',
-    'máy giặt': 'washing',
-    'washing': 'washing',
-    'nóng': 'heater',
-    'bình nóng lạnh': 'heater',
-    'heater': 'heater',
-    'của': '',
-    'the': '',
-    'a': '',
-    'an': '',
-    'and': '',
-    'với': '',
-    'with': '',
-    'số': '',
-    'number': '',
+    'bếp': 'stove', 'bếp điện': 'stove', 'stove': 'stove',
+    'từ': 'induction', 'bếp từ': 'induction', 'induction': 'induction',
+    'hút': 'hood', 'mùi': 'hood', 'hút mùi': 'hood', 'thông gió': 'hood', 'hood': 'hood',
+    'cơm': 'rice_cooker', 'nồi cơm': 'rice_cooker', 'rice': 'rice_cooker',
+    'chiên': 'air_fryer', 'không dầu': 'air_fryer', 'nồi chiên': 'air_fryer', 'air fryer': 'air_fryer',
+    'lò': 'oven', 'nướng': 'oven', 'lò nướng': 'oven', 'oven': 'oven',
+    'vi': 'microwave', 'sóng': 'microwave', 'lò vi sóng': 'microwave', 'microwave': 'microwave',
+    'ấm': 'kettle', 'siêu tốc': 'kettle', 'kettle': 'kettle',
+    'cà phê': 'coffee', 'máy cà phê': 'coffee', 'coffee': 'coffee',
+    'xay': 'blender', 'sinh tố': 'blender', 'máy xay': 'blender', 'blender': 'blender',
+    'rửa': 'dishwasher', 'bát': 'dishwasher', 'máy rửa bát': 'dishwasher', 'dishwasher': 'dishwasher',
+    'tủ': 'refrigerator', 'lạnh': 'refrigerator', 'tủ lạnh': 'refrigerator', 'fridge': 'refrigerator',
+    'bơm': 'pump', 'máy bơm': 'pump', 'pump': 'pump',
+    'quạt': 'fan', 'fan': 'fan',
+    'đèn': 'light', 'light': 'light',
+    'tivi': 'tv', 'tv': 'tv',
+    'điều hòa': 'ac', 'ac': 'ac',
+    'giặt': 'washing', 'máy giặt': 'washing', 'washing': 'washing',
+    'nóng': 'heater', 'bình nóng lạnh': 'heater', 'heater': 'heater',
+    'rèm': 'curtain', 'cửa': 'curtain', 'rèm cửa': 'curtain', 'curtain': 'curtain',
+    'của': '', 'the': '', 'cái': '', 'chiếc': '', 'với': '', 'số': '', 'máy': ''
   };
 
   const parseVoiceCommand = useCallback((transcript) => {
@@ -100,7 +72,11 @@ const useVoiceControl = () => {
       }
     }
     
-    const devicePhrases = ['tủ lạnh', 'lò vi sóng', 'máy giặt', 'bình nóng lạnh', 'điều hòa'];
+    const devicePhrases = [
+      'lò vi sóng', 'nồi cơm', 'nồi chiên', 'máy rửa bát', 'máy cà phê', 'máy xay',
+      'bếp từ', 'bếp điện', 'hút mùi', 'thông gió', 'máy bơm', 'bình nóng lạnh',
+      'tủ lạnh', 'máy giặt', 'điều hòa', 'lò nướng', 'rèm cửa'
+    ];
     for (const phrase of devicePhrases) {
       if (lowerTranscript.includes(phrase)) {
         location = voiceCommands[phrase];
