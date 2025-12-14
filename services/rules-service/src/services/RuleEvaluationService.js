@@ -17,8 +17,9 @@ class RuleEvaluationService {
     this.producer = this.kafka.producer();
     this.producerConnected = false;
     this.priorityService = new RulePriorityService();
-    this.lastEvaluationTime = new Map();
     this.lastMlAlertTime = new Map();
+    this.mlSupportCache = new Map();
+    this.mlMetadataCache = new Map();
 
     // ML support configuration
     this.mlSupportEnabled = process.env.ML_SUPPORT_ENABLED !== 'false';
@@ -81,7 +82,6 @@ class RuleEvaluationService {
   async evaluateRules(deviceId, sensorData) {
     try {
       sensorData.deviceId = sensorData.deviceId || deviceId;
-      this.lastEvaluationTime.set(deviceId, Date.now());
 
       const rules = await Rule.find({ deviceId, isActive: true, deletedAt: null });
       if (rules.length === 0) {
@@ -115,6 +115,9 @@ class RuleEvaluationService {
           const incident = this.priorityService.createIncidentReport(rules, { ...sensorData, deviceId });
           const message = this.priorityService.buildDetailedConsolidatedNotification(incident, null, sensorData);
           await this.sendToAlertsService(message);
+          await Promise.all(rules.map(rule => rule.incrementTriggerCount().catch(err => 
+            logger.error(`Error incrementing trigger count for rule ${rule.name}:`, err)
+          )));
           logger.info(`Consolidated alert sent for ${priorityLevel} priority - ${rules.length} rules`);
         } else {
           await this.executeActions(rules[0], sensorData).catch(() => {});
@@ -135,7 +138,8 @@ class RuleEvaluationService {
       }
 
       if (rule.priority !== 'urgent') {
-        const canTrigger = await this.checkRuleCanTrigger(rule, sensorData);
+        const { sensorType, sensorValue } = this.getSensorInfo(rule, sensorData);
+        const canTrigger = await rule.canTrigger(sensorValue, sensorType);
         if (!canTrigger) {
           logger.debug(`${rule.name}: skipped (cooldown or escalation gating)`);
           return false;
@@ -145,19 +149,11 @@ class RuleEvaluationService {
       const conditionsMet = await this.evaluateConditions(rule.conditions, sensorData);
       if (!conditionsMet) return false;
 
-      await rule.incrementTriggerCount();
       return true;
     } catch (err) {
       logger.error(`evaluateRule() error for ${rule.name}:`, err);
       return false;
     }
-  }
-
-  // Kiểm tra rule có thể trigger
-  async checkRuleCanTrigger(rule, sensorData) {
-    if (rule.priority === 'urgent') return true;
-    const { sensorType, sensorValue } = this.getSensorInfo(rule, sensorData);
-    return await rule.canTrigger(sensorValue, sensorType);
   }
 
   // Đánh giá tất cả conditions của rule
@@ -167,26 +163,23 @@ class RuleEvaluationService {
       return false;
     }
 
-    const results = await Promise.all(conditions.map(c => this.evaluateCondition(c, sensorData)));
+    const results = await Promise.all(conditions.map(condition => {
+      if (condition.type !== 'sensor') {
+        logger.warn(`Unknown condition type: ${condition.type}`);
+        return false;
+      }
+      return this.evaluateSensorCondition(condition, sensorData);
+    }));
     return results.every(r => r === true);
-  }
-
-  // Đánh giá một condition cụ thể
-  async evaluateCondition(condition, sensorData) {
-    if (condition.type !== 'sensor') {
-      logger.warn(`Unknown condition type: ${condition.type}`);
-      return false;
-    }
-    return this.evaluateSensorCondition(condition, sensorData);
   }
 
   // Đánh giá sensor condition
   async evaluateSensorCondition(condition, sensorData) {
-    const { sensor, operator, value } = condition;
-    const sensorValue = this.getSensorValue(sensor, sensorData);
+    const { sensor: sensorType, operator, value } = condition;
+    const sensorValue = this.getSensorValue(sensorType, sensorData);
 
     if (sensorValue === undefined || sensorValue === null) {
-      logger.warn(`Sensor value not available: ${sensor}`);
+      logger.warn(`Sensor value not available: ${sensorType}`);
       return false;
     }
 
@@ -204,16 +197,17 @@ class RuleEvaluationService {
       const mlSupport = await this.fetchMlSupport(sensorData.deviceId, sensorData);
       if (!mlSupport?.predictions) return thresholdMet;
 
-      const sensorMl = mlSupport.predictions[sensor];
+      const sensorMl = mlSupport.predictions[sensorType];
       const supportScore = sensorMl?.prediction_score ?? mlSupport.device?.overall_score;
       const mlAlertLevel = sensorMl?.alert_level ?? mlSupport.device?.alert_level;
       const mlPromoted = !thresholdMet && typeof supportScore === 'number' && supportScore >= this.mlSupportThreshold;
 
       if (mlPromoted) {
-        logger.info(`ML support promoted condition for ${sensorData.deviceId}:${sensor} (score=${supportScore})`);
+        logger.info(`ML support promoted condition for ${sensorData.deviceId}:${sensorType} (score=${supportScore})`);
       }
 
-      this.attachMlMetadata(sensorData, sensor, {
+      // Store ML metadata for this sensor type (sensorType is a string like 'temperature', 'humidity', etc.)
+      this.attachMlMetadata(sensorData.deviceId, sensorType, {
         score: supportScore,
         alertLevel: mlAlertLevel,
         promoted: mlPromoted,
@@ -261,29 +255,34 @@ class RuleEvaluationService {
   // Thực thi các actions của rule
   async executeActions(rule, sensorData) {
     try {
+      if (!Array.isArray(rule.actions) || rule.actions.length === 0) {
+        logger.warn(`Rule ${rule.name} has no actions configured; skipping execution`);
+        return;
+      }
+
       logger.info(`Executing ${rule.actions.length} actions for rule: ${rule.name}`);
-      await Promise.all(rule.actions.map(action =>
-        this.executeAction(action, rule, sensorData).catch(err =>
+      
+      const actionMap = {
+        send_notification: (action) => this.sendNotificationAction(action, rule, sensorData),
+        send_alert: (action) => this.sendAlertAction(action, rule, sensorData)
+      };
+
+      await Promise.all(rule.actions.map(action => {
+        logger.info(`Executing action: ${action.type} for rule: ${rule.name}`);
+        const handler = actionMap[action.type];
+        if (!handler) {
+          logger.warn(`Unknown action type: ${action.type}`);
+          return Promise.resolve();
+        }
+        return handler(action).catch(err =>
           logger.error(`Error executing action ${action.type} for rule ${rule.name}:`, err)
-        )
-      ));
+        );
+      }));
+      
+      await rule.incrementTriggerCount();
     } catch (error) {
       logger.error(`Error executing actions for rule ${rule.name}:`, error);
-    }
-  }
-
-  // Thực thi một action cụ thể
-  async executeAction(action, rule, sensorData) {
-    logger.info(`Executing action: ${action.type} for rule: ${rule.name}`);
-    const actionMap = {
-      send_notification: () => this.sendNotificationAction(action, rule, sensorData),
-      send_alert: () => this.sendAlertAction(action, rule, sensorData)
-    };
-    
-    if (actionMap[action.type]) {
-      await actionMap[action.type]();
-    } else {
-      logger.warn(`Unknown action type: ${action.type}`);
+      throw error;
     }
   }
 
@@ -337,7 +336,7 @@ class RuleEvaluationService {
           sensorValue,
           threshold,
           operator,
-          mlSupport: sensorData.__mlMeta?.[sensorType] || null
+          mlSupport: this.getMlMetadata(rule.deviceId, sensorType)
         }
       });
     } catch (error) {
@@ -377,7 +376,7 @@ class RuleEvaluationService {
             ruleId: rule._id.toString(),
             ruleName: rule.name,
             message: action.message || defaultMessage,
-            mlSupport: sensorData.__mlMeta?.[sensorType] || null
+            mlSupport: this.getMlMetadata(rule.deviceId, sensorType)
           })
         }]
       });
@@ -387,7 +386,7 @@ class RuleEvaluationService {
     }
   }
 
-  // Helper method để connect Kafka producer
+  // Giúp kết nối Kafka producer
   async ensureKafkaConnection() {
     if (!this.producerConnected) {
       try {
@@ -426,100 +425,75 @@ class RuleEvaluationService {
   replacePlaceholders(message, sensorData, sensorType, sensorValue, threshold, operator) {
     if (!message) return message;
 
-    // Đảm bảo có dữ liệu sensor hợp lệ
-    const temp = sensorData.temp !== undefined && sensorData.temp !== null ? sensorData.temp : 'N/A';
-    const humid = sensorData.humid !== undefined && sensorData.humid !== null ? sensorData.humid : 'N/A';
-    const smoke = sensorData.smoke !== undefined && sensorData.smoke !== null ? sensorData.smoke : 'N/A';
-    const gasPpm = sensorData.gas_ppm !== undefined && sensorData.gas_ppm !== null ? sensorData.gas_ppm : 'N/A';
+    const getValue = (key) => {
+      const val = sensorData[key];
+      return val !== undefined && val !== null ? val : 'N/A';
+    };
+
     const flameValue = sensorData.flame !== undefined && sensorData.flame !== null ? Number(sensorData.flame) : null;
     const flameDisplay = flameValue !== null && !Number.isNaN(flameValue) ? flameValue : 'N/A';
+    const flameStatus = flameValue !== null && !Number.isNaN(flameValue) && flameValue >= 1 ? 'có lửa' : 'an toàn';
 
-    let result = message
-      .replace(/\{temperature\}/g, temp)
-      .replace(/\{humidity\}/g, humid)
-      .replace(/\{smoke\}/g, smoke)
-      .replace(/\{gas_ppm\}/g, gasPpm)
-      .replace(/\{flame\}/g, flameDisplay)
-      .replace(/\{sensorValue\}/g, sensorValue !== undefined ? sensorValue : 'N/A')
-      .replace(/\{threshold\}/g, threshold !== undefined ? threshold : 'N/A')
-      .replace(/\{operator\}/g, operator || '>')
-      .replace(/\{sensorType\}/g, sensorType || 'unknown')
-      .replace(/\{deviceId\}/g, sensorData.deviceId || 'Unknown Device')
-      .replace(/\{deviceName\}/g, sensorData.deviceName || (sensorData.deviceId ? `Device ${sensorData.deviceId}` : 'Unknown Device'));
+    const replacements = {
+      temperature: getValue('temp'),
+      humidity: getValue('humid'),
+      smoke: getValue('smoke'),
+      gas_ppm: getValue('gas_ppm'),
+      flame: flameDisplay,
+      sensorValue: sensorValue !== undefined ? sensorValue : 'N/A',
+      threshold: threshold !== undefined ? threshold : 'N/A',
+      operator: operator || '>',
+      sensorType: sensorType || 'unknown',
+      deviceId: sensorData.deviceId || 'Unknown Device',
+      deviceName: sensorData.deviceName || (sensorData.deviceId ? `Device ${sensorData.deviceId}` : 'Unknown Device'),
+      temp: getValue('temp'),
+      humid: getValue('humid'),
+      smoke_value: getValue('smoke'),
+      gas_value: getValue('gas_ppm'),
+      flame_status: flameStatus
+    };
 
-    switch (sensorType) {
-      case 'temperature':
-        result = result.replace(/\{temp\}/g, temp);
-        break;
-      case 'humidity':
-        result = result.replace(/\{humid\}/g, humid);
-        break;
-      case 'smoke':
-        result = result.replace(/\{smoke_value\}/g, smoke);
-        break;
-      case 'gas_ppm':
-        result = result.replace(/\{gas_value\}/g, gasPpm);
-        break;
-      case 'flame': {
-        const flameStatus = flameValue !== null && !Number.isNaN(flameValue) && flameValue >= 1 ? 'có lửa' : 'an toàn';
-        result = result.replace(/\{flame_status\}/g, flameStatus);
-        break;
-      }
-    }
-    return result;
+    return Object.entries(replacements).reduce((result, [key, value]) => {
+      return result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    }, message);
   }
 
   buildMlPayload(deviceId, sensorData) {
-    if (!deviceId) {
-      return null;
-    }
-    const payload = {};
+    if (!deviceId) return null;
+    
     const keys = ['temp', 'humid', 'smoke', 'gas_ppm', 'gas'];
-    for (const key of keys) {
-      const value = sensorData[key];
-      if (value !== undefined && value !== null && !isNaN(value) && typeof value === 'number') {
-        payload[key] = value;
-      }
-    }
-    if (Object.keys(payload).length === 0) {
-      return null;
-    }
-    return {
-      doc: {
-        deviceId,
-        payload
-      }
-    };
+    const payload = Object.fromEntries(
+      keys
+        .map(key => [key, sensorData[key]])
+        .filter(([_, value]) => value !== undefined && value !== null && !isNaN(value) && typeof value === 'number')
+    );
+
+    return Object.keys(payload).length > 0 ? { doc: { deviceId, payload } } : null;
   }
 
-async fetchMlSupport(deviceId, sensorData) {
-    if (!this.mlSupportEnabled) {
-      return null;
-    }
-    sensorData.__mlSupportCache = sensorData.__mlSupportCache || {};
-    if (sensorData.__mlSupportCache.fetched) {
-      return sensorData.__mlSupportCache.result;
+  async fetchMlSupport(deviceId, sensorData) {
+    if (!this.mlSupportEnabled) return null;
+
+    if (this.mlSupportCache.has(deviceId)) {
+      const cached = this.mlSupportCache.get(deviceId);
+      if (cached.fetched) return cached.result;
     }
 
     const body = this.buildMlPayload(deviceId, sensorData);
     if (!body) {
-      sensorData.__mlSupportCache.fetched = true;
-      sensorData.__mlSupportCache.result = null;
+      this.mlSupportCache.set(deviceId, { fetched: true, result: null });
       return null;
     }
 
     const url = `${this.mlServiceUrl}/api/ml/predict/event/aggregate?compact=true&include_details=true`;
-    
     let lastError = null;
-    const maxRetries = 2;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+
+    for (let attempt = 0; attempt <= 2; attempt++) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.mlRequestTimeoutMs);
 
       try {
-        if (attempt > 0) {
-          await new Promise(resolve => setTimeout(resolve, 500 * attempt));
-        }
+        if (attempt > 0) await new Promise(resolve => setTimeout(resolve, 500 * attempt));
         
         const response = await fetch(url, {
           method: 'POST',
@@ -536,37 +510,31 @@ async fetchMlSupport(deviceId, sensorData) {
         }
 
         const data = await response.json();
+        const result = { device: data.device, predictions: data.details || {} };
         
-        sensorData.__mlSupportCache.result = {
-          device: data.device,
-          predictions: data.details || {}
-        };
-        
-        sensorData.__mlSupportCache.fetched = true;
-        return sensorData.__mlSupportCache.result;
+        this.mlSupportCache.set(deviceId, { fetched: true, result });
+        return result;
 
       } catch (error) {
-         clearTimeout(timeoutId);
-         lastError = error;
-         if (attempt < maxRetries && (error.name === 'AbortError' || error.message.includes('fetch failed'))) {
-             continue;
-         }
-         break;
+        clearTimeout(timeoutId);
+        lastError = error;
+        if (attempt < 2 && (error.name === 'AbortError' || error.message.includes('fetch failed'))) {
+          continue;
+        }
+        break;
       }
     }
     
-    if (lastError && typeof logger !== 'undefined') {
-        logger.warn(`ML support request failed for ${deviceId}: ${lastError.message}`);
-    }
-
-    sensorData.__mlSupportCache.result = null;
-    sensorData.__mlSupportCache.fetched = true;
+    if (lastError) logger.warn(`ML support request failed for ${deviceId}: ${lastError.message}`);
+    this.mlSupportCache.set(deviceId, { fetched: true, result: null });
     return null;
   }
 
-  attachMlMetadata(sensorData, sensorType, meta) {
-    sensorData.__mlMeta = sensorData.__mlMeta || {};
-    sensorData.__mlMeta[sensorType] = {
+  attachMlMetadata(deviceId, sensorType, meta) {
+    if (!this.mlMetadataCache.has(deviceId)) {
+      this.mlMetadataCache.set(deviceId, {});
+    }
+    this.mlMetadataCache.get(deviceId)[sensorType] = {
       score: meta.score,
       alertLevel: meta.alertLevel,
       promoted: meta.promoted,
@@ -575,88 +543,50 @@ async fetchMlSupport(deviceId, sensorData) {
     };
   }
 
+  getMlMetadata(deviceId, sensorType) {
+    return this.mlMetadataCache.get(deviceId)?.[sensorType] || null;
+  }
+
   async evaluateMlAnomaly(deviceId, sensorData) {
-    if (!this.mlSupportEnabled || !deviceId) {
-      return;
-    }
+    if (!this.mlSupportEnabled || !deviceId) return;
 
     try {
       const now = Date.now();
       const lastAlertTime = this.lastMlAlertTime.get(deviceId);
-      if (lastAlertTime && (now - lastAlertTime) < this.mlAlertCooldown) {
-        return;
-      }
+      if (lastAlertTime && (now - lastAlertTime) < this.mlAlertCooldown) return;
 
       const mlResult = await this.fetchMlSupport(deviceId, sensorData);
-      if (!mlResult || !mlResult.device) {
-        return;
-      }
+      if (!mlResult?.device) return;
 
-      const deviceScore = mlResult.device.overall_score;
-      const deviceAlertLevel = mlResult.device.alert_level;
-      const isDanger = mlResult.device.is_danger;
-      const primarySensor = mlResult.device.primary_cause;
-
-      const shouldAlert = isDanger || 
-                         (deviceScore >= this.mlSupportThreshold && 
-                         (deviceAlertLevel === 'high' || deviceAlertLevel === 'critical'));
-
-      if (!shouldAlert) {
-        return;
-      }
+      const { overall_score: deviceScore, alert_level: deviceAlertLevel, is_danger: isDanger, primary_cause: primarySensor } = mlResult.device;
+      const shouldAlert = isDanger || (deviceScore >= this.mlSupportThreshold && ['high', 'critical'].includes(deviceAlertLevel));
+      if (!shouldAlert || !sensorData.ownerId) return;
 
       const maxSensor = primarySensor || 'unknown';
-      let maxSensorValue = null;
-      
-      if (mlResult.predictions && mlResult.predictions[maxSensor]) {
-          maxSensorValue = mlResult.predictions[maxSensor].value;
-      }
-      
-      if (maxSensorValue === null || maxSensorValue === undefined) {
-         const keyMap = { 'gas_ppm': 'gas_ppm', 'gas': 'gas_ppm', 'temperature': 'temp', 'humidity': 'humid', 'smoke': 'smoke' };
-         const dataKey = keyMap[maxSensor] || maxSensor;
-         maxSensorValue = sensorData[dataKey];
-      }
-
-      const ownerId = sensorData.ownerId;
-      if (!ownerId) {
-        return;
-      }
-
-      const isCritical = deviceAlertLevel === 'critical';
-
-      const title = isCritical 
-        ? `🚨 CẢNH BÁO KHẨN CẤP: AI phát hiện nguy cơ cao!`
-        : `⚠️ Cảnh báo thông minh: Phát hiện bất thường`;
+      const sensorKeyMap = { gas_ppm: 'gas_ppm', gas: 'gas_ppm', temperature: 'temp', humidity: 'humid', smoke: 'smoke' };
+      const maxSensorValue = mlResult.predictions?.[maxSensor]?.value ?? sensorData[sensorKeyMap[maxSensor] || maxSensor];
 
       const sensorNameMap = {
-        'temperature': 'Nhiệt độ',
-        'humidity': 'Độ ẩm',
-        'gas': 'Khí gas',
-        'gas_ppm': 'Khí gas',
-        'smoke': 'Khói',
-        'flame': 'Lửa'
+        temperature: 'Nhiệt độ', humidity: 'Độ ẩm', gas: 'Khí gas', gas_ppm: 'Khí gas', smoke: 'Khói', flame: 'Lửa'
       };
+      const isCritical = deviceAlertLevel === 'critical';
+      const alertLevelText = deviceAlertLevel === 'critical' ? 'RẤT NGUY HIỂM' : deviceAlertLevel === 'high' ? 'Cao' : 'Trung bình';
 
-      const sensorName = sensorNameMap[maxSensor] || maxSensor;
-      
-      const message = `Hệ thống AI đã phát hiện mẫu dữ liệu bất thường.\n` +
-                      `Nguyên nhân chính: Cảm biến ${sensorName}\n\n` +
-                      `Giá trị đo được: ${maxSensorValue !== null && maxSensorValue !== undefined ? maxSensorValue : 'N/A'}\n` +
-                      `Điểm bất thường: ${(deviceScore * 100).toFixed(1)}%\n` +
-                      `Mức độ cảnh báo: ${deviceAlertLevel === 'critical' ? 'RẤT NGUY HIỂM' : deviceAlertLevel === 'high' ? 'Cao' : 'Trung bình'}\n` +
-                      `Thời gian: ${new Date().toLocaleString('vi-VN')}\n\n` +
-                      `${isCritical ? '🚨 AI nhận định đây là sự cố nghiêm trọng. Kiểm tra ngay!' : '⚠️ Có dấu hiệu lạ, vui lòng để ý thiết bị.'}`;
-
-      const alertMessage = {
-        userId: ownerId,
-        title: title,
-        message: message,
+      await this.sendToAlertsService({
+        userId: sensorData.ownerId,
+        title: isCritical ? '🚨 CẢNH BÁO KHẨN CẤP: AI phát hiện nguy cơ cao!' : '⚠️ Cảnh báo thông minh: Phát hiện bất thường',
+        message: `Hệ thống AI đã phát hiện mẫu dữ liệu bất thường.\n` +
+                `Nguyên nhân chính: Cảm biến ${sensorNameMap[maxSensor] || maxSensor}\n\n` +
+                `Giá trị đo được: ${maxSensorValue !== null && maxSensorValue !== undefined ? maxSensorValue : 'N/A'}\n` +
+                `Điểm bất thường: ${(deviceScore * 100).toFixed(1)}%\n` +
+                `Mức độ cảnh báo: ${alertLevelText}\n` +
+                `Thời gian: ${new Date().toLocaleString('vi-VN')}\n\n` +
+                `${isCritical ? '🚨 AI nhận định đây là sự cố nghiêm trọng. Kiểm tra ngay!' : '⚠️ Có dấu hiệu lạ, vui lòng để ý thiết bị.'}`,
         type: isCritical ? 'security_alert' : 'device_alert',
         category: isCritical ? 'security' : 'ml_anomaly',
         priority: isCritical ? 'urgent' : 'high',
         metadata: {
-          deviceId: deviceId,
+          deviceId,
           deviceName: `Device ${deviceId}`,
           source: 'ml_multivariate_isolation_forest',
           mlData: {
@@ -665,16 +595,13 @@ async fetchMlSupport(deviceId, sensorData) {
             primaryCause: maxSensor,
             predictions: mlResult.predictions
           },
-          sensorData: sensorData
+          sensorData
         }
-      };
+      });
 
-      await this.sendToAlertsService(alertMessage);
-      
       this.lastMlAlertTime.set(deviceId, now);
-      
     } catch (error) {
-       
+      logger.error('evaluateMlAnomaly error:', error);
     }
   }
 
