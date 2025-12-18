@@ -12,25 +12,12 @@ class RuleEvaluationService {
     this.kafka = new Kafka({
       clientId: 'rules-service',
       brokers: kafkaBrokers,
-      retry: {
-        initialRetryTime: 100,
-        retries: 8
-      }
+      retry: { initialRetryTime: 100, retries: 8 }
     });
     this.producer = this.kafka.producer();
     this.producerConnected = false;
     this.priorityService = new RulePriorityService();
-    
-    this.lastEvaluationTime = new Map();
-    // Emergency alert spam control
-    const rawResendInterval = Number(process.env.EMERGENCY_ALERT_RESEND_INTERVAL_MS || '30000'); // 30s
-    const rawCooldownAfterExit = Number(process.env.EMERGENCY_ALERT_COOLDOWN_AFTER_EXIT_MS || String(30 * 60 * 1000)); // 30m
-    this.emergencyResendIntervalMs = Number.isFinite(rawResendInterval) && rawResendInterval > 0 ? rawResendInterval : 30000;
-    const minCooldown = 30 * 60 * 1000;
-    const maxCooldown = 60 * 60 * 1000;
-    const sanitizedCooldown = Number.isFinite(rawCooldownAfterExit) ? rawCooldownAfterExit : minCooldown;
-    this.emergencyCooldownAfterExitMs = Math.min(Math.max(sanitizedCooldown, minCooldown), maxCooldown);
-    this.lastEmergencyAlertTime = new Map();
+    this.lastMlAlertTime = new Map();
 
     // ML support configuration
     this.mlSupportEnabled = process.env.ML_SUPPORT_ENABLED !== 'false';
@@ -38,165 +25,102 @@ class RuleEvaluationService {
     this.mlServiceUrl = process.env.ML_SERVICE_URL || 'http://localhost:3007';
     this.mlRequestTimeoutMs = Number(process.env.ML_SUPPORT_TIMEOUT_MS || '1500');
     this.mlAlertCooldown = Number(process.env.ML_ALERT_COOLDOWN_MS || '300000');
-    
-    this.lastMlAlertTime = new Map();
-    
   }
 
-  // Extract sensor info from rule + sensorData
-  getSensorInfo(rule, sensorData) {
-    let sensorType = 'unknown';
-    let sensorValue = 0;
-    let threshold = 0;
-    let operator = '>';
-
-    for (const condition of rule.conditions) {
-      if (condition.type === 'sensor' && condition.sensor) {
-        sensorType = condition.sensor;
-        operator = condition.operator || '>';
-        threshold = condition.value || 0;
-        switch (condition.sensor) {
-          case 'temperature':
-            sensorValue = sensorData.temp;
-            break;
-          case 'humidity':
-            sensorValue = sensorData.humid;
-            break;
-          case 'gas_ppm':
-            sensorValue = sensorData.gas_ppm;
-            break;
-          case 'smoke':
-            sensorValue = sensorData.smoke;
-            break;
-          case 'flame':
-            sensorValue = sensorData.flame;
-            if (sensorValue !== undefined && sensorValue !== null) {
-              sensorValue = Number(sensorValue);
-            }
-            break;
-          default:
-            break;
-        }
-        break;
+  // Lấy giá trị của sensor từ sensorData
+  getSensorValue(sensorType, sensorData) {
+    const sensorMap = {
+      temperature: () => sensorData.temp,
+      humidity: () => sensorData.humid,
+      gas_ppm: () => sensorData.gas_ppm,
+      smoke: () => sensorData.smoke,
+      flame: () => {
+        const val = sensorData.flame;
+        return val !== undefined && val !== null ? Number(val) : val;
       }
-    }
-
-    return { sensorType, sensorValue, threshold, operator };
+    };
+    return sensorMap[sensorType]?.() ?? undefined;
   }
 
-
-  // Default title by sensor type
-  getDefaultTitle(sensorType) {
-    switch (sensorType) {
-      case 'temperature':
-        return 'Cảnh báo nhiệt độ';
-      case 'humidity':
-        return 'Cảnh báo độ ẩm';
-      case 'gas_ppm':
-        return 'Cảnh báo khí gas';
-      case 'smoke':
-        return 'Cảnh báo khói';
-      case 'flame':
-        return 'Cảnh báo lửa';
-      default:
-        return `Cảnh báo ${sensorType}`;
+  // Lấy thông tin của sensor từ rule và sensorData
+  getSensorInfo(rule, sensorData) {
+    const sensorCondition = rule.conditions?.find(c => c.type === 'sensor' && c.sensor);
+    if (!sensorCondition) {
+      return { sensorType: 'unknown', sensorValue: 0, threshold: 0, operator: '>' };
     }
+
+    return {
+      sensorType: sensorCondition.sensor,
+      sensorValue: this.getSensorValue(sensorCondition.sensor, sensorData),
+      threshold: sensorCondition.value || 0,
+      operator: sensorCondition.operator || '>'
+    };
+  }
+
+  // Tạo title mặc định cho rule
+  getDefaultTitle(sensorType) {
+    const titles = {
+      temperature: 'Cảnh báo nhiệt độ',
+      humidity: 'Cảnh báo độ ẩm',
+      gas_ppm: 'Cảnh báo khí gas',
+      smoke: 'Cảnh báo khói',
+      flame: 'Cảnh báo lửa'
+    };
+    return titles[sensorType] || `Cảnh báo ${sensorType}`;
+  }
+
+  shouldElevateSecurity(sensorType, sensorValue) {
+    return sensorType === 'gas_ppm' || 
+           sensorType === 'flame' ||
+           (sensorType === 'smoke' && Number(sensorValue) === 1) || 
+           (sensorType === 'temperature' && Number(sensorValue) >= 80);
   }
 
   // Đánh giá tất cả rules cho một device khi nhận dữ liệu sensor
   async evaluateRules(deviceId, sensorData) {
     try {
-      if (!sensorData.deviceId) {
-        sensorData.deviceId = deviceId;
-      }
-      const now = Date.now();
-      const lastTime = this.lastEvaluationTime.get(deviceId);
-      
-      this.lastEvaluationTime.set(deviceId, now);
+      sensorData.deviceId = sensorData.deviceId || deviceId;
 
-      const query = { 
-        deviceId, 
-        isActive: true,
-        deletedAt: null
-      };
-      
-      const rules = await Rule.find(query);
-  
-      let triggeredRules = [];
-      if (rules.length > 0) {
-        triggeredRules = await Promise.all(
-          rules.map(async rule => {
-            try {
-              return (await this.evaluateRule(rule, sensorData)) ? rule : null;
-            } catch (err) {
-              return null;
-            }
-          })
-        ).then(results => results.filter(Boolean));
-      }
-
-      // Throttle emergency (urgent) alerts to avoid spamming users
-      if (triggeredRules.length > 0) {
-        const throttled = [];
-        triggeredRules = triggeredRules.filter(rule => {
-          const { allowed, reason, nextAllowedAt } = this.shouldAllowEmergencyAlert(deviceId, sensorData, rule);
-          if (!allowed) {
-            throttled.push({ ruleName: rule.name, reason, nextAllowedAt });
-          }
-          return allowed;
-        });
-
-        if (throttled.length > 0) {
-          throttled.forEach(item => {
-            const waitMs = item.nextAllowedAt ? item.nextAllowedAt - Date.now() : null;
-            const waitSec = waitMs && waitMs > 0 ? Math.ceil(waitMs / 1000) : null;
-            logger.info(`Throttled emergency alert for rule ${item.ruleName} (${item.reason})${waitSec ? ` - next in ~${waitSec}s` : ''}`);
-          });
-        }
-      }
-  
-      // 📢 Xử lý kết quả theo priority
-      let hasRuleTriggered = false;
-      if (triggeredRules.length > 1) {
-        hasRuleTriggered = true;
-        logger.info(`Multiple rules triggered: ${triggeredRules.map(r => r.name).join(', ')}`);
-        
-        // Sắp xếp theo priority: urgent → high → medium → low
-        const sortedRules = this.priorityService.sortByPriority(triggeredRules);
-        
-        // Nhóm rules theo priority level để gộp thông báo
-        const groupedRules = this.priorityService.groupRulesByPriority(sortedRules);
-        
-        // Gửi thông báo cho từng nhóm priority
-        for (const [priorityLevel, rules] of Object.entries(groupedRules)) {
-          if (rules.length > 1) {
-            // Gộp nhiều rules cùng priority
-            const incident = this.priorityService.createIncidentReport(rules, { ...sensorData, deviceId });
-            const consolidatedMessage = this.priorityService.buildDetailedConsolidatedNotification(incident, null, sensorData);
-            
-            await this.sendToAlertsService(consolidatedMessage);
-            logger.info(`Consolidated alert sent for ${priorityLevel} priority - ${rules.length} rules`);
-          } else {
-            // Gửi individual notification cho rule đơn lẻ
-            await this.executeActions(rules[0], sensorData).catch(err => {});
-            logger.info(`Individual alert sent for ${priorityLevel} priority - ${rules[0].name}`);
-          }
-        }
-        
-      } else if (triggeredRules.length === 1) {
-        hasRuleTriggered = true;
-        logger.info(`Single rule triggered: ${triggeredRules[0].name}`);
-        
-        // Send individual notification for single rule
-        const rule = triggeredRules[0];
-        await this.executeActions(rule, sensorData).catch(err => {});
-        logger.info(`Single rule alert sent - Rule: ${rule.name}`);
-      }
-
-      if (!hasRuleTriggered) {
+      const rules = await Rule.find({ deviceId, isActive: true, deletedAt: null });
+      if (rules.length === 0) {
         await this.evaluateMlAnomaly(deviceId, sensorData);
-      } else {
-        logger.debug(`Skipping ML anomaly alert for ${deviceId} - rule(s) already triggered`);
+        return;
+      }
+
+      const triggeredRules = (await Promise.all(
+        rules.map(rule => this.evaluateRule(rule, sensorData).then(result => result ? rule : null).catch(() => null))
+      )).filter(Boolean);
+
+      if (triggeredRules.length === 0) {
+        await this.evaluateMlAnomaly(deviceId, sensorData);
+        return;
+      }
+
+      if (triggeredRules.length === 1) {
+        logger.info(`Single rule triggered: ${triggeredRules[0].name}`);
+        await this.executeActions(triggeredRules[0], sensorData).catch(() => {});
+        return;
+      }
+
+      // Multiple rules triggered - process by priority
+      logger.info(`Multiple rules triggered: ${triggeredRules.map(r => r.name).join(', ')}`);
+      const groupedRules = this.priorityService.groupRulesByPriority(
+        this.priorityService.sortByPriority(triggeredRules)
+      );
+
+      for (const [priorityLevel, rules] of Object.entries(groupedRules)) {
+        if (rules.length > 1) {
+          const incident = this.priorityService.createIncidentReport(rules, { ...sensorData, deviceId });
+          const message = this.priorityService.buildDetailedConsolidatedNotification(incident, null, sensorData);
+          await this.sendToAlertsService(message);
+          await Promise.all(rules.map(rule => rule.incrementTriggerCount().catch(err => 
+            logger.error(`Error incrementing trigger count for rule ${rule.name}:`, err)
+          )));
+          logger.info(`Consolidated alert sent for ${priorityLevel} priority - ${rules.length} rules`);
+        } else {
+          await this.executeActions(rules[0], sensorData).catch(() => {});
+          logger.info(`Individual alert sent for ${priorityLevel} priority - ${rules[0].name}`);
+        }
       }
     } catch (err) {
       logger.error(`evaluateRules() error for device ${deviceId}:`, err);
@@ -210,30 +134,19 @@ class RuleEvaluationService {
         logger.warn(`Rule ${rule.name} has no conditions; skipping evaluation`);
         return false;
       }
-      const { priority } = rule;
 
-      // Special handling for urgent rules - always trigger regardless of cooldown/limits
-      const isUrgent = priority === 'urgent';
-      
-      if (!isUrgent) {
-        // Check if rule can trigger with escalation logic
-        const canTrigger = await this.checkRuleCanTrigger(rule, sensorData);
+      if (rule.priority !== 'urgent') {
+        const { sensorType, sensorValue } = this.getSensorInfo(rule, sensorData);
+        const canTrigger = await rule.canTrigger(sensorValue, sensorType);
         if (!canTrigger) {
           logger.debug(`${rule.name}: skipped (cooldown or escalation gating)`);
           return false;
         }
       }
 
-      // Đánh giá tất cả conditions với logic
       const conditionsMet = await this.evaluateConditions(rule.conditions, sensorData);
-      if (!conditionsMet) {
-        return false;
-      }
-      
-      // Increment trigger count for all priorities
-      await rule.incrementTriggerCount();
-      
-      // Don't execute actions here - let evaluateRules handle it
+      if (!conditionsMet) return false;
+
       return true;
     } catch (err) {
       logger.error(`evaluateRule() error for ${rule.name}:`, err);
@@ -241,183 +154,27 @@ class RuleEvaluationService {
     }
   }
 
-  // Kiểm soát spam cảnh báo khẩn cấp dựa trên emergencyMode/lastEmergencyAt
-  shouldAllowEmergencyAlert(deviceId, sensorData, rule) {
-    if (!rule || rule.priority !== 'urgent') {
-      return { allowed: true };
-    }
-
-    const now = Date.now();
-    const emergencyMode = Boolean(sensorData?.emergencyMode);
-    const lastEmergencyAtValue = sensorData?.lastEmergencyAt;
-    const lastEmergencyAtMs = lastEmergencyAtValue ? new Date(lastEmergencyAtValue).getTime() : null;
-
-    if (emergencyMode) {
-      const lastSent = this.lastEmergencyAlertTime.get(deviceId);
-      if (lastSent && (now - lastSent) < this.emergencyResendIntervalMs) {
-        return { allowed: false, reason: 'emergency_mode_resend_interval', nextAllowedAt: lastSent + this.emergencyResendIntervalMs };
-      }
-      this.lastEmergencyAlertTime.set(deviceId, now);
-      return { allowed: true };
-    }
-
-    if (lastEmergencyAtMs && Number.isFinite(lastEmergencyAtMs)) {
-      const cooldownUntil = lastEmergencyAtMs + this.emergencyCooldownAfterExitMs;
-      if (now < cooldownUntil) {
-        return { allowed: false, reason: 'post_emergency_cooldown', nextAllowedAt: cooldownUntil };
-      }
-    }
-
-    this.lastEmergencyAlertTime.set(deviceId, now);
-    return { allowed: true };
-  }
-
-  // Kiểm tra rule có thể trigger với escalation logic
-  async checkRuleCanTrigger(rule, sensorData) {
-    const { priority } = rule;
-    
-    // Urgent rules luôn bypass tất cả giới hạn
-    if (priority === 'urgent') {
-      return true;
-    }
-    
-    const { sensorType, sensorValue } = this.getSensorInfo(rule, sensorData);
-    
-    const canTrigger = await rule.canTrigger(sensorValue, sensorType);
-    if (canTrigger) {
-      return true;
-    }
-    
-    // thì cần check nếu có escalation để gửi alert
-    if (sensorValue && sensorType) {
-      const condition = rule.conditions.find(c => c.sensor === sensorType);
-      if (condition && condition.value) {
-        const escalationMet = rule.shouldEscalate(sensorValue, sensorType);
-        if (escalationMet) {
-          logger.warn(`🚨 ESCALATION → URGENT: ${rule.name} bypassing cooldown - ${sensorType}: ${sensorValue}`);
-          
-          await this.createEscalationAlert(rule, sensorData, {
-            sensor: sensorType,
-            currentValue: sensorValue,
-            threshold: condition.value,
-            reason: 'escalation'
-          });
-          
-          return true;
-        }
-      }
-    }
-    
-    return false;
-  }
-
-  // Tạo escalation alert
-  async createEscalationAlert(rule, sensorData, escalationInfo) {
-    const { sensor, currentValue, threshold, reason } = escalationInfo;
-    const { name, priority, createdBy } = rule;
-    
-    let title, message;
-    
-    title = `🚨 CẢNH BÁO KHẨN CẤP: ${name}`;
-    const hasThreshold = threshold !== undefined && threshold !== null;
-    const deviationPercent = hasThreshold && threshold !== 0
-      ? ((currentValue - threshold) / threshold * 100).toFixed(1)
-      : null;
-    const thresholdText = hasThreshold && deviationPercent !== null
-      ? `📈 Ngưỡng ban đầu: ${threshold}\n⚠️ Độ lệch: +${deviationPercent}%\n`
-      : hasThreshold
-        ? `📈 Ngưỡng ban đầu: ${threshold}\n`
-        : '';
-    message = `🚨 ${sensor} đã tăng ĐỘT NGỘT và có nguy cơ nguy hiểm!\n\n` +
-             `📊 Giá trị hiện tại: ${currentValue}\n` +
-             thresholdText +
-             `⏰ Thời gian: ${new Date().toLocaleString()}\n\n` +
-             `🚨 ĐÁNH GIÁ: Tình trạng NGHIÊM TRỌNG - Cần xử lý ngay!`;
-    
-    const escalationMessage = {
-      userId: createdBy,
-      title,
-      message,
-      priority: 'urgent',
-      type: 'escalation_alert',
-      category: 'security', // ✅ Chuyển sang security để FE hiển thị emergency
-      metadata: {
-        ruleId: rule._id,
-        ruleName: name,
-        sensor,
-        currentValue,
-        threshold,
-        escalationReason: reason,
-        cooldownBypassed: reason === 'escalation',
-        triggerCount: rule.triggerCount,
-        deviceId: sensorData.deviceId
-      }
-    };
-    
-    await this.sendToAlertsService(escalationMessage);
-    logger.info(`🚨 ESCALATION ALERT sent as URGENT for rule: ${name} - Reason: ${reason}`);
-  }
-
-  // Đánh giá tất cả conditions của rule (mặc định AND)
+  // Đánh giá tất cả conditions của rule
   async evaluateConditions(conditions, sensorData) {
-    if (!conditions || conditions.length === 0) {
+    if (!conditions?.length) {
       logger.warn('evaluateConditions() skipped: rule has no conditions configured');
       return false;
     }
 
-    // Nếu chỉ có 1 điều kiện, chỉ cần đánh giá điều kiện đó
-    if (conditions.length === 1) {
-      return await this.evaluateCondition(conditions[0], sensorData);
-    }
-
-    const results = [];
-    for (const condition of conditions) {
-      const conditionMet = await this.evaluateCondition(condition, sensorData);
-      results.push(conditionMet);
-    }
-
-    // Mặc định sử dụng logic AND
-    return results.every(result => result === true);
-  }
-
-  // Đánh giá một condition cụ thể
-  async evaluateCondition(condition, sensorData) {
-    if (condition.type === 'sensor') {
+    const results = await Promise.all(conditions.map(condition => {
+      if (condition.type !== 'sensor') {
+        logger.warn(`Unknown condition type: ${condition.type}`);
+        return false;
+      }
       return this.evaluateSensorCondition(condition, sensorData);
-    }
-    logger.warn(`Unknown condition type: ${condition.type}`);
-    return false;
+    }));
+    return results.every(r => r === true);
   }
 
   // Đánh giá sensor condition
   async evaluateSensorCondition(condition, sensorData) {
     const { sensor, operator, value } = condition;
-    
-    // Lấy giá trị sensor từ dữ liệu
-    let sensorValue;
-    switch (sensor) {
-      case 'temperature':
-        sensorValue = sensorData.temp;
-        break;
-      case 'humidity':
-        sensorValue = sensorData.humid;
-        break;
-      case 'gas_ppm':
-        sensorValue = sensorData.gas_ppm;
-        break;
-      case 'smoke':
-        sensorValue = sensorData.smoke;
-        break;
-      case 'flame':
-        sensorValue = sensorData.flame;
-        if (sensorValue !== undefined && sensorValue !== null) {
-          sensorValue = Number(sensorValue);
-        }
-        break;
-      default:
-        logger.warn(`Unknown sensor type: ${sensor}`);
-        return false;
-    }
+    const sensorValue = this.getSensorValue(sensor, sensorData);
 
     if (sensorValue === undefined || sensorValue === null) {
       logger.warn(`Sensor value not available: ${sensor}`);
@@ -436,9 +193,7 @@ class RuleEvaluationService {
 
     try {
       const mlSupport = await this.fetchMlSupport(sensorData.deviceId, sensorData);
-      if (!mlSupport || !mlSupport.predictions) {
-        return thresholdMet;
-      }
+      if (!mlSupport?.predictions) return thresholdMet;
 
       const sensorMl = mlSupport.predictions[sensor];
       const supportScore = sensorMl?.prediction_score ?? mlSupport.device?.overall_score;
@@ -497,91 +252,72 @@ class RuleEvaluationService {
   // Thực thi các actions của rule
   async executeActions(rule, sensorData) {
     try {
-      logger.info(`Executing ${rule.actions.length} actions for rule: ${rule.name}`);
-
-      for (const action of rule.actions) {
-        try {
-          await this.executeAction(action, rule, sensorData);
-        } catch (actionError) {
-          logger.error(`Error executing action ${action.type} for rule ${rule.name}:`, actionError);
-        }
+      if (!Array.isArray(rule.actions) || rule.actions.length === 0) {
+        logger.warn(`Rule ${rule.name} has no actions configured; skipping execution`);
+        return;
       }
+
+      logger.info(`Executing ${rule.actions.length} actions for rule: ${rule.name}`);
+      
+      const actionMap = {
+        send_notification: (action) => this.sendNotificationAction(action, rule, sensorData),
+        send_alert: (action) => this.sendAlertAction(action, rule, sensorData)
+      };
+
+      await Promise.all(rule.actions.map(action => {
+        logger.info(`Executing action: ${action.type} for rule: ${rule.name}`);
+        const handler = actionMap[action.type];
+        if (!handler) {
+          logger.warn(`Unknown action type: ${action.type}`);
+          return Promise.resolve();
+        }
+        return handler(action).catch(err =>
+          logger.error(`Error executing action ${action.type} for rule ${rule.name}:`, err)
+        );
+      }));
+      
+      await rule.incrementTriggerCount();
     } catch (error) {
       logger.error(`Error executing actions for rule ${rule.name}:`, error);
+      throw error;
     }
   }
 
-  // Thực thi một action cụ thể
-  async executeAction(action, rule, sensorData) {
-    try {
-      logger.info(`Executing action: ${action.type} for rule: ${rule.name}`);
-
-      switch (action.type) {
-        case 'send_notification':
-          await this.sendNotificationAction(action, rule, sensorData);
-          break;
-        case 'send_alert':
-          await this.sendAlertAction(action, rule, sensorData);
-          break;
-        default:
-          logger.warn(`Unknown action type: ${action.type}`);
-      }
-
-    } catch (error) {
-      logger.error(`Error executing action ${action.type}:`, error);
-    }
+  // Tạo message mặc định cho rule
+  getDefaultMessage(sensorType, sensorValue, threshold) {
+    const messages = {
+      temperature: `Cảm biến nhiệt độ đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}°C, Ngưỡng: ${threshold}°C`,
+      humidity: `Cảm biến độ ẩm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}%, Ngưỡng: ${threshold}%`,
+      gas_ppm: `Cảm biến gas_ppm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`,
+      smoke: `Cảm biến khói đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`,
+      flame: `Cảm biến lửa ${Number(sensorValue) >= 1 ? 'phát hiện lửa' : 'an toàn'}. Giá trị hiện tại: ${sensorValue}`
+    };
+    return messages[sensorType] || `Rule triggered. Sensor: ${sensorType}, Value: ${sensorValue}, Threshold: ${threshold}`;
   }
 
   // Gửi notification action
   async sendNotificationAction(action, rule, sensorData) {
     try {
-      const { sensorType, sensorValue, threshold, operator } = this.getSensorInfo(rule, sensorData);
-      
-      let detailedMessage = action.message;
-      if (!detailedMessage) {
-        // Tạo message chi tiết dựa trên sensor type
-        switch (sensorType) {
-          case 'temperature':
-            detailedMessage = `Cảm biến nhiệt độ đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}°C, Ngưỡng: ${threshold}°C`;
-            break;
-          case 'humidity':
-            detailedMessage = `Cảm biến độ ẩm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}%, Ngưỡng: ${threshold}%`;
-            break;
-          case 'gas_ppm':
-            detailedMessage = `Cảm biến gas_ppm đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`;
-            break;
-          case 'smoke':
-            detailedMessage = `Cảm biến khói đã vượt quá ngưỡng cho phép. Giá trị hiện tại: ${sensorValue}, Ngưỡng: ${threshold}`;
-            break;
-          case 'flame': {
-            const flameStatus = Number(sensorValue) >= 1 ? 'phát hiện lửa' : 'an toàn';
-            detailedMessage = `Cảm biến lửa ${flameStatus}. Giá trị hiện tại: ${sensorValue}`;
-            break;
-          }
-          default:
-            detailedMessage = `Rule "${rule.name}" has been triggered. Sensor: ${sensorType}, Value: ${sensorValue}, Threshold: ${threshold}`;
-        }
-      } else {
-        detailedMessage = this.replacePlaceholders(detailedMessage, sensorData, sensorType, sensorValue, threshold, operator);
-      }
-
-      // Determine if this should be elevated to security alert
-      const elevateSecurity = sensorType === 'gas_ppm' || 
-                              sensorType === 'flame' ||
-                              (sensorType === 'smoke' && Number(sensorValue) === 1) || 
-                              (sensorType === 'temperature' && Number(sensorValue) >= 80);
-
-      // Tạo title với placeholder replacement
-      let title = action.title || this.getDefaultTitle(sensorType);
-      title = this.replacePlaceholders(title, sensorData, sensorType, sensorValue, threshold, operator);
       if (!rule.createdBy) {
         logger.error(`Rule ${rule.name} has no createdBy, skipping notification`);
         return;
       }
 
-      const message = {
+      const { sensorType, sensorValue, threshold, operator } = this.getSensorInfo(rule, sensorData);
+      const elevateSecurity = this.shouldElevateSecurity(sensorType, sensorValue);
+      
+      const detailedMessage = action.message
+        ? this.replacePlaceholders(action.message, sensorData, sensorType, sensorValue, threshold, operator)
+        : this.getDefaultMessage(sensorType, sensorValue, threshold);
+
+      const title = this.replacePlaceholders(
+        action.title || this.getDefaultTitle(sensorType),
+        sensorData, sensorType, sensorValue, threshold, operator
+      );
+
+      await this.sendToAlertsService({
         userId: rule.createdBy,
-        title: title,
+        title,
         message: detailedMessage,
         type: elevateSecurity ? 'security_alert' : 'device_alert',
         category: elevateSecurity ? 'security' : 'rule',
@@ -591,16 +327,15 @@ class RuleEvaluationService {
           ruleName: rule.name,
           deviceId: rule.deviceId,
           deviceName: sensorData.deviceName || `Device ${rule.deviceId}`,
-          sensorData: sensorData,
+          sensorData,
           actionType: action.type,
-          sensorType: sensorType,
-          sensorValue: sensorValue,
-          threshold: threshold,
-          operator: operator,
+          sensorType,
+          sensorValue,
+          threshold,
+          operator,
           mlSupport: sensorData.__mlMeta?.[sensorType] || null
         }
-      };
-      await this.sendToAlertsService(message);
+      });
     } catch (error) {
       logger.error(`Error sending notification for rule ${rule.name}:`, error);
     }
@@ -608,46 +343,40 @@ class RuleEvaluationService {
 
   // Gửi alert action
   async sendAlertAction(action, rule, sensorData) {
-    const { sensorType, sensorValue, threshold } = this.getSensorInfo(rule, sensorData);
-    const elevateSecurity = sensorType === 'gas_ppm' || 
-                            sensorType === 'flame' ||
-                            (sensorType === 'smoke' && Number(sensorValue) === 1) || 
-                            (sensorType === 'temperature' && Number(sensorValue) >= 80);
-
     if (!rule.createdBy) {
       logger.error(`Rule ${rule.name} has no createdBy, skipping alert`);
       return;
     }
 
-    const message = {
-      deviceId: rule.deviceId,
-      deviceName: `Device ${rule.deviceId}`,
-      sensorType,
-      sensorValue,
-      threshold,
-      alertType: 'threshold_exceeded',
-      category: elevateSecurity ? 'security' : 'sensor',
-      priority: elevateSecurity ? 'urgent' : (rule.priority || 'medium'),
-      userId: rule.createdBy,
-      ruleId: rule._id.toString(),
-      ruleName: rule.name,
-      message: action.message || (sensorType === 'flame'
-        ? `Cảm biến lửa phát hiện ngọn lửa (Giá trị: ${sensorValue})`
-        : `Alert: ${rule.name} triggered`),
-      mlSupport: sensorData.__mlMeta?.[sensorType] || null
-    };
+    const { sensorType, sensorValue, threshold } = this.getSensorInfo(rule, sensorData);
+    const elevateSecurity = this.shouldElevateSecurity(sensorType, sensorValue);
+    const defaultMessage = sensorType === 'flame'
+      ? `Cảm biến lửa phát hiện ngọn lửa (Giá trị: ${sensorValue})`
+      : `Alert: ${rule.name} triggered`;
 
     try {
       await this.ensureKafkaConnection();
-      
       await this.producer.send({
         topic: 'device-alerts',
         messages: [{
           key: rule.deviceId,
-          value: JSON.stringify(message)
+          value: JSON.stringify({
+            deviceId: rule.deviceId,
+            deviceName: `Device ${rule.deviceId}`,
+            sensorType,
+            sensorValue,
+            threshold,
+            alertType: 'threshold_exceeded',
+            category: elevateSecurity ? 'security' : 'sensor',
+            priority: elevateSecurity ? 'urgent' : (rule.priority || 'medium'),
+            userId: rule.createdBy,
+            ruleId: rule._id.toString(),
+            ruleName: rule.name,
+            message: action.message || defaultMessage,
+            mlSupport: sensorData.__mlMeta?.[sensorType] || null
+          })
         }]
       });
-
       logger.info(`Alert sent for rule: ${rule.name}`);
     } catch (kafkaError) {
       logger.error(`Kafka alert send error for rule ${rule.name}:`, kafkaError);
@@ -693,47 +422,37 @@ class RuleEvaluationService {
   replacePlaceholders(message, sensorData, sensorType, sensorValue, threshold, operator) {
     if (!message) return message;
 
-    // Đảm bảo có dữ liệu sensor hợp lệ
-    const temp = sensorData.temp !== undefined && sensorData.temp !== null ? sensorData.temp : 'N/A';
-    const humid = sensorData.humid !== undefined && sensorData.humid !== null ? sensorData.humid : 'N/A';
-    const smoke = sensorData.smoke !== undefined && sensorData.smoke !== null ? sensorData.smoke : 'N/A';
-    const gasPpm = sensorData.gas_ppm !== undefined && sensorData.gas_ppm !== null ? sensorData.gas_ppm : 'N/A';
+    const getValue = (key) => {
+      const val = sensorData[key];
+      return val !== undefined && val !== null ? val : 'N/A';
+    };
+
     const flameValue = sensorData.flame !== undefined && sensorData.flame !== null ? Number(sensorData.flame) : null;
     const flameDisplay = flameValue !== null && !Number.isNaN(flameValue) ? flameValue : 'N/A';
+    const flameStatus = flameValue !== null && !Number.isNaN(flameValue) && flameValue >= 1 ? 'có lửa' : 'an toàn';
 
-    let result = message
-      .replace(/\{temperature\}/g, temp)
-      .replace(/\{humidity\}/g, humid)
-      .replace(/\{smoke\}/g, smoke)
-      .replace(/\{gas_ppm\}/g, gasPpm)
-      .replace(/\{flame\}/g, flameDisplay)
-      .replace(/\{sensorValue\}/g, sensorValue !== undefined ? sensorValue : 'N/A')
-      .replace(/\{threshold\}/g, threshold !== undefined ? threshold : 'N/A')
-      .replace(/\{operator\}/g, operator || '>')
-      .replace(/\{sensorType\}/g, sensorType || 'unknown')
-      .replace(/\{deviceId\}/g, sensorData.deviceId || 'Unknown Device')
-      .replace(/\{deviceName\}/g, sensorData.deviceName || (sensorData.deviceId ? `Device ${sensorData.deviceId}` : 'Unknown Device'));
+    const replacements = {
+      temperature: getValue('temp'),
+      humidity: getValue('humid'),
+      smoke: getValue('smoke'),
+      gas_ppm: getValue('gas_ppm'),
+      flame: flameDisplay,
+      sensorValue: sensorValue !== undefined ? sensorValue : 'N/A',
+      threshold: threshold !== undefined ? threshold : 'N/A',
+      operator: operator || '>',
+      sensorType: sensorType || 'unknown',
+      deviceId: sensorData.deviceId || 'Unknown Device',
+      deviceName: sensorData.deviceName || (sensorData.deviceId ? `Device ${sensorData.deviceId}` : 'Unknown Device'),
+      temp: getValue('temp'),
+      humid: getValue('humid'),
+      smoke_value: getValue('smoke'),
+      gas_value: getValue('gas_ppm'),
+      flame_status: flameStatus
+    };
 
-    switch (sensorType) {
-      case 'temperature':
-        result = result.replace(/\{temp\}/g, temp);
-        break;
-      case 'humidity':
-        result = result.replace(/\{humid\}/g, humid);
-        break;
-      case 'smoke':
-        result = result.replace(/\{smoke_value\}/g, smoke);
-        break;
-      case 'gas_ppm':
-        result = result.replace(/\{gas_value\}/g, gasPpm);
-        break;
-      case 'flame': {
-        const flameStatus = flameValue !== null && !Number.isNaN(flameValue) && flameValue >= 1 ? 'có lửa' : 'an toàn';
-        result = result.replace(/\{flame_status\}/g, flameStatus);
-        break;
-      }
-    }
-    return result;
+    return Object.entries(replacements).reduce((result, [key, value]) => {
+      return result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    }, message);
   }
 
   buildMlPayload(deviceId, sensorData) {
