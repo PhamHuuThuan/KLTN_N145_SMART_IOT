@@ -25,21 +25,21 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
 ml_service_instance = None
-app_state = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events for startup and shutdown."""
     global ml_service_instance
     
-    logger.info("Starting ML Service...")
+    logger.info("Starting ML Service (Multivariate Isolation Forest)...")
     
     try:
         ml_service_instance = MLService()
-        app_state['ml_service'] = ml_service_instance
+        
         router = setup_routes(ml_service_instance)
         app.include_router(router)
-        logger.info("ML Service initialized")
+        
+        logger.info("ML Service initialized successfully")
     except Exception as e:
         logger.error(f"Error during startup: {e}")
     
@@ -49,11 +49,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ML Service",
-    description="Machine Learning Service for Danger Prediction and Early Warning",
-    version="1.0.0",
+    description="Multivariate Anomaly Detection Service for Smart IoT",
+    version="2.0.0",
     lifespan=lifespan
 )
 
+# CORS
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -63,14 +64,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.get("/health")
 def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
         "service": "ml-service",
-        "version": "1.0.0"
+        "version": "2.0.0",
+        "mode": "multivariate"
     }
 
 @app.get("/")
@@ -78,19 +79,18 @@ async def root():
     """Root endpoint."""
     return {
         "service": "ML Service",
-        "description": "Machine Learning Service for Smart IoT",
-        "version": "1.0.0",
+        "description": "Multivariate Anomaly Detection using Isolation Forest & Trend Analysis",
+        "version": "2.0.0",
         "endpoints": {
             "predict": "/api/ml/predict",
             "predict_batch": "/api/ml/predict/batch",
             "status": "/api/ml/status",
-            "predict_from_event": "/api/ml/predict/event",
-            "predict_from_event_aggregate": "/api/ml/predict/event/aggregate"
+            "predict_event": "/api/ml/predict/event",
+            "predict_aggregate": "/api/ml/predict/event/aggregate"
         }
     }
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "3007"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True, access_log=False, log_level="warning")
-
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True, access_log=False)

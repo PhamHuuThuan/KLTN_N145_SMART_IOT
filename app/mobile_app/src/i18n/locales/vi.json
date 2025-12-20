@@ -251,28 +251,13 @@
       },
       "gasHigh": {
         "name": "💨 Khí gas cao",
-        "description": "Cảnh báo khi khí gas 401–1000 ppm",
+        "description": "Cảnh báo khi khí gas 701–1000 ppm",
         "message": "💨 Cảnh báo: Nồng độ khí gas cao! Kiểm tra nguồn rò rỉ ngay."
-      },
-      "gasMedium": {
-        "name": "💨 Khí gas trung bình",
-        "description": "Cảnh báo khi khí gas 200–400 ppm",
-        "message": "💨 Cảnh báo: Phát hiện khí gas nhẹ. Theo dõi và kiểm tra định kỳ."
       },
       "smokeEmergency": {
         "name": "🚨 Khói khẩn cấp",
-        "description": "Cảnh báo khẩn cấp khi khói > 700 ppm",
+        "description": "Cảnh báo khẩn cấp phát hiện có khói",
         "message": "🚨 CẢNH BÁO KHẨN CẤP: Nồng độ khói đậm! Nguy cơ cháy hoặc khí CO cao!"
-      },
-      "smokeHigh": {
-        "name": "🔥 Khói cao",
-        "description": "Cảnh báo khi khói 301–700 ppm",
-        "message": "🔥 Cảnh báo: Phát hiện khói đậm! Kiểm tra ngay để phòng cháy."
-      },
-      "smokeMedium": {
-        "name": "💨 Khói trung bình",
-        "description": "Cảnh báo khi khói 100–300 ppm",
-        "message": "💨 Cảnh báo: Phát hiện khói nhẹ. Có thể do bụi hoặc hơi nóng."
       },
       "tempEmergency": {
         "name": "🚨 Nhiệt độ khẩn cấp",
@@ -281,22 +266,22 @@
       },
       "tempHigh": {
         "name": "🌡️ Nhiệt độ cao",
-        "description": "Cảnh báo khi nhiệt độ 31–40°C",
+        "description": "Cảnh báo khi nhiệt độ 35–40°C",
         "message": "🌡️ Cảnh báo: Nhiệt độ cao! Kiểm tra hệ thống làm mát hoặc thông gió."
       },
       "tempLow": {
         "name": "❄️ Nhiệt độ thấp",
-        "description": "Cảnh báo khi nhiệt độ < 15°C",
+        "description": "Cảnh báo khi nhiệt độ < 25°C",
         "message": "❄️ Cảnh báo: Nhiệt độ thấp! Kiểm tra hệ thống sưởi hoặc môi trường lưu trữ."
       },
       "humidityEmergency": {
         "name": "🚨 Độ ẩm khẩn cấp",
-        "description": "Cảnh báo khẩn cấp khi độ ẩm > 80%",
+        "description": "Cảnh báo khẩn cấp khi độ ẩm > 70%",
         "message": "🚨 CẢNH BÁO KHẨN CẤP: Độ ẩm quá cao! Nguy cơ chập điện hoặc hư hại thiết bị!"
       },
       "humidityHigh": {
         "name": "💧 Độ ẩm cao",
-        "description": "Cảnh báo khi độ ẩm 61–80%",
+        "description": "Cảnh báo khi độ ẩm 55-70%",
         "message": "💧 Cảnh báo: Độ ẩm cao! Có thể gây nấm mốc, ảnh hưởng linh kiện."
       },
       "humidityLow": {
@@ -306,7 +291,7 @@
       },
       "flameDetected": {
         "name": "🔥 Phát hiện lửa",
-        "description": "Cảnh báo khẩn cấp khi cảm biến lửa kích hoạt",
+        "description": "Cảnh báo khẩn cấp phát hiện có lửa",
         "message": "🔥 CẢNH BÁO KHẨN CẤP: Phát hiện ngọn lửa! Dừng thiết bị và xử lý ngay lập tức!"
       }
     },
@@ -347,10 +332,34 @@
     "confirmNewPassword": "Xác nhận mật khẩu mới",
     "passwordChanged": "Đổi mật khẩu thành công",
     "passwordChangeError": "Không thể đổi mật khẩu",
+    "currentPasswordRequired": "Vui lòng nhập mật khẩu hiện tại",
+    "newPasswordRequired": "Vui lòng nhập mật khẩu mới",
+    "confirmPasswordRequired": "Vui lòng nhập lại mật khẩu mới",
+    "enterCurrentPassword": "Nhập mật khẩu hiện tại",
+    "enterNewPassword": "Nhập mật khẩu mới",
+    "enterConfirmPassword": "Nhập lại mật khẩu mới",
+    "currentPasswordIncorrect": "Mật khẩu hiện tại không đúng",
     "profileUpdated": "Cập nhật hồ sơ thành công",
     "profileUpdateError": "Không thể cập nhật hồ sơ",
     "avatar": "Ảnh đại diện",
-    "selectAvatar": "Chọn ảnh đại diện"
+    "selectAvatar": "Chọn ảnh đại diện",
+    "fullName": "Họ và tên",
+    "phoneNumber": "Số điện thoại",
+    "enterFullName": "Nhập họ và tên của bạn",
+    "enterPhoneNumber": "Nhập số điện thoại của bạn",
+    "fullNameRequired": "Vui lòng nhập họ và tên",
+    "invalidPhoneNumber": "Vui lòng nhập số điện thoại hợp lệ",
+    "emailAddress": "Địa chỉ email",
+    "editProfile": "Chỉnh sửa hồ sơ",
+    "saveChanges": "Lưu thay đổi",
+    "account": "Tài khoản",
+    "changeAvatar": "Đổi ảnh đại diện",
+    "tapAvatarToChange": "Chạm vào ảnh để đổi",
+    "permissionRequired": "Yêu cầu quyền truy cập",
+    "allowPhotoAccess": "Vui lòng cho phép truy cập ảnh để chọn ảnh đại diện.",
+    "logoutConfirm": "Đăng xuất",
+    "logoutConfirmMessage": "Bạn có chắc chắn muốn đăng xuất?",
+    "user": "Người dùng"
   },
   "settings": {
     "title": "Cài đặt",
@@ -464,8 +473,12 @@
       "low": "Thấp",
       "normal": "Bình thường",
       "high": "Cao",
-      "veryHigh": "Rất cao"
-    }
+      "veryHigh": "Rất cao",
+      "binary_normal": "An toàn",
+      "binary_alarm": "Cảnh báo"
+    },
+    "smokeSafe": "An toàn",
+    "smokeDetected": "Có khói"
   },
   "charts": {
     "title": "Biểu đồ cảm biến",

@@ -45,7 +45,6 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      setIsLoading(true);
       const authStatus = await authService.isAuthenticated();
       
       if (authStatus.isAuthenticated) {
@@ -79,18 +78,16 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      setIsLoading(true);
       const result = await authService.login(email, password);
       
       if (result.success) {
         const profile = await authService.getProfile();
         const currentUser = profile?.success && profile.user ? profile.user : result.user;
-        setUser(currentUser);
-        setIsAuthenticated(true);
         setToken(result.token);
-        // Set token for all services
         notificationService.setAuthToken(result.token);
         setAuthToken(result.token);
+        setUser(currentUser);
+        setIsAuthenticated(true);
         
         // Initialize chat session for the logged-in user
         if (currentUser?.id) {
@@ -137,8 +134,6 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      setIsLoading(true);
-      
       // Remove FCM token and clear chat session before logout
       if (user?.id) {
         try {
@@ -178,7 +173,6 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (name, phone, avatar) => {
     try {
-      setIsLoading(true);
       const result = await authService.updateProfile(name, phone, avatar);
       
       if (result.success) {
@@ -196,11 +190,11 @@ export const AuthProvider = ({ children }) => {
 
   const changePassword = async (currentPassword, newPassword) => {
     try {
-      setIsLoading(true);
       const result = await authService.changePassword(currentPassword, newPassword);
       return result;
     } catch (error) {
-      return { success: false, error: 'Password change failed' };
+      log.error('Change password error:', error);
+      return { success: false, error: error?.message || 'Đổi mật khẩu thất bại' };
     } finally {
       setIsLoading(false);
     }

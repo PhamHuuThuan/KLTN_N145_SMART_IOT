@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -33,22 +32,22 @@ const RegisterScreen = ({ navigation }) => {
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      setFeedback({ visible: true, type: 'error', message: 'Vui lòng nhập đầy đủ thông tin' });
       return;
     }
 
     if (!isValidEmail(email)) {
-      Alert.alert('Lỗi', 'Vui lòng nhập email hợp lệ');
+      setFeedback({ visible: true, type: 'error', message: 'Vui lòng nhập email hợp lệ' });
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
+      setFeedback({ visible: true, type: 'error', message: 'Mật khẩu phải có ít nhất 6 ký tự' });
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
+      setFeedback({ visible: true, type: 'error', message: 'Mật khẩu xác nhận không khớp' });
       return;
     }
 
@@ -115,14 +114,17 @@ const RegisterScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Email</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: CONFIG.COLORS.dark }]}
                 placeholder="Nhập email của bạn"
+                placeholderTextColor={CONFIG.COLORS.gray}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isLoading}
+                selectionColor={CONFIG.THEME.primary}
+                caretHidden={false}
               />
             </View>
 

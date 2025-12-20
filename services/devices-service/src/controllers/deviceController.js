@@ -242,7 +242,7 @@ export const toggleOutlet = async (req, res) => {
     
     const device = ownershipCheck.device;
     
-    if (!device.isOnline()) {
+    if (device.status !== 'online') {
       return res.status(400).json({
         success: false,
         message: 'Device is offline'

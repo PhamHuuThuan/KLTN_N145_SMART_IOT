@@ -71,6 +71,14 @@ const ruleSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  dailyTriggerCount: {
+    type: Number,
+    default: 0
+  },
+  lastTriggerDate: {
+    type: Date,
+    default: null
+  },
   lastTriggeredAt: {
     type: Date,
     default: null
@@ -78,40 +86,6 @@ const ruleSchema = new mongoose.Schema({
   deletedAt: {
     type: Date,
     default: null
-  },
-  escalationConfig: {
-    enabled: { type: Boolean, default: true },
-    escalationMultipliers: {
-      // Multiplier theo priority (0=high, 1=medium, 2=low)
-      high: {
-        temperature: { type: Number, default: 1.2 },    // +20%
-        smoke: { type: Number, default: 1.5 },          // +50%
-        gas_ppm: { type: Number, default: 2.0 },        // +100%
-        humidity: { type: Number, default: 1.3 },       // +30%
-        flame: { type: Number, default: 1.0 }           // Bật ngay khi phát hiện
-      },
-      medium: {
-        temperature: { type: Number, default: 1.3 },    // +30%
-        smoke: { type: Number, default: 1.8 },          // +80%
-        gas_ppm: { type: Number, default: 2.5 },        // +150%
-        humidity: { type: Number, default: 1.5 },       // +50%
-        flame: { type: Number, default: 1.0 }
-      },
-      low: {
-        temperature: { type: Number, default: 1.5 },    // +50%
-        smoke: { type: Number, default: 2.0 },          // +100%
-        gas_ppm: { type: Number, default: 3.0 },        // +200%
-        humidity: { type: Number, default: 2.0 },       // +100%
-        flame: { type: Number, default: 1.0 }
-      }
-    },
-    criticalThresholds: {
-      temperature: { type: Number, default: 90 },
-      smoke: { type: Number, default: 1.5 },
-      gas_ppm: { type: Number, default: 100 },
-      humidity: { type: Number, default: 20 },
-      flame: { type: Number, default: 1 }
-    }
   }
 });
 
@@ -122,12 +96,12 @@ ruleSchema.index({ ruleId: 1 });
 ruleSchema.index({ deviceId: 1 });
 ruleSchema.index({ createdBy: 1 });
 ruleSchema.index({ isActive: 1 });
+
 // sort by priority
 const sortByPriority = (a, b) =>
   PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
 
-// Statics
-// find by creator (người tạo rule)
+// find by creator
 ruleSchema.statics.findByCreator = async function (createdBy, options = {}) {
   const { deviceId, isActive, limit = 50, page = 1, includeDeleted = false } = options;
   
@@ -159,39 +133,20 @@ ruleSchema.methods.isInCooldown = function() {
   return elapsed < this.cooldownPeriod;
 };
 
-// Check if rule should escalate
-ruleSchema.methods.shouldEscalate = function(currentValue, sensorType) {
-  if (this.priority === 'urgent') {
-    return false;
-  }
-  
-  if (!this.escalationConfig.enabled) return false;
-  
-  const criticalThreshold = this.escalationConfig.criticalThresholds[sensorType];
-  if (criticalThreshold && currentValue >= criticalThreshold) {
-    return true;
-  }
-  
-  // Lấy multiplier theo priority của rule
-  const priorityMultipliers = this.escalationConfig.escalationMultipliers[this.priority];
-  if (!priorityMultipliers) return false;
-  
-  const multiplier = priorityMultipliers[sensorType];
-  if (!multiplier) return false;
-  
-  const condition = this.conditions.find(c => c.sensor === sensorType);
-  if (!condition || !condition.value) return false;
-  
-  const originalThreshold = condition.value;
-  const escalationThreshold = originalThreshold * multiplier;
-  
-  return currentValue >= escalationThreshold;
-};
-
 // Increment trigger count
 ruleSchema.methods.incrementTriggerCount = function() {
+  const now = new Date();
+  const todayKey = now.toDateString();
+  const lastKey = this.lastTriggerDate ? new Date(this.lastTriggerDate).toDateString() : null;
+
+  if (todayKey !== lastKey) {
+    this.dailyTriggerCount = 0;
+  }
+
   this.triggerCount++;
-  this.lastTriggeredAt = new Date();
+  this.dailyTriggerCount++;
+  this.lastTriggerDate = now;
+  this.lastTriggeredAt = now;
   return this.save();
 };
 

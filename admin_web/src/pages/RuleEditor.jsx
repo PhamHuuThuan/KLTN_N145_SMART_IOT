@@ -47,7 +47,17 @@ function RuleEditor() {
   const fetchDevices = async () => {
     try {
       const response = await devicesService.getAllDevices({ limit: 1000 });
-      setDevices(response.data || []);
+      const devicesData = response.data || [];
+      setDevices(devicesData);
+      
+      // Extract unique ownerIds from devices to populate users dropdown
+      const uniqueUsers = new Set();
+      devicesData.forEach(device => {
+        if (device.ownerId) {
+          uniqueUsers.add(device.ownerId);
+        }
+      });
+      setUsers(Array.from(uniqueUsers).sort());
     } catch (error) {
       console.error('Error fetching devices:', error);
     }
@@ -241,13 +251,18 @@ function RuleEditor() {
 
             <div style={styles.formGroup}>
               <label style={styles.label}>{t('ruleEditor.owner')}</label>
-              <input
-                type="text"
+              <select
                 value={formData.createdBy}
                 onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
-                style={styles.input}
-                placeholder={t('ruleEditor.ownerHint')}
-              />
+                style={styles.select}
+              >
+                <option value="">{t('ruleEditor.selectOwner')}</option>
+                {users.map((userId) => (
+                  <option key={userId} value={userId}>
+                    {userId}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

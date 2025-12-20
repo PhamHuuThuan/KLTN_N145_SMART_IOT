@@ -28,7 +28,6 @@ export const ThemeProvider = ({ children }) => {
         setIsDarkMode(savedTheme === 'dark');
       }
     } catch (error) {
-      // Silently handle error
     } finally {
       setIsLoading(false);
     }
@@ -40,7 +39,6 @@ export const ThemeProvider = ({ children }) => {
       setIsDarkMode(newTheme);
       await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme ? 'dark' : 'light');
     } catch (error) {
-      // Silently handle error
     }
   };
 
@@ -50,7 +48,6 @@ export const ThemeProvider = ({ children }) => {
       setIsDarkMode(isDark);
       await AsyncStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch (error) {
-      // Silently handle error
     }
   };
 
@@ -60,43 +57,41 @@ export const ThemeProvider = ({ children }) => {
     toggleTheme,
     setTheme,
     colors: isDarkMode ? {
-      // Dark mode colors
-      primary: '#3B82F6',           // blue-500
-      secondary: '#10B981',         // emerald-500
-      success: '#22C55E',           // green-500
-      danger: '#EF4444',            // red-500
-      warning: '#F59E0B',           // amber-500
-      info: '#8B5CF6',              // violet-500
-      gray: '#9CA3AF',              // gray-400
-      grayLight: '#6B7280',         // gray-500
-      surface: '#1F2937',           // gray-800
-      surfaceSecondary: '#374151',  // gray-700
-      background: '#111827',        // gray-900
-      backgroundSecondary: '#1F2937', // gray-800
-      border: '#374151',            // gray-700
-      text: '#F9FAFB',              // gray-50
-      textSecondary: '#D1D5DB',     // gray-300
-      textTertiary: '#9CA3AF',      // gray-400
+      primary: '#3B82F6',
+      secondary: '#10B981',
+      success: '#22C55E',
+      danger: '#EF4444',
+      warning: '#F59E0B',
+      info: '#8B5CF6',
+      gray: '#9CA3AF',
+      grayLight: '#6B7280',
+      surface: '#1F2937',
+      surfaceSecondary: '#374151',
+      background: '#111827',
+      backgroundSecondary: '#1F2937',
+      border: '#374151',
+      text: '#F9FAFB',
+      textSecondary: '#D1D5DB',
+      textTertiary: '#9CA3AF',
       white: '#FFFFFF',
       black: '#000000',
     } : {
-      // Light mode colors
-      primary: '#2563EB',           // blue-600
-      secondary: '#14B8A6',         // teal-500
-      success: '#22C55E',           // green-500
-      danger: '#EF4444',            // red-500
-      warning: '#F59E0B',           // amber-500
-      info: '#8B5CF6',              // violet-500
-      gray: '#94A3B8',              // slate-400
-      grayLight: '#CBD5E1',         // slate-300
-      surface: '#FFFFFF',           // white
-      surfaceSecondary: '#F8FAFC',  // slate-50
-      background: '#F1F5F9',        // slate-100
-      backgroundSecondary: '#FFFFFF', // white
-      border: '#E2E8F0',            // slate-200
-      text: '#1F2937',              // gray-800
-      textSecondary: '#4B5563',     // gray-600
-      textTertiary: '#6B7280',      // gray-500
+      primary: '#2563EB',
+      secondary: '#14B8A6',
+      success: '#22C55E',
+      danger: '#EF4444',
+      warning: '#F59E0B',
+      info: '#8B5CF6',
+      gray: '#94A3B8',
+      grayLight: '#CBD5E1',
+      surface: '#FFFFFF',
+      surfaceSecondary: '#F8FAFC',
+      background: '#F1F5F9',
+      backgroundSecondary: '#FFFFFF',
+      border: '#E2E8F0',
+      text: '#1F2937',
+      textSecondary: '#4B5563',
+      textTertiary: '#6B7280',
       white: '#FFFFFF',
       black: '#000000',
     }

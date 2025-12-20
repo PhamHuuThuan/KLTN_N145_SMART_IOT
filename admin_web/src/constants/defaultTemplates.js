@@ -96,11 +96,11 @@ export const DEFAULT_TEMPLATES = {
 
     gas_high: {
       name: '💨 Khí gas cao',
-      description: 'Cảnh báo khi khí gas 401–1000 ppm',
+      description: 'Cảnh báo khi khí gas 701–1000 ppm',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 401, unit: 'ppm' },
+        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 701, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 1000, unit: 'ppm' }
       ],
       actions: [
@@ -109,29 +109,15 @@ export const DEFAULT_TEMPLATES = {
     },
 
     smoke_emergency: {
-      name: '🚨 Khói khẩn cấp',
-      description: 'Cảnh báo khẩn cấp khi khói > 4.5V',
+      name: '🚨 Phát hiện khói',
+      description: 'Cảnh báo khẩn cấp khi phát hiện khói (giá trị = 1)',
       priority: 'urgent',
       cooldownPeriod: 0,
       conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>', value: 4.5, unit: 'V' }
+        { type: 'sensor', sensor: 'smoke', operator: '==', value: 1, unit: '' }
       ],
       actions: [
-        { type: 'send_alert', message: '🚨 CẢNH BÁO KHẨN CẤP: Nồng độ khói đậm! Nguy cơ cháy hoặc khí CO cao!' }
-      ]
-    },
-
-    smoke_high: {
-      name: '🔥 Khói cao',
-      description: 'Cảnh báo khi khói 3.5–4.5V',
-      priority: 'high',
-      cooldownPeriod: 60000,
-      conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>=', value: 3.5, unit: 'V' },
-        { type: 'sensor', sensor: 'smoke', operator: '<=', value: 4.5, unit: 'V' }
-      ],
-      actions: [
-        { type: 'send_notification', message: '🔥 Cảnh báo: Phát hiện khói đậm! Kiểm tra ngay để phòng cháy.' }
+        { type: 'send_alert', message: '🚨 CẢNH BÁO KHẨN CẤP: Phát hiện khói! Nguy cơ cháy hoặc khí CO cao!' }
       ]
     },
 
@@ -198,7 +184,7 @@ export const DEFAULT_TEMPLATES = {
       priority: 'urgent',
       cooldownPeriod: 0,
       conditions: [
-        { type: 'sensor', sensor: 'humidity', operator: '>', value: 80, unit: '%' }
+        { type: 'sensor', sensor: 'humidity', operator: '>', value: 70, unit: '%' }
       ],
       actions: [
         { type: 'send_alert', message: '🚨 EMERGENCY ALERT: Excessive humidity! Risk of short circuit or equipment damage!' }
@@ -247,11 +233,11 @@ export const DEFAULT_TEMPLATES = {
 
     gas_high: {
       name: '💨 High Gas Level',
-      description: 'Alert when gas concentration is between 401–1000 ppm',
+      description: 'Alert when gas concentration is between 701–1000 ppm',
       priority: 'high',
       cooldownPeriod: 60000,
       conditions: [
-        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 401, unit: 'ppm' },
+        { type: 'sensor', sensor: 'gas_ppm', operator: '>=', value: 701, unit: 'ppm' },
         { type: 'sensor', sensor: 'gas_ppm', operator: '<=', value: 1000, unit: 'ppm' }
       ],
       actions: [
@@ -260,43 +246,15 @@ export const DEFAULT_TEMPLATES = {
     },
 
     smoke_emergency: {
-      name: '🚨 Smoke Emergency',
-      description: 'Emergency alert when smoke > 4.5V',
+      name: '🚨 Smoke Detected',
+      description: 'Emergency alert when smoke is detected (value = 1)',
       priority: 'urgent',
       cooldownPeriod: 0,
       conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>', value: 4.5, unit: 'V' }
+        { type: 'sensor', sensor: 'smoke', operator: '==', value: 1, unit: '' }
       ],
       actions: [
-        { type: 'send_alert', message: '🚨 EMERGENCY ALERT: Dense smoke detected! High risk of fire or CO exposure!' }
-      ]
-    },
-
-    smoke_high: {
-      name: '🔥 High Smoke Level',
-      description: 'Alert when smoke 3.5–4.5V',
-      priority: 'high',
-      cooldownPeriod: 60000,
-      conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>=', value: 3.5, unit: 'V' },
-        { type: 'sensor', sensor: 'smoke', operator: '<=', value: 4.5, unit: 'V' }
-      ],
-      actions: [
-        { type: 'send_notification', message: '🔥 Warning: Heavy smoke detected! Possible fire, check immediately.' }
-      ]
-    },
-
-    smoke_medium: {
-      name: '💨 Medium Smoke Level',
-      description: 'Alert when smoke 2.5–3.5V (normal ~3V)',
-      priority: 'medium',
-      cooldownPeriod: 120000,
-      conditions: [
-        { type: 'sensor', sensor: 'smoke', operator: '>=', value: 2.5, unit: 'V' },
-        { type: 'sensor', sensor: 'smoke', operator: '<=', value: 3.5, unit: 'V' }
-      ],
-      actions: [
-        { type: 'send_notification', message: '💨 Notice: Light smoke detected. Could be dust or mild vapor.' }
+        { type: 'send_alert', message: '🚨 EMERGENCY ALERT: Smoke detected! High risk of fire or CO exposure!' }
       ]
     },
 

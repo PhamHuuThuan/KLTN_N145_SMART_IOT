@@ -12,16 +12,12 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
   const lastResultRef = useRef('');
 
   useEffect(() => {
-    log.info('Setting up Voice recognition callbacks');
-    
     const onSpeechStart = () => {
       setError(null);
       setListening(true);
     };
     
-    const onSpeechEnd = () => {
-      // Keep listening active for continuous recognition
-    };
+    const onSpeechEnd = () => {};
     
     const onSpeechError = (e) => {
       const msg = e?.error?.message || 'Speech error';
@@ -49,10 +45,7 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
     Voice.onSpeechResults = onSpeechResults;
     Voice.onSpeechPartialResults = onSpeechPartialResults;
 
-    log.info('Voice callbacks registered');
-
     return () => {
-      log.info('Cleaning up Voice callbacks');
       try {
         Voice.removeAllListeners();
         Voice.destroy();
@@ -122,14 +115,11 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
       
       try {
         await Voice.stop();
-      } catch (e) {
-        log.debug('No existing recognition to stop');
-      }
+      } catch (e) {}
       
       await new Promise(resolve => setTimeout(resolve, 200));
       
       try {
-        log.info('Calling Voice.start with locale:', locale);
         await Voice.start(locale, {
           EXTRA_PREFER_OFFLINE: false,
           EXTRA_PARTIAL_RESULTS: true,
@@ -152,11 +142,9 @@ export function useSpeechToText({ locale = 'vi-VN', onResult } = {}) {
   }, [locale]);
 
   const stop = useCallback(async () => {
-    try {
-      await Voice.stop();
-    } catch (e) {
-      log.debug('Stop error:', e);
-    }
+      try {
+        await Voice.stop();
+      } catch (e) {}
     setListening(false);
   }, []);
 

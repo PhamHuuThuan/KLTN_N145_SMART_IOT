@@ -97,14 +97,17 @@ const ForgotPasswordScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>{t('common.email')}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: CONFIG.COLORS.dark }]}
                 placeholder="Nhập email"
+                placeholderTextColor={CONFIG.COLORS.gray}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={true}
+                selectionColor={CONFIG.THEME.primary}
+                caretHidden={false}
               />
             </View>
 

@@ -190,7 +190,7 @@ export const RULE_TEMPLATES = {
           type: 'sensor',
           sensor: 'gas_ppm',
           operator: '>=',
-          value: 401,
+          value: 701,
           unit: 'ppm'
         },
         {
@@ -220,75 +220,15 @@ export const RULE_TEMPLATES = {
         {
           type: 'sensor',
           sensor: 'smoke',
-          operator: '>',
-          value: 4.5,
-          unit: 'V'
+          operator: '==',
+          value: 1,
+          unit: ''
         }
       ],
       actions: [
         {
           type: 'send_alert',
           message: 'rules.templates.smokeEmergency.message'
-        }
-      ]
-    },
-    
-    // 🟠 HIGH - Cao
-    smoke_high: {
-      name: 'rules.templates.smokeHigh.name',
-      description: 'rules.templates.smokeHigh.description',
-      priority: 'high',
-      cooldownPeriod: 60000, // 1 phút
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '>=',
-          value: 3.5,
-          unit: 'V'
-        },
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '<=',
-          value: 4.5,
-          unit: 'V'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_notification',
-          message: 'rules.templates.smokeHigh.message'
-        }
-      ]
-    },
-    
-    // 🟢 MEDIUM - Trung bình
-    smoke_medium: {
-      name: 'rules.templates.smokeMedium.name',
-      description: 'rules.templates.smokeMedium.description',
-      priority: 'medium',
-      cooldownPeriod: 120000, // 2 phút
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '>=',
-          value: 2.5,
-          unit: 'V'
-        },
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '<=',
-          value: 3.5,
-          unit: 'V'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_notification',
-          message: 'rules.templates.smokeMedium.message'
         }
       ]
     },
@@ -498,7 +438,7 @@ export const RULE_TEMPLATES = {
           type: 'sensor',
           sensor: 'gas_ppm',
           operator: '>=',
-          value: 401,
+          value: 701,
           unit: 'ppm'
         },
         {
@@ -527,73 +467,15 @@ export const RULE_TEMPLATES = {
         {
           type: 'sensor',
           sensor: 'smoke',
-          operator: '>',
-          value: 4.5,
-          unit: 'V'
+          operator: '==',
+          value: 1,
+          unit: ''
         }
       ],
       actions: [
         {
           type: 'send_alert',
           message: 'rules.templates.smokeEmergency.message'
-        }
-      ]
-    },
-    
-    smoke_high: {
-      name: 'rules.templates.smokeHigh.name',
-      description: 'rules.templates.smokeHigh.description',
-      priority: 'high',
-      cooldownPeriod: 60000, // 1 minute
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '>=',
-          value: 3.5,
-          unit: 'V'
-        },
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '<=',
-          value: 4.5,
-          unit: 'V'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_notification',
-          message: 'rules.templates.smokeHigh.message'
-        }
-      ]
-    },
-    
-    smoke_medium: {
-      name: 'rules.templates.smokeMedium.name',
-      description: 'rules.templates.smokeMedium.description',
-      priority: 'medium',
-      cooldownPeriod: 120000, // 2 minutes
-      conditions: [
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '>=',
-          value: 2.5,
-          unit: 'V'
-        },
-        {
-          type: 'sensor',
-          sensor: 'smoke',
-          operator: '<=',
-          value: 3.5,
-          unit: 'V'
-        }
-      ],
-      actions: [
-        {
-          type: 'send_notification',
-          message: 'rules.templates.smokeMedium.message'
         }
       ]
     },

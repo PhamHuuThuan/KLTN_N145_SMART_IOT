@@ -8,10 +8,7 @@ export const useOutletControl = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Control outlet
   const controlOutlet = useCallback(async (action, deviceId, outletId = 'o1') => {
-    logger.info(`useOutletControl: ${action}, device: ${deviceId}, outlet: ${outletId}`);
-    
     if (!deviceId) {
       setError('No device selected');
       return false;
@@ -36,7 +33,6 @@ export const useOutletControl = () => {
           throw new Error('Invalid action');
       }
 
-      logger.info(`Outlet control response:`, response);
       return response.success;
     } catch (err) {
       logger.error('Error controlling outlet:', err);
